@@ -1,0 +1,5 @@
+# Install FIRST, before nnunetv2. See adr/005.
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126
+# Fallbacks, in order: cu130, cu129
+# Driver 580.173.02 / RTX 3090 sm_86 supports all of them.
+# Constraint from nnunetv2: torch>=2.1.2, !=2.9.*

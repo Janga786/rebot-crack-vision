@@ -1,0 +1,3 @@
+# Optional hardware extra — install separately, never with the core stack (RISKS.md R-12)
+#   ./env.sh pip install -r requirements/requirements-realsense.txt
+pyrealsense2>=2.55,<3

@@ -1,0 +1,8 @@
+name: crackvision
+channels: [conda-forge]
+dependencies:
+  - python=3.11
+  - pip
+  - pip:
+    # torch must be installed separately first — see requirements-torch.txt
+    - -r requirements-core.txt
