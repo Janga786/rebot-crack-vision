@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "repo_id": "fadeevla/opencrack-nnunet",
+  "downloaded_utc": "2026-09-17T04:49:49Z",
+  "revision": "1198179e893f5f6eb0dd3eae2d8de5f1adf85afc",
+  "files": [
+    {
+      "path": "Dataset501_OpenCrack/nnUNetTrainer__nnUNetPlans__2d/dataset.json",
+      "bytes": 400,
+      "sha256": "2b8c47ce6a12fe5d3469437df4efe58b970dbf2a0b45d1c83393c3f5ca61dc08"
+    },
+    {
+      "path": "Dataset501_OpenCrack/nnUNetTrainer__nnUNetPlans__2d/dataset_fingerprint.json",
+      "bytes": 6738791,
+      "sha256": "0990276837260c7c600eca25189503dd0be33ce6cb944c1614a72f7cac3e6b7f"
+    },
+    {
+      "path": "Dataset501_OpenCrack/nnUNetTrainer__nnUNetPlans__2d/fold_0/checkpoint_ep0500.pth",
+      "bytes": 268091674,
+      "sha256": "dcba82012874682c84387c68a2b69f64eddef07e84ae7d813844cdf6396a1a5f"
+    },
+    {
+      "path": "Dataset501_OpenCrack/nnUNetTrainer__nnUNetPlans__2d/plans.json",
+      "bytes": 6361,
+      "sha256": "08f03a8e0f2312d9756e6637a2b8e115a5e27c898e93fe218784d0a69dc01eeb"
+    },
+    {
+      "path": "README.md",
+      "bytes": 6067,
+      "sha256": "26b9df32e6c1e162a409f00ff8bd06480d340e0c40c4e078222c21b4c4ccfda6"
+    },
+    {
+      "path": "reproducibility/splits_final.json",
+      "bytes": 3035124,
+      "sha256": "990ed5aca9e9dce4ba2edab68438a13a5f6d16ca17f5bcf01e68a3f2e14c419d"
+    }
+  ]
+}
