@@ -1,0 +1,39 @@
+# Model weights and nnU-Net roots — 268 MB checkpoint, and git-lfs is NOT installed here
+models/*
+!models/.gitkeep
+nnunet/raw/*
+nnunet/preprocessed/*
+nnunet/results/*
+!nnunet/raw/.gitkeep
+!nnunet/preprocessed/.gitkeep
+!nnunet/results/.gitkeep
+
+# Data — imagery is never committed
+data/**
+!data/**/
+!data/**/.gitkeep
+
+# Logs
+logs/*
+!logs/.gitkeep
+
+# Generated model manifest holds hashes only, but is regenerated — keep it tracked:
+!config/model_manifest.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store

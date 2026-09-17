@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "crackvision"
+version = "0.1.0"
+description = "OpenCrack nnU-Net v2 crack segmentation front-end for reBot B601-DM inspection"
+requires-python = ">=3.11"
+dependencies = []          # managed via requirements/ — see TC-002
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+  "gpu: requires a CUDA GPU",
+  "camera: requires an attached RealSense device",
+  "model: requires the downloaded OpenCrack checkpoint",
+]

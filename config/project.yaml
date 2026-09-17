@@ -1,0 +1,39 @@
+schema_version: 1
+paths:
+  input_originals: data/input_originals
+  nnunet_input:    data/nnunet_input
+  predictions:     data/predictions
+  overlays:        data/overlays
+  comparisons:     data/comparisons
+  skeletons:       data/skeletons
+  smoke_test:      data/smoke_test
+  d405:            data/d405
+  models:          models/opencrack-nnunet
+  logs:            logs
+model:
+  repo_id:        fadeevla/opencrack-nnunet
+  dataset_name:   Dataset501_OpenCrack
+  trainer_config: nnUNetTrainer__nnUNetPlans__2d
+  fold:           0
+  checkpoint:     checkpoint_ep0500.pth
+  configuration:  2d
+  dataset_id:     501
+inference:
+  device:         cuda
+  step_size:      0.5
+  disable_tta:    false
+  not_on_device:  false
+  npp:            3
+  nps:            3
+visualization:
+  overlay_alpha:   0.5
+  crack_color:     [255, 0, 0]
+  skeleton_color:  [0, 255, 0]
+  panel_gutter_px: 8
+skeleton:
+  min_component_size: 64
+realsense:
+  color: {width: 848, height: 480, fps: 30, format: bgr8}
+  depth: {width: 848, height: 480, fps: 30, format: z16}
+  align_to: color
+  warmup_frames: 30
