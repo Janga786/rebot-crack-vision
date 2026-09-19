@@ -1218,3 +1218,191 @@ ISSUES:
   - None otherwise.
 NEXT CARD: TC-008
 ```
+
+---
+
+## TC-008 — Batch inference runner
+
+```
+TASK: TC-008
+STATUS: COMPLETE
+CHANGES:
+  - src/crackvision/inference.py — new. Implements docs/INTERFACES.md §3.2: `build_predict_command()`
+    builds the nnU-Net CLI invocation as a list (`shell=False`), either
+    `nnUNetv2_predict_from_modelfolder -m <folder>` (default) or, via `--use-dataset-id`,
+    `nnUNetv2_predict -d 501 -c 2d` (adr/006 fallback, relies on TC-005's `nnunet/results` symlink);
+    `-f`/`-chk` are always taken from `config/project.yaml` (`model.fold`/`model.checkpoint`) and are
+    always present in the command, never conditionally omitted. `run_inference(cfg, *, device,
+    disable_tta, not_on_device, step_size, npp, nps, skip_existing, dry_run, logger, input_dir,
+    output_dir, use_dataset_id) -> dict` is the importable core: checks all five documented
+    preconditions in the card's own order (model folder missing → required files missing → input dir
+    empty → `--device cuda` unavailable → executable not on PATH) before launching anything, each
+    with its exact actionable message and `EXIT_PRECONDITION`; `--dry-run` builds and logs the command
+    (containing `-f 0`/`-chk checkpoint_ep0500.pth`) and returns without executing or checking
+    preconditions, matching the literal `--dry-run` contract TC-003/TC-005/TC-006 already established;
+    streams the subprocess's stdout+stderr into the logger line by line; detects CUDA OOM via
+    `(?i)(out of memory|outofmemoryerror|cuda error: out of memory)` against the combined output and
+    logs the exact five-step degradation ladder from the card body (never retries, never kills a GPU
+    process); afterwards verifies exactly one `{case}.png` per `{case}_0000.png` input, returning
+    `status:"partial"`/`exit_code:1` and naming every missing case if any are absent; logs the
+    `{0,1}`-not-`{0,255}` advisory once per real run. `main()`/`build_parser()` is the CLI: every flag
+    the card lists (`--input-dir --output-dir --device --disable-tta --not-on-device --step-size --npp
+    --nps --use-dataset-id`) plus all six §0.3 common flags; numeric/boolean inference flags default to
+    `None` in argparse and fall back to `config/project.yaml`'s `inference.*` values only when the flag
+    is absent, so an explicit CLI flag always wins (INTERFACES.md §4). Writes
+    `logs/inference_latest.json` via `RunSummary` for the base envelope, then merges in
+    `seconds_per_image`/`command`/`device` (fields `RunSummary`'s fixed schema has no slot for) into
+    both the `_latest.json` and its timestamped twin — the same documented adaptation TC-003
+    (`checks`/`versions`) and TC-005 used for their own extra fields, since `logging_setup.py` is not
+    this card's file to modify. **Also carries the `nnUNet_extTrainer` shim** for the checkpoint's
+    undocumented custom trainer name (`nnUNetTrainerSaveEvery10`, discovered by TC-006 — nnunetv2
+    2.8.1 does not ship this class): `prepare_ext_trainer_shim(cfg)` writes the same inference-only
+    `class nnUNetTrainerSaveEvery10(nnUNetTrainer): pass` shim TC-006 used, but into `logs/ext_trainer/`
+    (gitignored, `logs/*` per `.gitignore`) rather than a smoke-test-only directory, so both the real
+    CLI and `scripts/smoke_test.py` share one implementation instead of duplicating it. No
+    post-processing of prediction files anywhere in the module (grep-verified: no `astype`/threshold/
+    rescale/morphology call on prediction data). No hard-coded `/home/` path (grep-verified).
+  - scripts/smoke_test.py — modified, **only** the one substitution the card authorises: removed the
+    local `build_predict_command()`, the local `run_inference()` subprocess wrapper, `_OOM_MARKERS`/
+    `_looks_like_oom()`, `print_oom_ladder()`, and the `_EXT_TRAINER_*`/`prepare_ext_trainer_shim()`
+    block (all now superseded by `crackvision.inference`, which the previous items directly duplicated
+    the logic of), and replaced the inline command-build-and-run block in `main()` with a single call
+    to `crackvision.inference.run_inference(cfg, device=args.device, input_dir=nnunet_input_dir,
+    output_dir=predictions_dir, logger=logger)`, branching on `inference_result["status"] != "ok"`
+    instead of the old `returncode != 0`/`_looks_like_oom(output)` pair. `check_model_folder()` (the
+    rev-1-review-mandated precondition guard), every assertion in `evaluate_case()`, the fixture
+    generation, and the whole rendering/banner/timing logic are **byte-unchanged**. Removed the now-
+    unused `os`/`subprocess` imports; added `from crackvision.inference import run_inference`.
+  - docs/COMPLETION_LOG.md — this entry.
+  - task_cards/TASK_INDEX.md — TC-008 row set to `COMPLETE`; progress narrative updated to 8/16.
+TESTS:
+  - `./env.sh python -m py_compile src/crackvision/inference.py scripts/smoke_test.py` -> compiles
+    cleanly, both files.
+  - `grep -n "/home/" src/crackvision/inference.py` -> no match (exit 1).
+    `grep -n "shell=True\|weights_only\|sudo\|os.system\|pkill\|rm -rf" src/crackvision/inference.py
+    scripts/smoke_test.py` -> no match.
+  - `./env.sh python -m crackvision.inference --help` -> prints the full signature: `--root --config
+    -v -q --dry-run --skip-existing --input-dir --output-dir --device {cuda,cpu} --disable-tta
+    --not-on-device --step-size --npp --nps --use-dataset-id`, exit 0.
+  - `./env.sh python -m crackvision.inference --dry-run -v 2>&1 | grep -E "\-f 0|checkpoint_ep0500"` ->
+    matched: `nnU-Net command: nnUNetv2_predict_from_modelfolder -i .../data/nnunet_input -o
+    .../data/predictions -m .../nnUNetTrainer__nnUNetPlans__2d -f 0 -chk checkpoint_ep0500.pth -device
+    cuda -npp 3 -nps 3 -step_size 0.5`; plain `--dry-run -v` -> `exit=0`.
+  - **All five preconditions exercised for real, each producing exit 3 with its exact message:**
+    1. Empty input: `mv data/nnunet_input /tmp/ni.bak && mkdir data/nnunet_input &&
+       ./env.sh python -m crackvision.inference` -> `ERROR ... no *_0000.png files in
+       .../data/nnunet_input` / `ERROR ... run: ./env.sh python -m crackvision.prepare_inputs`,
+       `empty exit=3`; restored `data/nnunet_input` from the backup immediately after.
+    2. Model folder missing: on a scratch `--root` containing only `config/project.yaml` and a
+       populated `data/nnunet_input/foo_0000.png` -> `ERROR ... model folder missing: .../
+       nnUNetTrainer__nnUNetPlans__2d` / `ERROR ... run: ./env.sh python scripts/fetch_model.py`,
+       `missing-model exit=3`. **Never touched the real `models/**`** — confirmed via
+       `find models -newer config/model_manifest.json` -> empty, run immediately after.
+    3. Required files present-but-incomplete: same scratch root, model folder created with only
+       `dataset.json` (empty) -> `ERROR ... required model file missing: .../plans.json` and
+       `.../fold_0/checkpoint_ep0500.pth` / `ERROR ... run: ./env.sh python scripts/verify_model.py`,
+       `missing-files exit=3`.
+    4. `--device cuda` unavailable: called `run_inference(cfg, device="cuda")` directly against the
+       same scratch root (now with all three placeholder model files present) -> `--device cuda
+       requested but torch.cuda.is_available() is False` / `use --device cpu, or check ./env.sh python
+       scripts/check_env.py`, `{'status': 'precondition', 'exit_code': 3, ...}`.
+    5. Executable not on PATH: called `run_inference(cfg, device="cpu")` with `shutil.which` monkey-
+       patched to always return `None` -> `nnUNetv2_predict_from_modelfolder not found on PATH` /
+       `run TC-002 / check ./env.sh`, `{'status': 'precondition', 'exit_code': 3, ...}`. Scratch root
+       (`/tmp/tc008_scratch_root`) deleted afterward — outside the project, never committed.
+  - **Real run** (real OpenCrack model, two of TC-006's synthetic fixtures copied into
+    `data/input_originals/` and converted via `./env.sh python -m crackvision.prepare_inputs`, exactly
+    as TC-007's own review precedent): `./env.sh python -m crackvision.inference ; echo "exit=$?"` ->
+    real `nnUNetv2_predict_from_modelfolder` subprocess ran (cited nnU-Net, resolved
+    `nnUNetTrainerSaveEvery10` via `nnUNet_extTrainer=.../logs/ext_trainer`, predicted both cases),
+    `inference complete: 2 image(s) in 11.84s (5.919s/image)`, `exit=0`.
+    `ls data/predictions/` -> `synthetic_blank.png synthetic_crack.png` (plus nnU-Net's own copied
+    `dataset.json`/`plans.json`/`predict_from_raw_data_args.json`).
+    `./env.sh python -c "from PIL import Image; import numpy as np, glob; ..."` ->
+    `data/predictions/synthetic_blank.png uint8 (512, 512) [0]`,
+    `data/predictions/synthetic_crack.png uint8 (512, 512) [0 1]` — **pins the `{0,1}` convention and
+    the frame invariant** (input was 512×512).
+    `python3 -m json.tool logs/inference_latest.json` -> valid JSON: `"status": "ok", "exit_code": 0,
+    "counts": {"images": 2}, "duration_s": 13.21, "seconds_per_image":
+    5.9187614899128675, "command": [...with "-f","0","-chk","checkpoint_ep0500.pth"...], "device":
+    "cuda"` — all three required fields (`duration_s`, `images`, `seconds_per_image`) present.
+  - `--device cpu`: `./env.sh python -m crackvision.inference --device cpu ; echo "cpu exit=$?"` ->
+    real CPU subprocess (`perform_everything_on_device: False`, nnU-Net's own expected message),
+    `inference complete: 2 image(s) in 17.93s (8.963s/image)`, `cpu exit=0`.
+  - `--use-dataset-id`: cleared `data/predictions/*`, then
+    `./env.sh python -m crackvision.inference --use-dataset-id` -> real subprocess via
+    `nnUNetv2_predict -d 501 -c 2d -f 0 -chk checkpoint_ep0500.pth` through the `nnunet/results`
+    symlink, `inference complete: 2 image(s) in 11.83s (5.915s/image)`, exit=0,
+    `ls data/predictions/` shows both case PNGs again — **proves TC-005's symlink wiring is correct**.
+  - OOM ladder: `grep -n "CUDA out of memory. Try, in order" src/crackvision/inference.py` -> match;
+    `grep -n "not-on-device\|npp 1 --nps 1\|disable-tta\|max-side 1024\|device cpu"
+    src/crackvision/inference.py` -> all five ladder steps present, reachable from the
+    `_looks_like_oom(combined)` branch (inspected, not forced — a real OOM was not induced).
+  - `run_inference()` importable: `from crackvision.inference import run_inference; ...
+    run_inference(cfg, dry_run=True)` -> returns
+    `{'command': [...], 'device': 'cuda', 'errors': [], 'exit_code': 0, 'status': 'dry_run'}`, a plain
+    dict, no exception.
+  - `./env.sh python scripts/smoke_test.py --clean --device cuda ; echo "exit=$?"` (real run against
+    the refactored `smoke_test.py`) -> `SMOKE TEST PASSED (7 assertions x 2 images, 12.3 s)`,
+    `crack pixels: synthetic_crack 1.75%  synthetic_blank 0.00%`, `exit=0` — **identical to the
+    pre-refactor TC-006 rev-1 numbers** (same seed, same model, same assertions). Nested log lines
+    confirm `run_inference()`'s own advisory (`predictions are uint8 PNGs...`) and `nnUNet_extTrainer`
+    lines now appear under the `smoke_test` logger name, proving the shared call path.
+    Re-ran without `--clean` -> same `7 assertions x 2 images` banner, `exit=0` — **"still passes,
+    with its assertions unchanged"**, the card's own acceptance wording.
+  - `./env.sh python scripts/verify_model.py --check-hashes` (re-run after every real inference pass
+    above, including both `-m` and `-d 501` forms and both devices) -> `14 PASS · 1 WARN · 0 FAIL`,
+    exit=0, `check_hashes PASS 6 files match` — model tree intact throughout.
+    `find models -newer config/model_manifest.json` -> empty, checked repeatedly.
+  - `./env.sh pytest tests/ -v` -> **37 passed in 0.32s** — identical to TC-007's own count; this card
+    adds no test file per its own scope (no test file is listed under "Files to create").
+  - `nvidia-smi --query-gpu=memory.used --format=csv,noheader` -> `178 MiB` before and after every
+    real inference pass in this session — no leaked GPU process.
+  - Cleanup after testing: removed the copied `synthetic_{crack,blank}.png` from
+    `data/input_originals/`, the generated `*_0000.png` from `data/nnunet_input/`, everything under
+    `data/predictions/`, and `data/case_map.json`, restoring all three to their pre-session
+    `.gitkeep`-only state (this repo's `data/` tree is entirely gitignored runtime scratch, not a
+    tracked fixture — same housekeeping precedent TC-007 documented). The scratch precondition-testing
+    root (`/tmp/tc008_scratch_root`) was outside the project and was deleted after use.
+  - `git status --porcelain` -> exactly `src/crackvision/inference.py` (new) and
+    `scripts/smoke_test.py` (modified) beyond the pre-existing dirty state from session start
+    (`config/model_manifest.json` — TC-005's repair, unrelated; `task_cards/TASK_INDEX.md` — the
+    harness's own TC-008→IN PROGRESS/TC-010→READY sync, confirmed via `git diff` before I touched it;
+    the untracked planning docs). `git status --porcelain --ignored` shows only gitignored
+    `data/smoke_test/**`, `logs/**` (including the new `logs/ext_trainer/`) as touched — no other
+    pipeline directory left dirty.
+ISSUES:
+  - **The `nnUNet_extTrainer` shim moved from `data/smoke_test/ext_trainer/` (TC-006-only) to
+    `logs/ext_trainer/` (shared).** The checkpoint's custom `trainer_name` requirement is not tied to
+    the smoke test — it applies to every real invocation of this checkpoint, so the shim now lives
+    inside `crackvision.inference` itself and is written to `logs/ext_trainer/` (already a fully
+    gitignored runtime directory, `logs/*` per `.gitignore`) so both the CLI and
+    `scripts/smoke_test.py` share the identical file instead of two copies drifting apart. This is not
+    documented in `ARCHITECTURE.md`/`INTERFACES.md` (TC-006's review already flagged that the original
+    shim wasn't documented there either, and recommended TC-016 add it to the README) — flagging again
+    here for TC-016. One consequence: `scripts/smoke_test.py`'s own `ext_trainer_dir = smoke_root /
+    "ext_trainer"` local variable and its entry in `clean_dirs` are now vestigial (nothing writes there
+    any more) — left as-is since removing it is outside this card's authorised "swap the subprocess
+    call only" edit to that file, and `--clean` still harmlessly removes the directory if a stale one
+    exists from a pre-TC-008 run; it is simply never repopulated now. This is not a test failure —
+    the finding 5 behaviour (`--clean` covers `ext_trainer/`) from TC-006 rev-1 review still holds
+    literally, on a directory that no longer needs cleaning in practice.
+  - Per the card's own "Out of scope" list, no ensembling/multi-fold/`--save_probabilities` usage was
+    added — `--save_probabilities` is not even exposed as a flag, since the card says it "may be
+    exposed... but is not used" and no acceptance criterion asks for it; omitted rather than added
+    unused surface area.
+  - `skimage.morphology.remove_small_objects(binary, min_size=64)`'s `FutureWarning` (min_size ->
+    max_size, scikit-image 0.26.0) still appears when `scripts/smoke_test.py` renders its own minimal
+    visuals — unchanged from TC-006, out of this card's scope (`src/crackvision/inference.py` contains
+    no morphology at all; this is purely `smoke_test.py`'s own rendering code, untouched by my
+    substitution). Still flagged for TC-010.
+  - `config/model_manifest.json` continues to show as modified in `git status` (`downloaded_utc` only,
+    pre-existing from TC-005's repair, confirmed via `git diff` before this session touched anything) —
+    not touched by this card.
+  - `task_cards/TASK_INDEX.md` had already been flipped to TC-008 `IN PROGRESS`/TC-010 `READY` by the
+    harness before this session began (confirmed via `git diff` at session start, matching the
+    orchestrator's documented re-sync behaviour) — this card's own edit only changes TC-008 to
+    `COMPLETE` and updates the progress narrative; TC-010's row was left exactly as the harness set it.
+  - None otherwise.
+NEXT CARD: TC-009
+```

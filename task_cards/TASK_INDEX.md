@@ -18,9 +18,9 @@ prerequisites are now all satisfied from `BLOCKED` to `READY`.
 | TC-005 | nnU-Net wiring + semantic validation | TC-004 | SMALL | COMPLETE | Sonnet |
 | TC-006 | Synthetic end-to-end smoke test (Level 2) | TC-003, TC-005 | MEDIUM | COMPLETE | Sonnet |
 | TC-007 | Input preparation + naming contract | TC-002 | MEDIUM | COMPLETE | Sonnet |
-| TC-008 | Batch inference runner | TC-005, TC-006, TC-007 | MEDIUM | **READY** | Sonnet |
+| TC-008 | Batch inference runner | TC-005, TC-006, TC-007 | MEDIUM | COMPLETE | Sonnet |
 | TC-009 | Visualization pipeline | TC-007 | MEDIUM | **READY** | Sonnet |
-| TC-010 | Skeletonization utility | TC-002 (TC-007 for real data) | SMALL–MED | BLOCKED | Sonnet |
+| TC-010 | Skeletonization utility | TC-002 (TC-007 for real data) | SMALL–MED | **READY** | Sonnet |
 | TC-011 | One-command runner `run_test.sh` | TC-003, TC-007, TC-008, TC-009, TC-010 | MEDIUM | BLOCKED | Sonnet |
 | TC-012 | RealSense software validation | TC-002 | SMALL | **READY** | Sonnet |
 | TC-013 | D405 capture utility | TC-012 | **COMPLEX** | BLOCKED | Sonnet |
@@ -149,7 +149,7 @@ One card creates each file. Nothing else may create or rewrite it.
 ## Progress
 
 ```
-TC-001, TC-002, TC-003, TC-004, TC-005, TC-006, TC-007 ████████░░░░░░░░  7 / 16 complete
+TC-001, TC-002, TC-003, TC-004, TC-005, TC-006, TC-007, TC-008 █████████░░░░░░░  8 / 16 complete
 ```
 
 TC-002 delivered the `crackvision` conda env (Python 3.11), CUDA torch 2.14.0+cu126, nnunetv2 2.8.1,
@@ -174,5 +174,16 @@ the `INTERFACES.md` §1.1 case-id table, every required Pillow-mode fixture (RGB
 palette, CMYK, 16-bit, EXIF-rotated), and the corrupt-file/empty-dir/idempotency/dry-run/clean/
 skip-existing acceptance criteria; see `docs/COMPLETION_LOG.md` for two internally-contradictory
 rows found in the §1.1 table (implemented per the algorithm, not per the contradicting literal
-answer text — flagged there for whoever next touches `docs/INTERFACES.md`). TC-008 and TC-009 are
-now unblocked.
+answer text — flagged there for whoever next touches `docs/INTERFACES.md`). TC-008 built
+`src/crackvision/inference.py` and is now COMPLETE: `run_inference()` builds the
+`nnUNetv2_predict_from_modelfolder` command (with the mandatory `-f 0`/`-chk checkpoint_ep0500.pth`
+overrides), checks all five documented preconditions before launching anything, verifies one
+prediction per input afterwards, and detects CUDA OOM without retrying or killing anything. It also
+now owns the `nnUNet_extTrainer` shim for the checkpoint's undocumented custom trainer name
+(previously private to `scripts/smoke_test.py`, TC-006), writing it to `logs/ext_trainer/` so both
+the CLI and the smoke test share one implementation; `scripts/smoke_test.py` was refactored to call
+`run_inference()` instead of building its own subprocess command, per this card's one authorised
+edit to that file, and still passes with byte-identical assertions. Both `-m` (default) and
+`--use-dataset-id` (`-d 501 -c 2d`, proving TC-005's symlink) invocation forms were run for real on
+CUDA and CPU. TC-009 remains READY (unaffected by this card); TC-010 flipped to READY when TC-007
+completed (harness-synced, not this card's doing).

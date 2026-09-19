@@ -14,9 +14,7 @@ other pipeline directory (docs/INTERFACES.md §3.8, task_cards/TC-006-gpu-smoke-
 from __future__ import annotations
 
 import argparse
-import os
 import shutil
-import subprocess
 import sys
 import time
 from pathlib import Path
@@ -27,6 +25,7 @@ from PIL import Image, ImageDraw, ImageFilter
 from skimage.morphology import remove_small_objects, skeletonize
 
 from crackvision.config import Config, ConfigError, add_common_args, load_config
+from crackvision.inference import run_inference
 from crackvision.logging_setup import EXIT_OK, EXIT_PRECONDITION, EXIT_RUNTIME, EXIT_USAGE, RunSummary, setup_logging
 
 SEED = 1234
@@ -108,29 +107,6 @@ def convert_to_nnunet_input(fixtures: dict[str, Path], nnunet_input_dir: Path, l
     return converted
 
 
-def build_predict_command(cfg: Config, input_dir: Path, output_dir: Path, device: str) -> list[str]:
-    model_dir = cfg.paths["models"] / cfg.model["dataset_name"] / cfg.model["trainer_config"]
-    return [
-        "nnUNetv2_predict_from_modelfolder",
-        "-i",
-        str(input_dir),
-        "-o",
-        str(output_dir),
-        "-m",
-        str(model_dir),
-        "-f",
-        str(cfg.model["fold"]),
-        "-chk",
-        cfg.model["checkpoint"],
-        "-device",
-        device,
-        "-npp",
-        str(cfg.inference["npp"]),
-        "-nps",
-        str(cfg.inference["nps"]),
-    ]
-
-
 def check_model_folder(cfg: Config) -> list[str]:
     """Return the required model paths that are missing; empty if the model folder is intact.
 
@@ -145,75 +121,6 @@ def check_model_folder(cfg: Config) -> list[str]:
         model_dir / f"fold_{cfg.model['fold']}" / cfg.model["checkpoint"],
     ]
     return [str(p) for p in required if not p.is_file()]
-
-
-_OOM_MARKERS = ("out of memory", "cuda out of memory", "outofmemoryerror")
-
-
-def _looks_like_oom(text: str) -> bool:
-    lowered = text.lower()
-    return any(marker in lowered for marker in _OOM_MARKERS)
-
-
-# The released checkpoint's internal metadata (torch.load(..., weights_only=False)["trainer_name"])
-# names a custom trainer, "nnUNetTrainerSaveEvery10", used by the OpenCrack authors to control
-# checkpoint-saving cadence during their own training run. Only the checkpoint and planner configs
-# were published (docs/COMPLETION_LOG.md TC-006) — the trainer subclass's source was not. nnU-Net's
-# own inference code (nnunetv2/inference/predict_from_raw_data.py) resolves this name via
-# recursive_find_trainer_class_by_name() and, failing that, via the documented `nnUNet_extTrainer`
-# environment variable — this is upstream's own supported extension point for exactly this case, not
-# an invented workaround. The model card (models/opencrack-nnunet/README.md) confirms the network
-# architecture is fully specified by plans.json ("self-configuring... the configuration is the one
-# the nnU-Net planner derives") with no mention of a custom architecture, and that training used "no
-# early stopping" — consistent with a trainer subclass that only changes checkpoint-saving interval,
-# not network construction (which nnUNetTrainer.build_network_architecture already provides and this
-# shim does not override). This is inference-only: no training loop is invoked (adr/010).
-_EXT_TRAINER_CLASS_NAME = "nnUNetTrainerSaveEvery10"
-_EXT_TRAINER_SOURCE = f'''"""Inference-only shim for docs/COMPLETION_LOG.md TC-006 — see scripts/smoke_test.py.
-
-Recreates the class NAME the OpenCrack checkpoint's "trainer_name" metadata field requires, so
-nnU-Net's recursive_find_trainer_class_by_name() can resolve it via the nnUNet_extTrainer
-environment variable. It inherits nnUNetTrainer unmodified: this file exists to satisfy an
-isinstance/name lookup for INFERENCE, never to train (adr/010 — nnUNetv2_train is never invoked).
-"""
-
-from nnunetv2.training.nnUNetTrainer.nnUNetTrainer import nnUNetTrainer
-
-
-class {_EXT_TRAINER_CLASS_NAME}(nnUNetTrainer):
-    pass
-'''
-
-
-def prepare_ext_trainer_shim(smoke_root: Path, logger: Any) -> Path:
-    """Write the nnUNet_extTrainer shim described above into data/smoke_test/ (never into models/)."""
-    ext_dir = smoke_root / "ext_trainer"
-    ext_dir.mkdir(parents=True, exist_ok=True)
-    shim_path = ext_dir / f"{_EXT_TRAINER_CLASS_NAME}.py"
-    shim_path.write_text(_EXT_TRAINER_SOURCE, encoding="utf-8")
-    logger.info(
-        "wrote nnUNet_extTrainer shim for checkpoint-embedded trainer_name=%r to %s "
-        "(inherits nnUNetTrainer unmodified; inference-only, see module docstring)",
-        _EXT_TRAINER_CLASS_NAME,
-        shim_path,
-    )
-    return ext_dir
-
-
-def run_inference(command: list[str], logger: Any, ext_trainer_dir: Path | None = None) -> tuple[int, str]:
-    """Run the nnU-Net CLI as a list-form subprocess (never shell=True), streaming output into the log."""
-    env = os.environ.copy()
-    if ext_trainer_dir is not None:
-        env["nnUNet_extTrainer"] = str(ext_trainer_dir)
-    logger.info("nnU-Net command: %s", " ".join(command))
-    if ext_trainer_dir is not None:
-        logger.info("nnUNet_extTrainer=%s", ext_trainer_dir)
-    proc = subprocess.run(command, capture_output=True, text=True, env=env)
-    combined = proc.stdout + "\n" + proc.stderr
-    for line in combined.splitlines():
-        if line.strip():
-            logger.info("nnunet: %s", line)
-    return proc.returncode, combined
 
 
 def render_visuals(
@@ -266,16 +173,6 @@ def render_visuals(
         "skeleton_pixels": skeleton_pixels,
         "crack_pct": crack_pct,
     }
-
-
-def print_oom_ladder(logger: Any) -> None:
-    logger.error("CUDA out of memory. Degradation ladder (ARCHITECTURE.md §9), try in order:")
-    logger.error("  1. add --not_on_device to the nnU-Net command (moves tile aggregation to CPU RAM)")
-    logger.error("  2. lower -npp/-nps (reduces RAM contention, not VRAM, but helps under load)")
-    logger.error("  3. add --disable_tta (drops mirroring TTA, ~8x fewer forward passes)")
-    logger.error("  4. downscale inputs via an explicit --max-side flag (breaks the frame invariant; not used here)")
-    logger.error("  5. re-run with --device cpu (slow but always correct)")
-    logger.error("Never kill a GPU process to make room.")
 
 
 def evaluate_case(
@@ -425,20 +322,20 @@ def main(argv: list[str] | None = None) -> int:
     convert_to_nnunet_input(fixtures, nnunet_input_dir, logger)
     timings["convert_inputs"] = time.monotonic() - t0
 
-    ext_trainer_dir = prepare_ext_trainer_shim(smoke_root, logger)
-
-    command = build_predict_command(cfg, nnunet_input_dir, predictions_dir, args.device)
     t0 = time.monotonic()
-    returncode, output = run_inference(command, logger, ext_trainer_dir=ext_trainer_dir)
+    inference_result = run_inference(
+        cfg,
+        device=args.device,
+        input_dir=nnunet_input_dir,
+        output_dir=predictions_dir,
+        logger=logger,
+    )
     timings["nnunet_predict"] = time.monotonic() - t0
+    command = inference_result.get("command", [])
 
-    if returncode != 0:
-        if _looks_like_oom(output):
-            print_oom_ladder(logger)
-            summary.add_error("CUDA OOM during nnU-Net predict; see log for degradation ladder")
-        else:
-            logger.error("nnUNetv2_predict_from_modelfolder exited %d", returncode)
-            summary.add_error(f"nnU-Net subprocess exited {returncode}")
+    if inference_result["status"] != "ok":
+        for err in inference_result.get("errors", []):
+            summary.add_error(err)
         summary.write(cfg, "smoke_test", "failed", EXIT_RUNTIME)
         print("=" * 60)
         print("  SMOKE TEST FAILED   (nnU-Net subprocess did not exit 0)")
