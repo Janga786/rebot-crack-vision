@@ -881,3 +881,179 @@ ISSUES:
   - None otherwise.
 NEXT CARD: TC-007
 ```
+
+---
+
+## TC-006 (revision 1) — Synthetic end-to-end smoke test (Level 2 core)
+
+```
+TASK: TC-006
+STATUS: COMPLETE
+CHANGES:
+  - scripts/smoke_test.py — revised per the rev-1 Opus review (docs/REVIEW_LOG.md,
+    .task_orchestrator/reviews/TC-006-rev1-8d7946ef31e0/{report.md,issues.json}: 1 BLOCKER, 1 MAJOR,
+    4 MINOR). Fixed exactly these six findings, nothing else:
+    1. [BLOCKER] Added `check_model_folder(cfg)`, called in `main()` right after the CUDA
+       precondition check and before any fixture generation or subprocess launch. It checks
+       `plans.json`, `dataset.json`, and `fold_<fold>/<checkpoint>` under the model dir (same
+       derivation as `build_predict_command`); if any is missing it logs each missing path, logs
+       "run: ./env.sh python scripts/fetch_model.py (TC-004), then: ./env.sh python
+       scripts/verify_model.py (TC-005)", writes a `"precondition"` summary, and returns
+       EXIT_PRECONDITION (3) — for both `--device cuda` and `--device cpu`, before nnU-Net's own
+       FileNotFoundError can surface as an exit-1 traceback. The mandated `-f 0`/`-chk
+       checkpoint_ep0500.pth` command line is unchanged; nothing is downloaded.
+    2. [MAJOR] Moved the `--dry-run` guard above the `--clean` block (previously `--clean`'s
+       `shutil.rmtree` ran unconditionally before the dry-run check, so `--dry-run --clean` deleted
+       real output directories). `--dry-run --clean` now only logs
+       "dry-run: would remove <dirs>" and deletes nothing; plain `--clean` (no dry-run) still
+       actually removes the directories. Moved `import shutil` to the module-level import block.
+    3. [MINOR] `generate_fixtures` now draws one noisy base from a single seeded
+       `np.random.default_rng(1234)` call, reuses it untouched as `synthetic_blank`, and draws the
+       polyline onto a *copy* of it for `synthetic_crack` (a second, separately seeded generator
+       supplies the polyline jitter so its geometry stays reproducible independent of the base
+       generator's consumed stream). `_draw_blank` removed; `_draw_crack(base, rng)` now takes the
+       shared base explicitly. Seed 1234, image size, base grey level, noise sigma, polyline
+       endpoints/branch/width and the 0.6-radius Gaussian blur are all unchanged.
+    4. [MINOR] Split the per-case prediction check out of the main loop into a new
+       `evaluate_case(...)` function: it now reads the prediction and asserts dtype ==
+       uint8 / unique-values ⊆ {0,1} / shape == the actual original fixture's (height, width)
+       *before* calling `render_visuals()`; a failure short-circuits (returns `result=None`) and
+       skips rendering entirely, instead of letting a malformed prediction crash inside the overlay
+       blend. `render_visuals()` now takes the already-loaded `pred` ndarray as a parameter instead
+       of re-reading the file, and no longer computes dtype/unique/shape itself (the caller sets
+       those on the result dict). The shape check compares against the real fixture's own
+       `Image.open(original_path).height/.width`, not the `IMAGE_SIZE` literal.
+    5. [MINOR] `--clean`'s directory list now includes `ext_trainer/` alongside
+       `input/nnunet_input/predictions/overlays/skeletons`, so a stale shim `__pycache__` cannot
+       outlive a change to `_EXT_TRAINER_SOURCE`. `prepare_ext_trainer_shim()` already rewrites the
+       shim unconditionally on every run, so removing the directory first is safe.
+    6. [MINOR] The `n_assertions_per_image` banner value is no longer a hardcoded `6`; each call to
+       `evaluate_case` now returns the number of assertions it actually ran for that case
+       (`checks`, incremented once per assertion evaluated: dtype, unique-values, shape, then — if
+       those pass — mask/overlay/skeleton existence+size, then skeleton≤mask), collected into
+       `assertions_per_case`, and the banner prints `max(assertions_per_case.values())` — the true
+       count is 7, not 6 (dtype, unique, shape, 3×file-check, skeleton≤mask), which the hardcoded
+       literal had silently undercounted. `--skip-existing` remains an accepted no-op (see ISSUES),
+       matching TC-003/TC-004's disclosed precedent rather than inventing new semantics here.
+  - task_cards/TASK_INDEX.md — TC-006 row set back to COMPLETE (was flipped to IN PROGRESS by the
+    orchestrator for this revision). No other rows changed.
+  - docs/COMPLETION_LOG.md — this entry.
+TESTS:
+  - `./env.sh python -m py_compile scripts/smoke_test.py` -> compiles cleanly.
+  - **Finding 1 (BLOCKER) — model-missing precondition, exit 3, no traceback:**
+    `./env.sh python scripts/smoke_test.py --root <scratch-root-with-only-config/project.yaml>
+    --device cpu` ->
+    ```
+    ERROR   smoke_test: model file missing: <root>/models/opencrack-nnunet/Dataset501_OpenCrack/nnUNetTrainer__nnUNetPlans__2d/plans.json
+    ERROR   smoke_test: model file missing: <root>/models/opencrack-nnunet/Dataset501_OpenCrack/nnUNetTrainer__nnUNetPlans__2d/dataset.json
+    ERROR   smoke_test: model file missing: <root>/models/opencrack-nnunet/Dataset501_OpenCrack/nnUNetTrainer__nnUNetPlans__2d/fold_0/checkpoint_ep0500.pth
+    ERROR   smoke_test: run: ./env.sh python scripts/fetch_model.py (TC-004), then: ./env.sh python scripts/verify_model.py (TC-005)
+    ```
+    `exit=3`, no Python traceback anywhere in the output. `<root>/logs/smoke_test_latest.json` ->
+    `"status": "precondition", "exit_code": 3`, `errors` names all three missing paths. Re-verified
+    the model-present path is unaffected below (both `--device cuda` and `--device cpu` still PASS).
+  - **Finding 2 (MAJOR) — `--dry-run --clean` no longer destructive:** created
+    `data/smoke_test/input/SENTINEL` and `data/smoke_test/ext_trainer/SENTINEL_EXT`, then
+    `./env.sh python scripts/smoke_test.py --dry-run --clean` -> logged
+    `"dry-run: would remove <root>/data/smoke_test/{input,nnunet_input,predictions,overlays,skeletons,ext_trainer}"`,
+    `exit=0`; `ls -a data/smoke_test/ data/smoke_test/input data/smoke_test/ext_trainer` afterwards
+    showed every directory **and both sentinels** still present — nothing was deleted. Then
+    `./env.sh python scripts/smoke_test.py --clean --device cuda` (no `--dry-run`) -> real run,
+    `SMOKE TEST PASSED (7 assertions x 2 images, 12.4 s)`, `exit=0`; `ls -a` afterwards showed both
+    sentinels **gone** (real `--clean` still actually cleans, including the previously-missed
+    `ext_trainer/__pycache__` — finding 5).
+  - **Finding 3 (MINOR) — fixture reproducibility and matched-pair noise:**
+    Two independent in-process calls to `generate_fixtures()` into separate temp dirs, and two
+    on-disk `--clean`-free regenerations into `data/smoke_test/input/`, all produced byte-identical
+    files: `synthetic_crack.png` md5 `b64873df0e19524292613851b1e1d410` (both runs),
+    `synthetic_blank.png` md5 `447a8a2371f32ad108f91930feb7a26a` (both runs). Matched-pair check:
+    `diff = |crack - blank|` outside a 4px-dilated "diff>30" crack mask has `max=30, mean=8.73`;
+    applying the *same* 0.6-radius Gaussian blur directly to the shared unblurred base (no polyline
+    at all) gives `max=31, mean=8.73` against that base — i.e. the entire background difference
+    between the two fixtures is explained by the crack image's own blur smoothing the *same* shared
+    noise, not by a different noise draw. The two fixtures are a genuine matched pair.
+  - **Finding 4 (MINOR) — malformed prediction fails cleanly, no crash:** unit-level exercise of
+    `evaluate_case()` (docs/REVIEW_LOG.md accepts this form of proof) with a hand-written 256×256
+    uint8 all-zero PNG placed at `<tmp>/predictions/synthetic_crack.png` against the real 512×512
+    `synthetic_crack.png` fixture as the original ->
+    `failures=['synthetic_crack: prediction shape (256, 256) != original image shape (512, 512)']`,
+    `result is None` (rendering skipped, no exception raised), `checks=3`. No traceback.
+  - **Finding 5 (MINOR) — `--clean` now covers `ext_trainer/`:** demonstrated together with finding
+    2's test above (`ext_trainer/SENTINEL_EXT` and its old `__pycache__` were both removed by a real
+    `--clean`, and the directory + shim were correctly regenerated by the same run).
+  - **Finding 6 (MINOR) — assertion count is computed, not literal:** both the CUDA and CPU full
+    runs below print `(7 assertions x 2 images, ...)`, not the old hardcoded `6`; confirmed by
+    reading `main()`'s use of `max(assertions_per_case.values(), default=0)` fed by
+    `evaluate_case`'s real per-case `checks` counter (3 pre-render + 3 file checks + 1
+    skeleton≤mask = 7 on the success path). `--skip-existing`: `grep -n "skip_existing"
+    scripts/smoke_test.py` -> no match outside `add_common_args` itself — confirmed still an
+    accepted no-op (see ISSUES), not silently broken.
+  - **Full re-run of all ten original acceptance criteria on the revised file:**
+    `./env.sh python scripts/smoke_test.py --clean --device cuda` ->
+    ```
+    ============================================================
+      SMOKE TEST PASSED   (7 assertions x 2 images, 12.3 s)
+      predictions: /home/boosterk1/Projects/rebot_crack_vision/data/smoke_test/predictions/
+      crack pixels: synthetic_crack 1.75%   synthetic_blank 0.00%
+      NOTE: crack-pixel counts are informational only; this test
+            verifies execution, not accuracy.
+    ============================================================
+    ```
+    `exit=0`. Exact nnU-Net command line from the log: `nnUNetv2_predict_from_modelfolder -i
+    .../data/smoke_test/nnunet_input -o .../data/smoke_test/predictions -m
+    .../models/opencrack-nnunet/Dataset501_OpenCrack/nnUNetTrainer__nnUNetPlans__2d -f 0 -chk
+    checkpoint_ep0500.pth -device cuda -npp 3 -nps 3` — `-f 0` and `-chk checkpoint_ep0500.pth`
+    present exactly as mandated.
+  - `./env.sh python -c "from PIL import Image; import numpy as np; a=np.array(Image.open(
+    'data/smoke_test/predictions/synthetic_crack.png')); print(a.dtype, a.shape, np.unique(a))"` ->
+    `uint8 (512, 512) [0 1]`. Same check on `synthetic_blank.png` -> `uint8 (512, 512) [0]`.
+  - `./env.sh python scripts/smoke_test.py --device cpu` (no `--clean`, fixtures regenerated
+    in-place) -> `SMOKE TEST PASSED (7 assertions x 2 images, 18.3 s)`, `cpu exit=0`. Same
+    dtype/shape/unique values as the CUDA run.
+  - `nvidia-smi --query-gpu=memory.used --format=csv,noheader` -> `178 MiB` before, `178 MiB`
+    immediately after both the CUDA and CPU runs — VRAM fully released, nothing leaked.
+  - Mask/overlay/skeleton sizes: `Image.open(...).size` -> `(512, 512)` for all six files
+    (`synthetic_{crack,blank}_{mask,overlay}.png`, `synthetic_{crack,blank}_skeleton.png`).
+    Pixel counts: `synthetic_crack` mask_pixels=4577, skeleton_pixels=657 (`657 <= 4577` holds);
+    `synthetic_blank` mask_pixels=0, skeleton_pixels=0 (`0 <= 0` holds).
+  - `grep -inE "iou|dice|recall" scripts/smoke_test.py` -> only the module docstring's explicit
+    statement that these are never asserted; no match in any assertion/comparison code.
+  - `grep -n "/home/" scripts/smoke_test.py` -> no match. `grep -n "shell=True"` -> only inside a
+    docstring sentence. `grep -n "weights_only"` -> only inside the trainer-shim explanatory
+    comment (this script never touches the checkpoint directly).
+  - `./env.sh python scripts/verify_model.py --check-hashes` (re-run after every real inference
+    pass above) -> `14 PASS · 1 WARN · 0 FAIL`, exit=0, `check_hashes PASS 6 files match` — model
+    tree still intact; `find models -newer config/model_manifest.json` -> empty.
+  - `git status --porcelain` -> only `scripts/smoke_test.py` (mine), plus the two pre-existing dirty
+    files from session start (`config/model_manifest.json`, `task_cards/TASK_INDEX.md`, the latter
+    now correctly re-set to COMPLETE by me). `git status --porcelain --ignored | grep smoke_test`
+    shows only gitignored `data/smoke_test/**` and `logs/smoke_test_*` — nothing written outside
+    `data/smoke_test/` and `logs/`. `data/predictions/`, `data/overlays/`, `data/comparisons/`,
+    `data/skeletons/`, `data/input_originals/` all still hold only their TC-001 `.gitkeep`.
+  - `./env.sh pytest tests/ -v` -> `collected 0 items` / `no tests ran` — unchanged, no regression
+    (this card owns no test file).
+ISSUES:
+  - `--skip-existing` remains an accepted no-op in this file (accepted by `add_common_args`, has no
+    effect anywhere in `smoke_test.py`) — this is the rev-1 review's own suggested resolution
+    ("either implement meaningfully or record as an accepted no-op, matching how TC-003/TC-004
+    disclosed the same situation"). Implementing real skip-existing semantics for a two-fixture,
+    sub-second-to-generate synthetic smoke test would add complexity with no practical benefit and
+    was not requested by any of the six findings, so it is disclosed here rather than built.
+  - `skimage.morphology.remove_small_objects(binary, min_size=64)` still emits the same
+    `FutureWarning` about `min_size` -> `max_size` under scikit-image 0.26.0 noted in the original
+    TC-006 completion report. Unchanged and out of scope for this revision (none of the six findings
+    touch it; it remains flagged for TC-010, which owns the real `crackvision.skeleton` module).
+  - The `nnUNet_extTrainer` shim from the original submission (checkpoint's embedded `trainer_name`
+    is `nnUNetTrainerSaveEvery10`, not shipped with nnunetv2 2.8.1) is unchanged and was already
+    independently verified and accepted by the rev-1 review; not touched in this revision beyond
+    ensuring `--clean` now also removes `ext_trainer/` between runs (finding 5).
+  - `config/model_manifest.json` shows as modified in `git status` (only `downloaded_utc` differs
+    from the committed value) — this predates this session (confirmed via `git diff`, matches the
+    state already disclosed in the TC-005 rev-2 and original TC-006 completion reports) and was not
+    touched or committed by this revision.
+  - The live hardlink hazard from TC-004's review scratch tree, flagged again in the rev-1 review,
+    was not touched by this card (read-only access to `models/**` throughout, confirmed by `find
+    models -newer config/model_manifest.json` staying empty across every run in this session).
+  - None otherwise.
+NEXT CARD: TC-007
+```

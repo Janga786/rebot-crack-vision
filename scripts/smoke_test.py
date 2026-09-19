@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -45,9 +46,9 @@ def _noisy_base(rng: np.random.Generator) -> np.ndarray:
     return arr
 
 
-def _draw_crack(rng: np.random.Generator) -> Image.Image:
-    arr = _noisy_base(rng)
-    img = Image.fromarray(arr, mode="RGB")
+def _draw_crack(base: np.ndarray, rng: np.random.Generator) -> Image.Image:
+    """Draw the wandering polyline + branch onto a copy of `base` (never mutates the caller's array)."""
+    img = Image.fromarray(base.copy(), mode="RGB")
     draw = ImageDraw.Draw(img)
 
     # main wandering polyline from ~(60,40) to ~(460,470)
@@ -66,23 +67,26 @@ def _draw_crack(rng: np.random.Generator) -> Image.Image:
     return img.filter(ImageFilter.GaussianBlur(radius=0.6))
 
 
-def _draw_blank(rng: np.random.Generator) -> Image.Image:
-    arr = _noisy_base(rng)
-    return Image.fromarray(arr, mode="RGB")
-
-
 def generate_fixtures(input_dir: Path, logger: Any) -> dict[str, Path]:
-    """Write the two deterministic synthetic fixtures into input_dir. Pure numpy + PIL, no network."""
+    """Write the two deterministic synthetic fixtures into input_dir. Pure numpy + PIL, no network.
+
+    Both fixtures share exactly one noisy base (a single seeded draw), so synthetic_blank is the
+    untouched base and synthetic_crack is that same base with a polyline drawn on a copy of it —
+    a matched pair differing only in the crack region (plus the crack image's own blur). The
+    polyline geometry is drawn from a second, separately seeded generator so its shape stays
+    reproducible regardless of how much of the base generator's stream noise generation consumed.
+    """
     input_dir.mkdir(parents=True, exist_ok=True)
-    rng = _rng()
+    base = _noisy_base(_rng())
+    geometry_rng = _rng()
     paths: dict[str, Path] = {}
 
-    crack_img = _draw_crack(rng)
+    crack_img = _draw_crack(base, geometry_rng)
     crack_path = input_dir / "synthetic_crack.png"
     crack_img.save(crack_path, format="PNG", compress_level=6)
     paths["synthetic_crack"] = crack_path
 
-    blank_img = _draw_blank(rng)
+    blank_img = Image.fromarray(base, mode="RGB")
     blank_path = input_dir / "synthetic_blank.png"
     blank_img.save(blank_path, format="PNG", compress_level=6)
     paths["synthetic_blank"] = blank_path
@@ -125,6 +129,22 @@ def build_predict_command(cfg: Config, input_dir: Path, output_dir: Path, device
         "-nps",
         str(cfg.inference["nps"]),
     ]
+
+
+def check_model_folder(cfg: Config) -> list[str]:
+    """Return the required model paths that are missing; empty if the model folder is intact.
+
+    Mirrors build_predict_command's model_dir derivation. Existence-only: this never downloads or
+    modifies anything, it just gives a precise exit-3 error before the subprocess is launched
+    (adr/006), instead of letting nnU-Net's own FileNotFoundError surface as an exit-1 traceback.
+    """
+    model_dir = cfg.paths["models"] / cfg.model["dataset_name"] / cfg.model["trainer_config"]
+    required = [
+        model_dir / "plans.json",
+        model_dir / "dataset.json",
+        model_dir / f"fold_{cfg.model['fold']}" / cfg.model["checkpoint"],
+    ]
+    return [str(p) for p in required if not p.is_file()]
 
 
 _OOM_MARKERS = ("out of memory", "cuda out of memory", "outofmemoryerror")
@@ -198,14 +218,17 @@ def run_inference(command: list[str], logger: Any, ext_trainer_dir: Path | None 
 
 def render_visuals(
     case: str,
-    pred_path: Path,
+    pred: np.ndarray,
     overlays_dir: Path,
     skeletons_dir: Path,
     original_path: Path,
     logger: Any,
 ) -> dict[str, Any]:
-    """Minimal mask + red overlay + skeleton for eyeballing (TC-009/TC-010 do the real versions later)."""
-    pred = np.array(Image.open(pred_path))
+    """Minimal mask + red overlay + skeleton for eyeballing (TC-009/TC-010 do the real versions later).
+
+    Callers must validate `pred`'s dtype/unique-values/shape before calling this (evaluate_case
+    does) — a malformed prediction should fail cleanly, not crash inside the overlay blend below.
+    """
     binary = pred > 0
 
     mask_u8 = (binary * 255).astype(np.uint8)
@@ -242,9 +265,6 @@ def render_visuals(
         "mask_pixels": mask_pixels,
         "skeleton_pixels": skeleton_pixels,
         "crack_pct": crack_pct,
-        "pred_shape": pred.shape,
-        "pred_dtype": pred.dtype,
-        "pred_unique": sorted(int(v) for v in np.unique(pred)),
     }
 
 
@@ -256,6 +276,74 @@ def print_oom_ladder(logger: Any) -> None:
     logger.error("  4. downscale inputs via an explicit --max-side flag (breaks the frame invariant; not used here)")
     logger.error("  5. re-run with --device cpu (slow but always correct)")
     logger.error("Never kill a GPU process to make room.")
+
+
+def evaluate_case(
+    case: str,
+    predictions_dir: Path,
+    original_path: Path,
+    overlays_dir: Path,
+    skeletons_dir: Path,
+    logger: Any,
+) -> tuple[list[str], dict[str, Any] | None, float, int]:
+    """Check one case's prediction against the {0,1}/dtype/frame-invariant contract, then render.
+
+    The dtype/unique-values/shape assertions run BEFORE render_visuals() is ever called, so a
+    malformed prediction (wrong shape, wrong dtype) fails this case cleanly instead of crashing
+    inside the overlay blend. Returns (failures, result_or_None, render_seconds, assertions_run) —
+    result is None when a precondition assertion already failed and rendering was skipped.
+    """
+    failures: list[str] = []
+    checks = 0
+
+    pred_path = predictions_dir / f"{case}.png"
+    if not pred_path.is_file() or pred_path.stat().st_size == 0:
+        return [f"{case}: prediction missing or empty at {pred_path}"], None, 0.0, checks
+
+    with Image.open(original_path) as orig_im:
+        original_shape = (orig_im.height, orig_im.width)
+
+    pred = np.array(Image.open(pred_path))
+    pred_dtype = pred.dtype
+    pred_unique = sorted(int(v) for v in np.unique(pred))
+    pred_shape = pred.shape
+
+    checks += 1
+    if pred_dtype != np.uint8:
+        failures.append(f"{case}: prediction dtype is {pred_dtype}, expected uint8")
+    checks += 1
+    if not set(pred_unique).issubset({0, 1}):
+        failures.append(f"{case}: prediction unique values {pred_unique} not subset of {{0,1}}")
+    checks += 1
+    if pred_shape != original_shape:
+        failures.append(f"{case}: prediction shape {pred_shape} != original image shape {original_shape}")
+
+    if failures:
+        return failures, None, 0.0, checks
+
+    t0 = time.monotonic()
+    result = render_visuals(case, pred, overlays_dir, skeletons_dir, original_path, logger)
+    render_seconds = time.monotonic() - t0
+    result["pred_dtype"] = pred_dtype
+    result["pred_unique"] = pred_unique
+    result["pred_shape"] = pred_shape
+
+    for label, path in (("mask", result["mask_path"]), ("overlay", result["overlay_path"]), ("skeleton", result["skeleton_path"])):
+        checks += 1
+        if not path.is_file():
+            failures.append(f"{case}: {label} file missing at {path}")
+            continue
+        with Image.open(path) as im:
+            if im.size != (IMAGE_SIZE, IMAGE_SIZE):
+                failures.append(f"{case}: {label} size {im.size} != ({IMAGE_SIZE},{IMAGE_SIZE})")
+
+    checks += 1
+    if result["skeleton_pixels"] > result["mask_pixels"]:
+        failures.append(
+            f"{case}: skeleton_pixels ({result['skeleton_pixels']}) > mask_pixels ({result['mask_pixels']})"
+        )
+
+    return failures, result, render_seconds, checks
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -288,19 +376,23 @@ def main(argv: list[str] | None = None) -> int:
     predictions_dir = smoke_root / "predictions"
     overlays_dir = smoke_root / "overlays"
     skeletons_dir = smoke_root / "skeletons"
+    ext_trainer_dir = smoke_root / "ext_trainer"
+    clean_dirs = (input_dir, nnunet_input_dir, predictions_dir, overlays_dir, skeletons_dir, ext_trainer_dir)
 
-    if args.clean:
-        import shutil
-
-        for d in (input_dir, nnunet_input_dir, predictions_dir, overlays_dir, skeletons_dir):
-            if d.exists():
-                shutil.rmtree(d)
-        logger.info("--clean: removed prior data/smoke_test/{input,nnunet_input,predictions,overlays,skeletons}")
-
+    # --dry-run is checked before --clean so "smoke_test.py --dry-run --clean" only logs what
+    # --clean would remove and deletes/writes nothing (docs/INTERFACES.md §0.3).
     if args.dry_run:
+        if args.clean:
+            logger.info("dry-run: would remove %s", ", ".join(str(d) for d in clean_dirs))
         logger.info("dry-run: would generate fixtures, run nnUNetv2_predict_from_modelfolder, render visuals")
         logger.info("dry-run: logs/smoke_test_latest.json not written")
         return EXIT_OK
+
+    if args.clean:
+        for d in clean_dirs:
+            if d.exists():
+                shutil.rmtree(d)
+        logger.info("--clean: removed prior %s", ", ".join(str(d) for d in clean_dirs))
 
     if args.device == "cuda":
         import torch
@@ -310,6 +402,18 @@ def main(argv: list[str] | None = None) -> int:
             summary.add_error("cuda requested but unavailable")
             summary.write(cfg, "smoke_test", "precondition", EXIT_PRECONDITION)
             return EXIT_PRECONDITION
+
+    missing_model_paths = check_model_folder(cfg)
+    if missing_model_paths:
+        for path_str in missing_model_paths:
+            logger.error("model file missing: %s", path_str)
+        logger.error(
+            "run: ./env.sh python scripts/fetch_model.py (TC-004), then: "
+            "./env.sh python scripts/verify_model.py (TC-005)"
+        )
+        summary.add_error(f"model folder incomplete; missing: {', '.join(missing_model_paths)}")
+        summary.write(cfg, "smoke_test", "precondition", EXIT_PRECONDITION)
+        return EXIT_PRECONDITION
 
     timings: dict[str, float] = {}
 
@@ -343,38 +447,18 @@ def main(argv: list[str] | None = None) -> int:
 
     failures: list[str] = []
     per_case: dict[str, dict[str, Any]] = {}
+    assertions_per_case: dict[str, int] = {}
 
     for case in CASES:
-        pred_path = predictions_dir / f"{case}.png"
-        if not pred_path.is_file() or pred_path.stat().st_size == 0:
-            failures.append(f"{case}: prediction missing or empty at {pred_path}")
-            continue
-
         original_path = fixtures[case]
-        t0 = time.monotonic()
-        result = render_visuals(case, pred_path, overlays_dir, skeletons_dir, original_path, logger)
-        timings[f"render_{case}"] = time.monotonic() - t0
-        per_case[case] = result
-
-        if result["pred_dtype"] != np.uint8:
-            failures.append(f"{case}: prediction dtype is {result['pred_dtype']}, expected uint8")
-        if not set(result["pred_unique"]).issubset({0, 1}):
-            failures.append(f"{case}: prediction unique values {result['pred_unique']} not subset of {{0,1}}")
-        if result["pred_shape"] != (IMAGE_SIZE, IMAGE_SIZE):
-            failures.append(f"{case}: prediction shape {result['pred_shape']} != ({IMAGE_SIZE},{IMAGE_SIZE})")
-
-        for label, path in (("mask", result["mask_path"]), ("overlay", result["overlay_path"]), ("skeleton", result["skeleton_path"])):
-            if not path.is_file():
-                failures.append(f"{case}: {label} file missing at {path}")
-                continue
-            with Image.open(path) as im:
-                if im.size != (IMAGE_SIZE, IMAGE_SIZE):
-                    failures.append(f"{case}: {label} size {im.size} != ({IMAGE_SIZE},{IMAGE_SIZE})")
-
-        if result["skeleton_pixels"] > result["mask_pixels"]:
-            failures.append(
-                f"{case}: skeleton_pixels ({result['skeleton_pixels']}) > mask_pixels ({result['mask_pixels']})"
-            )
+        case_failures, result, render_seconds, checks = evaluate_case(
+            case, predictions_dir, original_path, overlays_dir, skeletons_dir, logger
+        )
+        failures.extend(case_failures)
+        assertions_per_case[case] = checks
+        if result is not None:
+            timings[f"render_{case}"] = render_seconds
+            per_case[case] = result
 
     total_duration = sum(timings.values())
 
@@ -394,7 +478,7 @@ def main(argv: list[str] | None = None) -> int:
     summary.write(cfg, "smoke_test", "ok", EXIT_OK)
 
     print("=" * 60)
-    n_assertions_per_image = 6
+    n_assertions_per_image = max(assertions_per_case.values(), default=0)
     print(
         f"  SMOKE TEST PASSED   ({n_assertions_per_image} assertions x {len(per_case)} images, "
         f"{total_duration:.1f} s)"
