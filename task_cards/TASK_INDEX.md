@@ -17,9 +17,9 @@ prerequisites are now all satisfied from `BLOCKED` to `READY`.
 | TC-004 | OpenCrack model acquisition | TC-002 | SMALL–MED | COMPLETE | Sonnet |
 | TC-005 | nnU-Net wiring + semantic validation | TC-004 | SMALL | COMPLETE | Sonnet |
 | TC-006 | Synthetic end-to-end smoke test (Level 2) | TC-003, TC-005 | MEDIUM | COMPLETE | Sonnet |
-| TC-007 | Input preparation + naming contract | TC-002 | MEDIUM | **READY** | Sonnet |
-| TC-008 | Batch inference runner | TC-005, TC-006, TC-007 | MEDIUM | BLOCKED | Sonnet |
-| TC-009 | Visualization pipeline | TC-007 | MEDIUM | BLOCKED | Sonnet |
+| TC-007 | Input preparation + naming contract | TC-002 | MEDIUM | COMPLETE | Sonnet |
+| TC-008 | Batch inference runner | TC-005, TC-006, TC-007 | MEDIUM | **READY** | Sonnet |
+| TC-009 | Visualization pipeline | TC-007 | MEDIUM | **READY** | Sonnet |
 | TC-010 | Skeletonization utility | TC-002 (TC-007 for real data) | SMALL–MED | BLOCKED | Sonnet |
 | TC-011 | One-command runner `run_test.sh` | TC-003, TC-007, TC-008, TC-009, TC-010 | MEDIUM | BLOCKED | Sonnet |
 | TC-012 | RealSense software validation | TC-002 | SMALL | **READY** | Sonnet |
@@ -149,7 +149,7 @@ One card creates each file. Nothing else may create or rewrite it.
 ## Progress
 
 ```
-TC-001, TC-002, TC-003, TC-004, TC-005, TC-006 ███████░░░░░░░░░  6 / 16 complete
+TC-001, TC-002, TC-003, TC-004, TC-005, TC-006, TC-007 ████████░░░░░░░░  7 / 16 complete
 ```
 
 TC-002 delivered the `crackvision` conda env (Python 3.11), CUDA torch 2.14.0+cu126, nnunetv2 2.8.1,
@@ -166,5 +166,13 @@ both CUDA and CPU against two synthetic fixtures, producing well-formed `{0,1}`-
 checkpoint's internal `trainer_name` metadata is a custom trainer (`nnUNetTrainerSaveEvery10`) not
 shipped with nnunetv2 2.8.1 — worked around via nnU-Net's own documented `nnUNet_extTrainer`
 extension point with a shim file generated at runtime under `data/smoke_test/ext_trainer/` (never
-under `models/`); see `docs/COMPLETION_LOG.md` for the full evidence trail. TC-007 remains the next
-unblocked card (already READY, independent of TC-006).
+under `models/`); see `docs/COMPLETION_LOG.md` for the full evidence trail. TC-007 built
+`src/crackvision/naming.py` (the case_id contract) and `src/crackvision/prepare_inputs.py` (forces
+arbitrary imagery to 3-channel 8-bit RGB PNG + writes `data/case_map.json`) and is now COMPLETE: 37
+new tests in `tests/test_naming.py`/`tests/test_prepare_inputs.py` all pass, including every row of
+the `INTERFACES.md` §1.1 case-id table, every required Pillow-mode fixture (RGBA, grayscale,
+palette, CMYK, 16-bit, EXIF-rotated), and the corrupt-file/empty-dir/idempotency/dry-run/clean/
+skip-existing acceptance criteria; see `docs/COMPLETION_LOG.md` for two internally-contradictory
+rows found in the §1.1 table (implemented per the algorithm, not per the contradicting literal
+answer text — flagged there for whoever next touches `docs/INTERFACES.md`). TC-008 and TC-009 are
+now unblocked.

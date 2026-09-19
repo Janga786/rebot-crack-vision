@@ -1057,3 +1057,164 @@ ISSUES:
   - None otherwise.
 NEXT CARD: TC-007
 ```
+
+---
+
+## TC-007 — Input preparation utility and the naming contract
+
+```
+TASK: TC-007
+STATUS: COMPLETE
+CHANGES:
+  - src/crackvision/naming.py — new. Pure functions, no I/O: `derive_case_id` (the sanitisation
+    rule from docs/INTERFACES.md §1.1, applied via two compiled regexes), `assign_case_ids`
+    (collision resolution in `sorted(sources, key=str)` order, first occurrence bare, later ones
+    `__2`/`__3`/…), plus the eight path helpers from §1.2 (`nnunet_input_path`, `prediction_path`,
+    `mask_path`, `overlay_path`, `comparison_path`, `skeleton_path`, `skeleton_overlay_path`,
+    `skeleton_stats_path`), each returning the literal `data/<subdir>/{case}<suffix>` relative
+    `Path` from the table, independent of `crackvision.config` (matches the component table's
+    "Reads —, Writes —" contract for the naming module).
+  - src/crackvision/prepare_inputs.py — new. CLI + `main()` per docs/INTERFACES.md §3.1: discovers
+    supported-extension files non-recursively in `--input-dir` (default `cfg.paths["input_originals"]`),
+    assigns case_ids via `naming.assign_case_ids`, then per file: `Image.open` -> `img.load()` (so a
+    truncated file raises here, not deep in the pipeline) -> `ImageOps.exif_transpose(img) or img`
+    (guarded per the card's own noted Pillow-version gotcha) -> `.convert("RGB")` (mandatory,
+    unconditional) -> optional `--max-side` LANCZOS downscale (off by default, records
+    `downscaled`/`scale_factor`) -> `img.save(dst, format="PNG", compress_level=6)`. A single
+    corrupt/unreadable file is caught, logged at ERROR, counted in `counts.failed`, and the batch
+    continues (no case_map entry is written for it). Writes `data/case_map.json` in full every run
+    (schema_version 1, `generated_utc`, absolute `root`, `cases` sorted by `case_id`, project-relative
+    POSIX `source_path`/`nnunet_input`, sha256 of both source and output). `--dry-run` writes nothing;
+    `--clean` deletes existing `*.png` in the output dir first; `--skip-existing` decodes+converts
+    in-memory for accurate case_map metadata but skips the `save()` call when the destination already
+    exists. Exit 3 (naming the directory + accepted extensions) when zero supported files are found;
+    exit 1 (`status: "partial"`) when `counts.failed > 0`; exit 0 otherwise. No hard-coded `/home/`
+    path (grep-verified).
+  - tests/conftest.py — new. `tmp_project` fixture: copies the real `config/project.yaml` into a
+    pytest `tmp_path`, calls `load_config(root=tmp_path)`, creates every `cfg.paths` directory, and
+    returns the `Config` — no test ever reads or writes this repo's real `data/`.
+  - tests/test_naming.py — new. Every single-file row of the docs/INTERFACES.md §1.1 worked-example
+    table, parametrised; collision-suffix ordering (`a b.png`/`a_b.png` -> `a_b`/`a_b__2`); a
+    three-way collision proving sorted-path order (`__2`, `__3`); order-independence of
+    `assign_case_ids`; the empty-input case; and all eight path helpers. Two of the table's
+    multi-file rows are implemented per the *algorithm* rather than per their own literal answer
+    column, which contradicts itself — see ISSUES below; both are documented in the test file's
+    module docstring and at each assertion site, not silently "corrected" without a trace.
+  - tests/test_prepare_inputs.py — new. In-test PIL fixtures for every required mode (RGB JPEG,
+    RGBA PNG, grayscale `L` PNG, palette `P` PNG, CMYK TIFF, 16-bit `I;16` PNG via
+    `Image.new("I;16", size).frombytes(...)` to avoid a Pillow 13 deprecation on the `fromarray(...,
+    mode=...)` path, EXIF-orientation-6 JPEG, BMP) all asserted to come out `mode=="RGB"`,
+    `format=="PNG"`, 3-channel uint8; the EXIF fixture asserted upright with width/height swapped;
+    `data/case_map.json` schema/sort-order/relative-POSIX-path/sha256 round-trip; `--dry-run` writes
+    zero files; `--clean` removes a manually-planted stale output; re-running twice yields identical
+    `sha256_nnunet_input`; `--skip-existing` leaves the existing file's mtime untouched and reports
+    it under `counts.skipped`, not `counts.converted`; a zero-byte file plus a half-truncated real
+    PNG alongside one good file yields `counts.failed == 2`, `counts.converted == 1`, `status:
+    "partial"`, exit 1, and the good case still lands in `case_map.json`; empty and missing input
+    dirs both exit 3; `data/input_originals/` content-hash is unchanged after a run (including one
+    that passes `--max-side`); `--max-side` downscales and records `scale_factor`; an unsupported
+    extension (`.txt`) is excluded from `counts.found` without error.
+TESTS:
+  - `./env.sh python -m py_compile src/crackvision/naming.py src/crackvision/prepare_inputs.py
+    tests/conftest.py tests/test_naming.py tests/test_prepare_inputs.py` -> compiles cleanly.
+  - `./env.sh pytest tests/test_naming.py tests/test_prepare_inputs.py -v` -> **37 passed** (8
+    parametrised case-id-table rows + 7 more naming tests + 8 path-helper rows + 15 prepare_inputs
+    tests), `0.35s`. Full transcript included every individual test name, all `PASSED`.
+  - `./env.sh pytest tests/ -v` -> same **37 passed** (no other test files exist yet in `tests/` —
+    TC-001 through TC-006 own no test files of their own), `0.31s`.
+  - `./env.sh python -m crackvision.prepare_inputs --help` -> prints full usage: `--root --config -v
+    -q --dry-run --skip-existing --input-dir --output-dir --max-side --clean`, exit 0.
+  - `./env.sh python -m crackvision.prepare_inputs` (real `data/input_originals/` empty except
+    `.gitkeep`) -> `ERROR ... no supported images found in .../data/input_originals (accepted
+    extensions: .bmp, .jpeg, .jpg, .png, .tif, .tiff)`, `empty-dir exit=3 (expect 3)` -> **matched**.
+  - Real end-to-end run, per the card's own command list: copied
+    `data/smoke_test/input/{synthetic_blank,synthetic_crack}.png` (TC-006's leftover fixtures) into
+    `data/input_originals/`, then `./env.sh python -m crackvision.prepare_inputs` -> `exit=0`, logged
+    `converted .../synthetic_blank.png -> .../synthetic_blank_0000.png (RGB PNG -> RGB, 512x512)` and
+    the same for `synthetic_crack`, `wrote .../data/case_map.json (2 case(s))`.
+    `ls data/nnunet_input/` -> `synthetic_blank_0000.png synthetic_crack_0000.png`.
+    `python3 -m json.tool data/case_map.json` -> valid JSON matching the §2 schema exactly (both
+    entries: `schema_version:1`, absolute `root`, `source_path`/`nnunet_input` as project-relative
+    POSIX strings, `source_mode:"RGB"`, `source_format:"PNG"`, `converted:true`, `downscaled:false`,
+    `scale_factor:1.0`, matching `sha256_source`/`sha256_nnunet_input` — the synthetic PNGs were
+    already RGB, so source and output hashes are identical, as expected for a lossless no-op
+    re-encode).
+    `./env.sh python -c "from PIL import Image; import glob; ... assert im.mode=='RGB' and
+    im.format=='PNG' ..."` -> `all RGB PNG OK`.
+    `sha256sum data/input_originals/*.png` recorded before cleanup for the idempotency/read-only
+    checks below.
+    `python3 -m json.tool logs/prepare_inputs_latest.json` -> `status:"ok"`, `exit_code:0`,
+    `counts:{"found":2,"converted":2}`.
+    `grep -n "/home/" src/crackvision/naming.py src/crackvision/prepare_inputs.py tests/conftest.py
+    tests/test_naming.py tests/test_prepare_inputs.py` -> no match (exit 1 from grep, i.e. clean).
+  - Idempotency re-run (same real fixtures, no `--clean`): `./env.sh python -m
+    crackvision.prepare_inputs` again -> `exit=0`; `sha256sum data/nnunet_input/*.png` -> **identical
+    hashes** to the first run for both files.
+  - Cleanup: removed the copied `data/input_originals/{synthetic_blank,synthetic_crack}.png`, the
+    generated `data/nnunet_input/*_0000.png`, and `data/case_map.json` after the demonstration above,
+    restoring `data/input_originals/` and `data/nnunet_input/` to `.gitkeep`-only (this repo's `data/`
+    tree is entirely gitignored runtime scratch, not a tracked fixture — see docs/ARCHITECTURE.md §5
+    source-control policy — so this is housekeeping for the next card's session, not a git operation).
+    `ls -la data/input_originals/ data/nnunet_input/` after cleanup -> only `.gitkeep` in each.
+  - `git status --porcelain` before committing -> exactly the 5 new files this card owns
+    (`src/crackvision/naming.py`, `src/crackvision/prepare_inputs.py`, `tests/conftest.py`,
+    `tests/test_naming.py`, `tests/test_prepare_inputs.py`) plus this entry's edit to
+    `docs/COMPLETION_LOG.md` and the status-board edit to `task_cards/TASK_INDEX.md`, on top of the
+    pre-existing dirty state (`config/model_manifest.json`, the untracked planning `docs/*.md` /
+    `docs/adr/` / `task_cards/TC-0NN-*.md` / `task_cards/AGENT_INSTRUCTIONS.md`) that was already
+    present before this session started and is not owned by this card.
+ISSUES:
+  - **Two rows of the docs/INTERFACES.md §1.1 worked-example table are internally inconsistent; both
+    were implemented per the normative algorithm (verified computationally against every other row
+    in the same table, which all check out), not per the table's own literal answer text.** Neither
+    is a redesign — the algorithm itself is unambiguous and is spelled out twice (INTERFACES.md §1.1
+    and the task card body), and it is not something I invented a fix for; I just followed it where
+    two of its own worked examples disagree with themselves:
+    1. `A.png` then `a!.png` — the answer column prints "`A`, then `a__2`", but the same cell's own
+       parenthetical says "distinct stems → no collision: `A` vs `a`". The algorithm has no
+       case-folding step anywhere, so `A.png` → `A` and `a!.png` → `a` are two different strings and
+       there is, in fact, no collision — the parenthetical is correct and the leading answer text
+       is not (it reads like a copy/paste leftover from the actual-collision row two lines below,
+       `a b.png`/`a_b.png` → `a_b`/`a_b__2`). Implemented and tested as: `A.png` → `A`, `a!.png` →
+       `a`, no suffix on either.
+    2. `x y.png` then `x-y.png` then `x_y.png` — the table says "no collision", but the normative
+       sanitisation rule maps both the space in `x y.png` and the underscore in `x_y.png` to `_`, so
+       both stems sanitise to the identical string `x_y` — that is the literal definition of a
+       collision this same section gives two rows earlier. `x-y.png` is untouched (`-` is an
+       allowed character) and stays `x-y`. In `sorted(str)` order the three filenames sort as
+       `x y.png` < `x-y.png` < `x_y.png` (space 0x20 < hyphen 0x2D < underscore 0x5F), so the
+       deterministic result is `x y.png` → `x_y` (bare, first `x_y`-producer), `x-y.png` → `x-y`
+       (never collided), `x_y.png` → `x_y__2` (second `x_y`-producer). Implemented and tested exactly
+       this way, with the reasoning recorded at the point of use in `tests/test_naming.py`'s module
+       docstring and at each assertion.
+    I did not treat this as a BLOCKER per AGENT_INSTRUCTIONS.md rule 4 — the algorithm is not
+    "impossible", it is fully specified and testable, and only two illustrative example cells
+    disagree with their own stated rule. Flagging here per rule 3 ("write it under ISSUES: — do not
+    fix it") since fixing the *documentation* is out of this card's file-ownership list
+    (`docs/INTERFACES.md` is planning-session-owned, "nobody" may modify it per
+    `task_cards/TASK_INDEX.md` §File ownership).
+  - `naming.py`'s eight path helpers return fixed literal `data/<subdir>/...` relative paths, per
+    docs/INTERFACES.md §1.2's own literal table, independent of `crackvision.config`. This means a
+    future card's `--output-dir`/config override for a given stage would not automatically flow
+    through `naming.<x>_path()` — `prepare_inputs.py` itself does not have this problem (it builds
+    its actual output path from `args.output_dir` and only borrows `nnunet_input_path(case).name` for
+    the filename suffix), but a later consumer (TC-009/TC-010) that called e.g.
+    `naming.prediction_path(case)` directly and expected it to honour a non-default `--output-dir`
+    would need to resolve it against the same directory it configured separately. This is exactly
+    what the component table specifies (naming.py: "Reads —, Writes —", pure functions with no cfg
+    dependency) and is not something this card's scope covers changing — flagging it only so TC-008
+    (which resolves `data/nnunet_input` for `-i`) and TC-009/TC-010 (which build predictions/overlay
+    paths) are aware their own CLI's `--output-dir`/`--input-dir` flag, not `naming.py`, is the source
+    of truth for the actual runtime location.
+  - `PIL.Image.fromarray(arr, mode="I;16")` (the natural way to build a 16-bit test fixture) emits a
+    `DeprecationWarning` under Pillow 12.3.0 ("'mode' parameter for changing data types is deprecated
+    and will be removed in Pillow 13 (2026-10-15)"). Used `Image.new("I;16", size).frombytes(...)`
+    instead in `tests/test_prepare_inputs.py`, which round-trips through a real PNG save/reopen with
+    no warning — confirmed with `warnings.simplefilter("error")` before committing to that approach.
+    Not an issue in `prepare_inputs.py` itself (which never constructs an `I;16` image, only opens
+    ones already on disk), but worth noting for any future card that builds synthetic 16-bit fixtures.
+  - `config/model_manifest.json` continues to show as modified in `git status` (pre-existing dirty
+    state carried from TC-005's repair; not touched by this session — confirmed untouched throughout).
+  - None otherwise.
+NEXT CARD: TC-008
+```
