@@ -16,7 +16,7 @@ prerequisites are now all satisfied from `BLOCKED` to `READY`.
 | TC-003 | Environment verification (Level 1) | TC-002 | SMALL–MED | COMPLETE | Sonnet |
 | TC-004 | OpenCrack model acquisition | TC-002 | SMALL–MED | COMPLETE | Sonnet |
 | TC-005 | nnU-Net wiring + semantic validation | TC-004 | SMALL | COMPLETE | Sonnet |
-| TC-006 | Synthetic end-to-end smoke test (Level 2) | TC-003, TC-005 | MEDIUM | **READY** | Sonnet |
+| TC-006 | Synthetic end-to-end smoke test (Level 2) | TC-003, TC-005 | MEDIUM | COMPLETE | Sonnet |
 | TC-007 | Input preparation + naming contract | TC-002 | MEDIUM | **READY** | Sonnet |
 | TC-008 | Batch inference runner | TC-005, TC-006, TC-007 | MEDIUM | BLOCKED | Sonnet |
 | TC-009 | Visualization pipeline | TC-007 | MEDIUM | BLOCKED | Sonnet |
@@ -149,7 +149,7 @@ One card creates each file. Nothing else may create or rewrite it.
 ## Progress
 
 ```
-TC-001, TC-002, TC-003, TC-004, TC-005 ██████░░░░░░░░░░  5 / 16 complete
+TC-001, TC-002, TC-003, TC-004, TC-005, TC-006 ███████░░░░░░░░░  6 / 16 complete
 ```
 
 TC-002 delivered the `crackvision` conda env (Python 3.11), CUDA torch 2.14.0+cu126, nnunetv2 2.8.1,
@@ -159,4 +159,12 @@ PASS. TC-005 built `scripts/verify_model.py` and is now COMPLETE: a corrupted lo
 (one stray trailing byte, a hardlink write-through from TC-004's own review scratch tree — see
 `docs/COMPLETION_LOG.md`) was repaired via `./env.sh python scripts/fetch_model.py --force`
 (re-verified: only `downloaded_utc` changed, all six manifest sha256/bytes values identical), after
-which all 14 core checks plus `--check-hashes` PASS. TC-006 is now READY.
+which all 14 core checks plus `--check-hashes` PASS. TC-006 built `scripts/smoke_test.py` and is now
+COMPLETE: the real OpenCrack checkpoint ran end-to-end via `nnUNetv2_predict_from_modelfolder` on
+both CUDA and CPU against two synthetic fixtures, producing well-formed `{0,1}`-valued uint8
+512×512 predictions. A previously-undiscovered upstream fact surfaced in the process — the
+checkpoint's internal `trainer_name` metadata is a custom trainer (`nnUNetTrainerSaveEvery10`) not
+shipped with nnunetv2 2.8.1 — worked around via nnU-Net's own documented `nnUNet_extTrainer`
+extension point with a shim file generated at runtime under `data/smoke_test/ext_trainer/` (never
+under `models/`); see `docs/COMPLETION_LOG.md` for the full evidence trail. TC-007 remains the next
+unblocked card (already READY, independent of TC-006).

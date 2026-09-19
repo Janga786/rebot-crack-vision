@@ -705,3 +705,179 @@ ISSUES:
     match).
 NEXT CARD: TC-006
 ```
+
+---
+
+## TC-006 — Synthetic end-to-end smoke test (Level 2 core)
+
+```
+TASK: TC-006
+STATUS: COMPLETE
+CHANGES:
+  - scripts/smoke_test.py — new. Implements docs/INTERFACES.md §3.8: generates two deterministic
+    (numpy.random.default_rng(1234)) 512x512 synthetic fixtures into data/smoke_test/input/
+    (synthetic_crack.png: mid-grey + Gaussian noise + a dark 2-3px wandering polyline with one
+    branch, Gaussian-blurred; synthetic_blank.png: same base, no crack), force-converts each to
+    3-channel RGB PNG at data/smoke_test/nnunet_input/<case>_0000.png, builds the
+    nnUNetv2_predict_from_modelfolder command as a list (never shell=True) from config/project.yaml
+    values (-i/-o/-m/-f 0/-chk checkpoint_ep0500.pth/-device/-npp 3/-nps 3), streams its stdout+stderr
+    into the log, and on success renders a minimal mask (x255)/red overlay/skimage skeleton into
+    data/smoke_test/{overlays,skeletons}/ for eyeballing. Asserts (never accuracy): subprocess exit 0,
+    prediction files exist and non-empty, dtype==uint8, unique values subset of {0,1}, shape==(512,512)
+    == input shape, mask/overlay/skeleton files exist at 512x512, skeleton_pixels <= mask_pixels.
+    Prints the SMOKE TEST PASSED/FAILED banner, per-stage timings, and the exact nnU-Net command line.
+    `--device {cuda,cpu}` (default cuda; exits 3 if cuda requested but torch.cuda.is_available() is
+    False), `--clean` (removes prior data/smoke_test/{input,nnunet_input,predictions,overlays,
+    skeletons} first), `--dry-run` (writes nothing, exits 0, never imports torch). CUDA-OOM detection
+    on the subprocess output prints the ARCHITECTURE.md §9 degradation ladder and exits 1 (never
+    retries automatically, never kills a GPU process). Uses crackvision.config/logging_setup exactly
+    as TC-003/004/005 do (RunSummary + setup_logging). No hard-coded `/home/` path (grep-verified).
+  - docs/COMPLETION_LOG.md — this entry.
+  - task_cards/TASK_INDEX.md — TC-006 row set to COMPLETE; progress narrative updated to 6/16. No
+    other row flips: TC-008 (the only card whose deps include TC-006) still needs TC-007, which is
+    unaffected by this card and was already READY.
+TESTS:
+  - `./env.sh python -m py_compile scripts/smoke_test.py` -> compiles cleanly.
+  - `grep -n "/home/" scripts/smoke_test.py` -> no match. `grep -n "shell=True"` -> only inside a
+    docstring sentence ("never shell=True"), not actual usage. `grep -n "weights_only"` -> no match
+    (this script never touches the checkpoint directly; verify_model.py already validated it).
+  - Pre-flight model integrity check (per TC-005 review's own recommendation to run --check-hashes
+    first as the cheapest detector for a hardlink recurrence):
+    `./env.sh python scripts/verify_model.py --check-hashes` -> `14 PASS · 1 WARN · 0 FAIL`, exit=0,
+    `check_hashes PASS 6 files match .../config/model_manifest.json` — model tree confirmed healthy
+    before this card touched anything.
+  - `./env.sh python scripts/smoke_test.py --dry-run` -> logs the dry-run lines, writes nothing,
+    exit=0.
+  - `./env.sh python scripts/smoke_test.py --clean ; echo "exit=$?"` (device defaults to cuda) ->
+    real nnU-Net subprocess ran, banner:
+    ```
+    ============================================================
+      SMOKE TEST PASSED   (6 assertions x 2 images, 12.3 s)
+      predictions: /home/boosterk1/Projects/rebot_crack_vision/data/smoke_test/predictions/
+      crack pixels: synthetic_crack 1.19%   synthetic_blank 0.00%
+      NOTE: crack-pixel counts are informational only; this test
+            verifies execution, not accuracy.
+    ============================================================
+    ```
+    `exit=0`. Per-stage timings printed: generate_fixtures 0.151s, convert_inputs 0.103s,
+    nnunet_predict 11.880s, render_synthetic_crack 0.086s, render_synthetic_blank 0.061s.
+  - **Exact nnU-Net command line used (pasted from the run log, per acceptance criterion):**
+    `nnUNetv2_predict_from_modelfolder -i .../data/smoke_test/nnunet_input -o
+    .../data/smoke_test/predictions -m .../models/opencrack-nnunet/Dataset501_OpenCrack/
+    nnUNetTrainer__nnUNetPlans__2d -f 0 -chk checkpoint_ep0500.pth -device cuda -npp 3 -nps 3` —
+    confirms `-f 0` and `-chk checkpoint_ep0500.pth` are present exactly as mandated.
+  - `ls -la data/smoke_test/predictions/` -> `synthetic_blank.png` (334 B), `synthetic_crack.png`
+    (2766 B), plus nnU-Net's own copied dataset.json/plans.json/predict_from_raw_data_args.json.
+  - `./env.sh python -c "from PIL import Image; import numpy as np; a=np.array(Image.open(
+    'data/smoke_test/predictions/synthetic_crack.png')); print('dtype',a.dtype,'shape',a.shape,
+    'unique',np.unique(a))"` -> `dtype uint8 shape (512, 512) unique [0 1]` — **pins the {0,1}
+    convention, printed in this report as required.** Same check on synthetic_blank.png -> `dtype
+    uint8 shape (512, 512) unique [0]`.
+  - `ls -la data/smoke_test/overlays/ data/smoke_test/skeletons/` -> `synthetic_crack_mask.png`,
+    `synthetic_crack_overlay.png`, `synthetic_blank_mask.png`, `synthetic_blank_overlay.png`,
+    `synthetic_crack_skeleton.png`, `synthetic_blank_skeleton.png` all present; opened
+    programmatically and confirmed 512x512 for every file (this is also asserted by the script
+    itself, which passed).
+  - `synthetic_crack`: mask_pixels=3114, skeleton_pixels=595 -> `595 <= 3114` holds.
+    `synthetic_blank`: mask_pixels=0, skeleton_pixels=0 -> `0 <= 0` holds. Both printed in the run log
+    (`case synthetic_crack: 3114 crack pixels (1.188%), 595 skeleton pixels`, `case synthetic_blank:
+    0 crack pixels (0.000%), 0 skeleton pixels`).
+  - `nvidia-smi --query-gpu=memory.used --format=csv` -> `178 MiB` before, during-run peak not
+    captured, and `178 MiB` again immediately after the run completed — VRAM fully released, no
+    leaked process, matching the acceptance criterion.
+  - CPU path: `./env.sh python scripts/smoke_test.py --device cpu ; echo "cpu exit=$?"` -> same
+    `SMOKE TEST PASSED (6 assertions x 2 images, 18.3 s)` banner, `cpu exit=0`. nnU-Net logged
+    `perform_everything_on_device=True is only supported for cuda devices! Setting this to False`
+    (expected, upstream's own message, not an error) and `perform_everything_on_device: False`.
+    Predictions: `synthetic_crack` dtype=uint8, unique=[0,1], shape=(512,512); `synthetic_blank`
+    dtype=uint8, unique=[0], shape=(512,512).
+  - `grep -inE "iou|dice|recall" scripts/smoke_test.py` -> only the module docstring's explicit
+    statement that these are *never* asserted; no match in any assertion/comparison code — confirms
+    the card's most important constraint (no accuracy assertion anywhere).
+  - Nothing-written-outside-scope check: `git status --porcelain` before and after both runs shows
+    only `scripts/smoke_test.py` as a new tracked-candidate file beyond the pre-existing dirty state
+    from session start; `git status --porcelain --ignored` shows `data/smoke_test/{ext_trainer,
+    input,nnunet_input,overlays,predictions,skeletons}/` all as `!!` (gitignored, as expected) and
+    `data/predictions/`, `data/overlays/`, `data/comparisons/`, `data/skeletons/` (the *real* pipeline
+    directories) still hold only their TC-001 `.gitkeep` — confirmed via `ls -la` on all four,
+    nothing else present.
+  - `find models -newer config/model_manifest.json` -> empty, run immediately after both smoke-test
+    invocations — confirms `models/**` was not modified by this card.
+  - Re-ran `./env.sh python scripts/verify_model.py --check-hashes` after both smoke-test runs ->
+    identical `14 PASS · 1 WARN · 0 FAIL`, exit=0, `check_hashes PASS 6 files match` — model tree
+    still intact after two real inference passes.
+  - `./env.sh pytest tests/ -v` -> `collected 0 items` / `no tests ran` — no regression (this card
+    owns no test file per its own scope; `tests/` still holds only TC-001's `.gitkeep`).
+  - Malformed-config exit code: `./env.sh python scripts/smoke_test.py --config
+    /tmp/bad_config_smoketest.yaml` (file containing `bad: yaml: [`) -> `smoke_test: malformed YAML
+    in /tmp/bad_config_smoketest.yaml: ...`, `exit=2` (scratch file outside the repo, removed after).
+ISSUES:
+  - **Significant, disclosed deviation — a genuine upstream fact not anticipated by ARCHITECTURE.md
+    or the card's own Failure-handling table.** The first run of the real nnU-Net command failed
+    (exit 1) with `RuntimeError: Could not find requested nnunet trainer nnUNetTrainerSaveEvery10 in
+    nnunetv2.training.nnUNetTrainer`. Diagnosed via
+    `torch.load(checkpoint_ep0500.pth, weights_only=False)['trainer_name']` ==
+    `"nnUNetTrainerSaveEvery10"`: the checkpoint's own internal metadata (read by nnU-Net's
+    `initialize_from_trained_model_folder`, `nnunetv2/inference/predict_from_raw_data.py:85`) names a
+    custom trainer class that the OpenCrack authors used during their own training run but never
+    published — only the checkpoint and planner-generated `plans.json`/`dataset.json` were released
+    (confirmed against `models/opencrack-nnunet/README.md`, which documents "no early stopping" and a
+    fixed 500-epoch single-fold budget with the architecture "the one the nnU-Net planner derives" —
+    consistent with a trainer subclass whose only special behaviour is checkpoint-saving cadence, not
+    network construction). I verified this class does not exist anywhere in the installed nnunetv2
+    2.8.1 package (`find .../nnUNetTrainer -iname "*SaveEvery*"` -> no match; only `variants/
+    training_length/nnUNetTrainer_Xepochs.py` and `variants/benchmarking/*5epochs*.py` exist, neither
+    matching). This is not a bug in my invocation — the model card's own suggested command
+    (`nnUNetv2_predict -d 501 -c 2d -f 0 -chk checkpoint_ep0500.pth`) hits the identical
+    `initialize_from_trained_model_folder` code path and would fail identically.
+    **Fix applied, using nnU-Net's own documented, supported extension point** (confirmed by reading
+    `nnunetv2/utilities/find_class_by_name.py`'s `recursive_find_trainer_class_by_name`, and the
+    error message itself: *"If the trainer is located elsewhere ... specify the external path via the
+    `nnUNet_extTrainer` environment variable"*): `scripts/smoke_test.py` now writes a tiny shim file
+    (`class nnUNetTrainerSaveEvery10(nnUNetTrainer): pass` — inherits everything unmodified, overrides
+    nothing) to `data/smoke_test/ext_trainer/nnUNetTrainerSaveEvery10.py` at runtime, and sets
+    `nnUNet_extTrainer` in the subprocess's environment to that directory. **This never touches
+    `models/**`, `src/crackvision/**`, or any file outside `data/smoke_test/`** (this card's own
+    allowed-files list) and requires no change to the mandated command line (`-f 0 -chk
+    checkpoint_ep0500.pth` etc. are unchanged and unaffected). It is inference-only: no
+    `nnUNetv2_train` or optimiser step is ever invoked (adr/010 unaffected). Confirmed to be the
+    correct fix, not a masking hack, because `network.load_state_dict(parameters[0])` succeeded
+    cleanly on both CUDA and CPU (a real architecture mismatch would have raised a key-mismatch error
+    here, not silently produced plausible output) and the model then genuinely detected the synthetic
+    crack (1.19% crack pixels on `synthetic_crack`, 0.00% on `synthetic_blank` — informational only,
+    not asserted, but strong circumstantial confirmation the network loaded its real trained weights
+    correctly rather than random-init fallback weights).
+    **This is a new fact for later cards to know:** any future direct use of this checkpoint (e.g. if
+    TC-008's `crackvision.inference` module ever bypasses `smoke_test.py`'s command-building and
+    reimplements it independently) must also set `nnUNet_extTrainer` or predictions will fail with the
+    same RuntimeError. TC-008's own card already says it refactors `smoke_test.py`'s subprocess logic
+    into a reusable function — as long as it reuses `run_inference()`/`prepare_ext_trainer_shim()`
+    from this file rather than rewriting the command construction from scratch, this is inherited
+    automatically.
+  - `skimage.morphology.remove_small_objects(binary, min_size=64)` (used in this card's *minimal*
+    inline skeleton rendering, exactly as `docs/INTERFACES.md` §3.4 specifies for the real
+    `crackvision.skeleton` module TC-010 will build) emits `FutureWarning: Parameter min_size is
+    deprecated since version 0.26.0 ... use max_size instead` under the pinned scikit-image 0.26.0.
+    Non-fatal, does not affect this card's assertions (all passed), and I did not change the call —
+    §3.4's algorithm block says "exactly this, nothing more" (adr/008) and changing the parameter
+    name/semantics is TC-010's decision to make, not mine to improvise here. **Flagging for TC-010**:
+    the exact literal algorithm in `docs/INTERFACES.md` §3.4 will need to address this deprecation
+    (rename to `max_size`, note the semantic difference the warning describes — "or equal to" vs
+    "smaller than" — or explicitly pin a warnings filter) when it builds the real module.
+  - Confirmed, per TC-005's rev-2 review note, the live hardlink-fixture hazard
+    (`.../scratchpad/.../fakeroot` sharing inodes with three model files) was **not** triggered or
+    touched by this card — this card only reads `models/**` (via the CLI's `-m` argument) and never
+    writes into it; `find models -newer config/model_manifest.json` stayed empty across the whole
+    session. I did not attempt to `rm -rf` that external fakeroot myself since it is outside
+    `~/Projects/rebot_crack_vision` and outside this card's file list — flagging it again here since
+    the hazard is still live per the last review, in case the orchestrator wants a human to clear it
+    before further cards touch `models/`.
+  - `nnUNetTrainer` version note: `checkpoint_loadable` in `verify_model.py` already WARNs (not
+    FAILs) on `weights_only=True` for this exact checkpoint — that WARN is about a different, already
+    -documented issue (`numpy._core.multiarray.scalar` in the pickle, TC-005's finding) and is
+    unrelated to the trainer-name issue found here, which only surfaces when nnU-Net actually tries to
+    *construct* the network from the trainer name, something `verify_model.py` never does (by design
+    — it only sanity-checks the checkpoint is a loadable archive, it doesn't run inference).
+  - None otherwise.
+NEXT CARD: TC-007
+```
