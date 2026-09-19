@@ -580,3 +580,128 @@ ISSUES:
 NEXT CARD: TC-005 (re-run after `fetch_model.py --force` restores a clean `plans.json`; TC-006 stays
 BLOCKED until then)
 ```
+
+---
+
+## TC-005 (revision 1) — nnU-Net model wiring and semantic validation
+
+```
+TASK: TC-005
+STATUS: COMPLETE
+CHANGES:
+  - No code changes. scripts/verify_model.py is byte-identical to the version committed in 14c05b4
+    (`git diff --stat scripts/verify_model.py` -> empty) — the audit's finding was that the script
+    is correct and the *model tree* was corrupt, not the script.
+  - models/opencrack-nnunet/Dataset501_OpenCrack/nnUNetTrainer__nnUNetPlans__2d/plans.json — repaired
+    by re-running `./env.sh python scripts/fetch_model.py --force` (TC-004's own tool), per the
+    review's explicit, scoped, revision-1-only authorisation to write models/** and
+    config/model_manifest.json to undo review-tooling damage (see ISSUES). Not hand-edited.
+  - config/model_manifest.json — rewritten by the same `fetch_model.py --force` run (TC-004 owns
+    this file; the write is the authorised side effect of the repair, not a TC-005 edit). Only
+    `downloaded_utc` changed (`2026-09-17T04:49:49Z` -> `2026-09-19T01:26:14Z`); `revision` and all
+    six files' `bytes`/`sha256` are byte-identical to the pre-repair manifest — confirmed by
+    `git diff config/model_manifest.json` before running any further checks. Left uncommitted per
+    the review's commit instructions (see ISSUES) — TC-004 owns this file, TC-005 does not commit it.
+  - docs/COMPLETION_LOG.md — this entry.
+  - task_cards/TASK_INDEX.md — TC-005 row set to `COMPLETE`; TC-006 row set to `READY` (TC-003 is
+    COMPLETE); Progress section narrative updated to 5/16 and to describe the repair instead of the
+    block.
+TESTS:
+  - Pre-repair confirmation (read-only, matching the audit's diagnosis exactly):
+    `sha256sum .../plans.json` -> `68f9754477c76e07a28e4bfc091d81506766e6d539e0d0b1cb3a92d492cc51dd`
+    (6362 bytes); `tail -c 20 .../plans.json | xxd` -> hex tail `...7d0a 7d58` (`}\n}X`, one stray
+    `X` byte after the final `}`), matching the manifest's expected 6361 bytes /
+    `08f03a8e0f2312d9756e6637a2b8e115a5e27c898e93fe218784d0a69dc01eeb` mismatch reported by the audit.
+  - `./env.sh python scripts/fetch_model.py --force ; echo "exit=$?"` -> re-downloaded 6 files,
+    logged `plans.json 6361 bytes sha256=08f03a8e0f2312d9756e6637a2b8e115a5e27c898e93fe218784d0a69dc01eeb`,
+    wrote the manifest, `exit=0`.
+  - Post-repair verification: `wc -c .../plans.json` -> `6361`; `sha256sum .../plans.json` ->
+    `08f03a8e0f2312d9756e6637a2b8e115a5e27c898e93fe218784d0a69dc01eeb` (matches manifest exactly);
+    `python3 -m json.tool .../plans.json > /dev/null` -> parses cleanly, no error.
+  - `git diff config/model_manifest.json` -> only the `downloaded_utc` line changed; `revision`
+    (`1198179e893f5f6eb0dd3eae2d8de5f1adf85afc`) and every file's `bytes`/`sha256` unchanged ->
+    confirms this is repair of a corrupted local copy, not upstream drift, per the review's own
+    stop-condition.
+  - `./env.sh python scripts/verify_model.py --check-hashes ; echo "exit=$?"` ->
+    `required_files PASS`, `dataset_json_parse PASS`, all four `dataset_*` PASS (values below),
+    `plans_json_parse PASS`, `plans_configuration_present PASS configurations contains '2d'`,
+    `plans_patch_size PASS [256, 256]`, `plans_normalization_schemes PASS ["ZScoreNormalization",
+    "ZScoreNormalization", "ZScoreNormalization"]`, `plans_name PASS "nnUNetPlans"`,
+    `plans_dataset_name PASS "Dataset501_OpenCrack"`, `checkpoint_loadable WARN` (documented
+    magic-byte fallback, `weights_only=True` raised `UnpicklingError` for
+    `numpy._core.multiarray.scalar`, exactly as anticipated), `nnunet_results_symlink PASS`,
+    `check_hashes PASS 6 files match .../config/model_manifest.json`. `14 PASS · 1 WARN · 0 FAIL`,
+    `exit=0`. Matches the review's accept condition for issue 1 exactly.
+  - `./env.sh python scripts/verify_model.py ; echo "exit=$?"` (no `--check-hashes`, the card's own
+    first command) -> same 13 non-hash checks, all PASS except the same documented
+    `checkpoint_loadable` WARN. `13 PASS · 1 WARN · 0 FAIL`, `exit=0`.
+  - Idempotency: `stat -c '%i %Z' nnunet/results/Dataset501_OpenCrack` before and after a second
+    consecutive `./env.sh python scripts/verify_model.py` run -> `20879111 1789624174` both times
+    (byte-identical inode and ctime); second run's table and exit code identical to the first
+    (`13 PASS · 1 WARN · 0 FAIL`, `exit=0`).
+  - `ls -la nnunet/results/` -> `Dataset501_OpenCrack -> ../../models/opencrack-nnunet/Dataset501_OpenCrack`.
+  - `readlink nnunet/results/Dataset501_OpenCrack` -> `../../models/opencrack-nnunet/Dataset501_OpenCrack`
+    (relative, starts with `../`, per adr/004).
+  - `test -f nnunet/results/Dataset501_OpenCrack/nnUNetTrainer__nnUNetPlans__2d/plans.json && echo
+    "symlink resolves"` -> `symlink resolves`.
+  - `./env.sh python -c "import os,glob; print(sorted(glob.glob(os.path.join(os.environ['nnUNet_results'],'Dataset501*'))))"`
+    -> `['/home/boosterk1/Projects/rebot_crack_vision/nnunet/results/Dataset501_OpenCrack']` — the
+    `-d 501` fallback path (adr/006) is discoverable.
+  - `find models -newer config/model_manifest.json` -> empty (run after the repair and after every
+    verification pass in this session) — confirms `models/**` was not touched again after the
+    authorised repair, and that the repair itself left the manifest no older than the model files.
+  - `cat logs/verify_model_latest.json` -> valid JSON envelope (`tool/schema_version/started_utc/
+    finished_utc/duration_s/status/exit_code/counts/errors`) plus a `checks` array of 15 entries
+    (all 14 core checks + `check_hashes`, from the `--check-hashes` run that ran last), `status:
+    "ok"`, `exit_code: 0`, `counts: {"pass": 14, "warn": 1}`. (Note: the review's accept text said
+    "a 14-entry checks array once --check-hashes is included" — the actual array has 15 entries,
+    one per check row printed in the table, including `check_hashes` itself; the 14 PASS + 1 WARN =
+    15 total is what the printed table's own summary line also shows. Flagging the discrepancy
+    between the review's wording and the observed array length rather than silently matching it.)
+  - `git diff --stat scripts/verify_model.py` -> empty (no code change).
+  - `git status --porcelain` -> `config/model_manifest.json` and `task_cards/TASK_INDEX.md` modified
+    (both expected — see CHANGES); the same pre-existing untracked planning docs from session start;
+    no other file touched.
+  - `./env.sh pytest tests/ -v` -> `collected 0 items` / `no tests ran` (unchanged from TC-005
+    revision 0 and TC-003; `tests/` still holds only TC-001's `.gitkeep` — TC-005 owns no test file).
+  - Dataset.json / plans.json contract values, printed and PASS-verified this run (per the card's
+    Documentation-update requirement): `channel_names={"0": "R", "1": "G", "2": "B"}`,
+    `labels={"background": 0, "crack": 1}`, `file_ending=".png"`,
+    `overwrite_image_reader_writer="NaturalImage2DIO"`, `patch_size=[256, 256]`.
+ISSUES:
+  - **Root cause (established by the review, re-confirmed here, not re-litigated):** the corrupt
+    `plans.json` was a hardlink write-through from TC-004's own review scratch tree (built with
+    hardlinks; `find -samefile` showed the scratch copy and the real model file shared one inode) —
+    the reviewer's deliberate "corrupt a scratch plans.json" test at `2026-09-17T05:39:01Z` wrote
+    through into the real file and was never reverted, 2m15s before the original TC-005 attempt began.
+    Not caused by any implementation card. Repaired per the review's explicit, scoped exception for
+    this revision only (`fetch_model.py --force`, authorised to touch `models/**` and
+    `config/model_manifest.json` despite TC-005's normal file-ownership list).
+  - `config/model_manifest.json` is left **modified but uncommitted** in the working tree
+    (`downloaded_utc` only). The review's commit instructions for this revision name exactly three
+    files to commit — `scripts/verify_model.py` (unchanged, so nothing to commit there),
+    `docs/COMPLETION_LOG.md`, and `task_cards/TASK_INDEX.md` — and do not include
+    `config/model_manifest.json`, which TC-004 owns. I did not commit it. The next session/reviewer
+    should be aware `git status` will show this file as dirty; it reflects the sanctioned repair, not
+    an unreviewed change, and its content (aside from the timestamp) is identical to what TC-004
+    originally produced and already committed in `e118073`.
+  - Per issue 3 (minor, optional) in the review report: `verify_model.py`'s exit-code precedence
+    (`hash_fail` short-circuits to exit 1 even when core FAILs are also present) is left as-is. This
+    is the intentional, literal reading of the card's own contract ("`--check-hashes` re-verifies
+    sha256... Mismatch -> exit 1 naming the file", `docs/INTERFACES.md` §3.7.5, distinct from the
+    0/3 exit codes used by every other check) — changing it would mean guessing a new, undocumented
+    precedence rule the card never specified. Not applicable to the currently-delivered tree (no
+    core FAILs are present after the repair), so it could not be re-reproduced this run in any case.
+  - Per issue 4 (minor, optional): `verify_model.py --dry-run` exits 0 unconditionally, even if the
+    read-only checks it ran would otherwise report FAILs. This mirrors `check_env.py`'s accepted
+    literal reading of `docs/INTERFACES.md` §0.3 ("log what would be done, write nothing, exit 0")
+    and is unchanged. **TC-011's `run_test.sh` must not call `verify_model.py --dry-run` as a
+    pass/fail gate** — it must call it without `--dry-run` and branch on the real exit code (0/1/3).
+  - `checkpoint_loadable` still WARNs on every run (`weights_only=True` raises `UnpicklingError:
+    Unsupported global: GLOBAL numpy._core.multiarray.scalar`), falling back to the magic-byte check
+    as the card's §3 explicitly anticipates for nnU-Net checkpoints carrying non-tensor metadata.
+    This is unchanged from revision 0 and is not a defect — `weights_only=False` appears nowhere in
+    the file (`grep -n "weights_only=False\|weights_only = False" scripts/verify_model.py` -> no
+    match).
+NEXT CARD: TC-006
+```

@@ -15,8 +15,8 @@ prerequisites are now all satisfied from `BLOCKED` to `READY`.
 | TC-002 | Python environment, dependencies, `env.sh` | TC-001 | MEDIUM | COMPLETE | Sonnet |
 | TC-003 | Environment verification (Level 1) | TC-002 | SMALL–MED | COMPLETE | Sonnet |
 | TC-004 | OpenCrack model acquisition | TC-002 | SMALL–MED | COMPLETE | Sonnet |
-| TC-005 | nnU-Net wiring + semantic validation | TC-004 | SMALL | **BLOCKED** (corrupt `plans.json` in `models/`, see COMPLETION_LOG) | Sonnet |
-| TC-006 | Synthetic end-to-end smoke test (Level 2) | TC-003, TC-005 | MEDIUM | BLOCKED | Sonnet |
+| TC-005 | nnU-Net wiring + semantic validation | TC-004 | SMALL | COMPLETE | Sonnet |
+| TC-006 | Synthetic end-to-end smoke test (Level 2) | TC-003, TC-005 | MEDIUM | **READY** | Sonnet |
 | TC-007 | Input preparation + naming contract | TC-002 | MEDIUM | **READY** | Sonnet |
 | TC-008 | Batch inference runner | TC-005, TC-006, TC-007 | MEDIUM | BLOCKED | Sonnet |
 | TC-009 | Visualization pipeline | TC-007 | MEDIUM | BLOCKED | Sonnet |
@@ -149,15 +149,14 @@ One card creates each file. Nothing else may create or rewrite it.
 ## Progress
 
 ```
-TC-001, TC-002, TC-003, TC-004 █████░░░░░░░░░░░  4 / 16 complete
+TC-001, TC-002, TC-003, TC-004, TC-005 ██████░░░░░░░░░░  5 / 16 complete
 ```
 
 TC-002 delivered the `crackvision` conda env (Python 3.11), CUDA torch 2.14.0+cu126, nnunetv2 2.8.1,
 the pinned imaging stack, and the `env.sh` scrubbing launcher. TC-004 downloaded and hashed the
 OpenCrack nnU-Net snapshot into `models/opencrack-nnunet/`; `check_env.py`'s model rows are now
-PASS. TC-005 built and ran `scripts/verify_model.py`, but is BLOCKED: `.../nnUNetTrainer__nnUNetPlans__2d/plans.json`
-in `models/` is corrupted (one stray trailing byte, sha256 mismatch vs `config/model_manifest.json`)
-— likely an unreverted artifact of TC-004's own review testing (`docs/REVIEW_LOG.md`), not upstream
-drift. Re-run `./env.sh python scripts/fetch_model.py --force` then re-run TC-005 to clear it; every
-other check (dataset.json's 4 assertions, checkpoint sanity, the symlink and its edge cases) already
-PASSes. TC-006 stays BLOCKED until TC-005 is COMPLETE.
+PASS. TC-005 built `scripts/verify_model.py` and is now COMPLETE: a corrupted local `plans.json`
+(one stray trailing byte, a hardlink write-through from TC-004's own review scratch tree — see
+`docs/COMPLETION_LOG.md`) was repaired via `./env.sh python scripts/fetch_model.py --force`
+(re-verified: only `downloaded_utc` changed, all six manifest sha256/bytes values identical), after
+which all 14 core checks plus `--check-hashes` PASS. TC-006 is now READY.
