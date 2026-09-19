@@ -252,12 +252,18 @@ def run_inference(
     log.info("predictions are uint8 PNGs with values {0,1} (not {0,255}); see data/overlays/ for viewable renders")
 
     t0 = time.monotonic()
-    proc = subprocess.run(command, capture_output=True, text=True, env=env)
+    proc = subprocess.Popen(
+        command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, env=env
+    )
+    lines: list[str] = []
+    for line in proc.stdout:  # type: ignore[union-attr]
+        stripped = line.rstrip()
+        lines.append(stripped)
+        if stripped.strip():
+            log.info("nnunet: %s", stripped)
+    proc.wait()
     duration_s = time.monotonic() - t0
-    combined = proc.stdout + "\n" + proc.stderr
-    for line in combined.splitlines():
-        if line.strip():
-            log.info("nnunet: %s", line)
+    combined = "\n".join(lines)
 
     if proc.returncode != 0:
         if _looks_like_oom(combined):
@@ -308,8 +314,10 @@ def _augment_summary_files(log_dir: Path, tool: str, latest_path: Path, extra: d
     """Merge extra top-level fields into `<tool>_latest.json` and its timestamped twin.
 
     `RunSummary`'s schema (crackvision.logging_setup, TC-001, not this card's to modify) has no
-    field for `run_inference()`'s extra keys (`seconds_per_image`, `command`, `device`) — the same
-    documented adaptation TC-003 (`checks`/`versions`) and TC-005 used for their own extra fields.
+    field for `run_inference()`'s extra keys (`images`, `inference_duration_s`, `seconds_per_image`,
+    `command`, `device`) — the same documented adaptation TC-003 (`checks`/`versions`) and TC-005
+    used for their own extra fields. `inference_duration_s` is named distinctly from RunSummary's
+    own `duration_s` (the tool's whole-run wall time) so the two are never conflated.
     """
     extra = {k: v for k, v in extra.items() if v is not None}
     if not extra:
@@ -407,6 +415,8 @@ def main(argv: list[str] | None = None) -> int:
         "inference",
         latest_path,
         {
+            "images": result.get("images"),
+            "inference_duration_s": result.get("duration_s"),
             "seconds_per_image": result.get("seconds_per_image"),
             "command": result.get("command"),
             "device": result.get("device"),

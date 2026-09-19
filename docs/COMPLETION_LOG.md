@@ -1406,3 +1406,102 @@ ISSUES:
   - None otherwise.
 NEXT CARD: TC-009
 ```
+
+---
+
+TASK: TC-008
+STATUS: COMPLETE
+CHANGES:
+  - src/crackvision/inference.py — revised per the rev-1 Opus review
+    (.task_orchestrator/reviews/TC-008-rev1-1bcf09a35ee4/{report.md,issues.json}: 1 MAJOR, 1 MINOR).
+    Fixed exactly these two findings, nothing else:
+    1. [MAJOR] `run_inference()` previously launched the nnU-Net subprocess with
+       `subprocess.run(command, capture_output=True, text=True, env=env)` and only replayed the
+       captured stdout+stderr into the logger after the process had already exited — the earlier
+       completion-log entry's claim that the module "streams the subprocess's stdout+stderr into the
+       logger line by line" was false of that code (all `nnunet:` log lines carried one identical
+       timestamp). Replaced it with `subprocess.Popen(command, stdout=subprocess.PIPE,
+       stderr=subprocess.STDOUT, text=True, bufsize=1, env=env)`, iterating `for line in proc.stdout`
+       and calling `log.info("nnunet: %s", line.rstrip())` as each line arrives, accumulating the same
+       lines into a list so the joined text is still available to the unchanged
+       `_looks_like_oom(combined)` regex check; finishes with `proc.wait()` and keeps using
+       `proc.returncode` exactly as before. No change to command construction, precondition order, the
+       OOM ladder, the partial-output verification, or exit codes. `scripts/smoke_test.py` was not
+       touched — it only consumes `run_inference()`'s returned dict, not its internal subprocess
+       mechanics.
+    2. [MINOR] `logs/inference_latest.json` merged `seconds_per_image`/`command`/`device` but neither
+       the measured subprocess duration nor a top-level `images` count, so `duration_s` in the file
+       (RunSummary's whole-tool wall time — unchanged, not this card's field to redefine) could not be
+       reconciled against `seconds_per_image`, and a consumer reading `summary["images"]` (the card's
+       own acceptance wording) got `KeyError` since the count was only ever written to
+       `counts.images`. `main()` now also passes `"images": result.get("images")` and
+       `"inference_duration_s": result.get("duration_s")` through `_augment_summary_files()` as
+       additional top-level keys — named distinctly from `RunSummary`'s own `duration_s` so the two
+       are never conflated. `RunSummary`'s schema and `logging_setup.py` are untouched.
+  - docs/COMPLETION_LOG.md — this entry. The original TC-008 entry above is left as written
+    (append-only, per `task_cards/AGENT_INSTRUCTIONS.md` rule 10) — its "streams ... line by line"
+    claim was inaccurate of the code at the time it was written; this entry is the correction.
+  - task_cards/TASK_INDEX.md — TC-008 row confirmed `COMPLETE` (already so from rev-0; no status
+    change needed).
+TESTS:
+  - `./env.sh pytest tests/ -q` -> `37 passed in 0.32s`, matching the rev-0 baseline exactly.
+  - `./env.sh python -m crackvision.inference --help` -> unchanged full signature, exit 0.
+  - `./env.sh python -m crackvision.inference --dry-run -v 2>&1 | grep -E "\-f 0|checkpoint_ep0500"` ->
+    matched; `dryrun exit=0`.
+  - **Streaming proof (Finding 1's acceptance condition), real GPU run against two inputs**
+    (`data/nnunet_input/rev1testA_0000.png` 512x512, `rev1testB_0000.png` 480x640, synthetic, written
+    directly for this test): `./env.sh python -m crackvision.inference` -> `exit=0`,
+    `inference complete: 2 image(s) in 11.98s (5.992s/image)`.
+    `awk '/nnunet:/ {print $2}' logs/inference_20260919T192639Z.log | sort -u | wc -l` -> `17` (> 1,
+    required > 1). Earliest `nnunet:` line timestamp `19:26:45.153`, `inference complete:` line
+    timestamp `19:26:52.724` — 7.57s apart (required >= 1s). Per-tile nnU-Net progress lines (`0%`,
+    `11%`, `56%`, `100%`, etc.) are individually timestamped seconds apart in the log, confirming they
+    arrived as the subprocess produced them, not as a single post-hoc dump.
+  - Predictions from that run: `data/predictions/rev1testA.png uint8 (512, 512) [0 1]`,
+    `data/predictions/rev1testB.png uint8 (480, 640) [0]` — dtype/values/shape all correct, frame
+    invariant held for both the square and non-square input.
+  - **Finding 2's exact acceptance check:**
+    `python3 -c "import json; d=json.load(open('logs/inference_latest.json'));
+    print(d['images'], d['inference_duration_s'], d['seconds_per_image'], d['duration_s'])"` ->
+    `2 11.983982879668474 5.991991439834237 13.352` (no `KeyError`);
+    `abs(d['images']*d['seconds_per_image'] - d['inference_duration_s'])` -> `0.0` (< 0.01, required).
+  - **OOM branch still fires under the new Popen path**: patched `subprocess.Popen` (selectively, only
+    for the nnU-Net command, so torch's own internal `Popen` calls for CUDA init were unaffected) to
+    return a fake process yielding lines including `"CUDA out of memory. Tried to allocate 2 GiB"` and
+    `returncode=1` -> `run_inference()` returned `{'status': 'failed', 'exit_code': 1, ...}`, logged
+    all five ladder steps (`--not-on-device`, `--not-on-device --npp 1 --nps 1`, `--disable-tta`,
+    `prepare_inputs --max-side 1024`, `--device cpu`) plus the "Do NOT kill their processes" line, and
+    the `nnunet: <line>` entries appeared for each fed line before the failure was logged.
+  - Preconditions re-verified (both untouched by this revision's diff, confirmed still correct):
+    empty-input -> `no *_0000.png files in .../data/nnunet_input` / `run: ./env.sh python -m
+    crackvision.prepare_inputs`, `empty exit=3`. Missing-model (scratch `--root` with only
+    `config/project.yaml`) -> `model folder missing: ...` / `run: ./env.sh python
+    scripts/fetch_model.py`, `missing-model exit=3`.
+  - `--device cpu`: real run -> `inference complete: 2 image(s) in 19.18s (9.589s/image)`,
+    `cpu exit=0`; nnU-Net's own `perform_everything_on_device=True is only supported for cuda
+    devices! Setting this to False` line streamed live, confirming CPU mode too streams rather than
+    batch-captures.
+  - `--use-dataset-id`: real run -> `nnUNetv2_predict -d 501 -c 2d -f 0 -chk checkpoint_ep0500.pth ...`,
+    `inference complete: 2 image(s) in 11.95s (5.975s/image)`, exit=0, both prediction PNGs present.
+  - `./env.sh python scripts/smoke_test.py --clean --device cuda` -> `SMOKE TEST PASSED (7 assertions x
+    2 images, 12.4 s)`, `crack pixels: synthetic_crack 1.75%   synthetic_blank 0.00%`, `exit=0` —
+    unchanged from the rev-0 numbers; `scripts/smoke_test.py` was not modified this revision.
+  - `./env.sh python scripts/verify_model.py --check-hashes` -> `14 PASS · 1 WARN · 0 FAIL`,
+    `check_hashes PASS 6 files match` — model tree unaffected by any of this session's real runs.
+  - `nvidia-smi --query-compute-apps=pid,used_memory --format=csv` -> empty (no compute processes) both
+    before and after every real run in this session; `nvidia-smi --query-gpu=memory.used --format=csv`
+    -> `178 MiB` at session end, matching the idle baseline — no leaked GPU process.
+  - Cleanup: removed the scratch `rev1testA_0000.png`/`rev1testB_0000.png` from `data/nnunet_input/`
+    and their corresponding predictions from `data/predictions/`, restoring both to `.gitkeep`-only
+    plus nnU-Net's own harmless copied `dataset.json`/`plans.json`/`predict_from_raw_data_args.json`
+    sidecar files (regenerated by nnU-Net itself on every real run regardless of caller; not written by
+    this module). The scratch `--root` used for the missing-model precondition check was under `/tmp`,
+    outside the project, and was removed after use.
+  - `git status --porcelain` -> only `src/crackvision/inference.py` (modified) and
+    `docs/COMPLETION_LOG.md` (this entry) beyond the pre-existing dirty state from session start
+    (`config/model_manifest.json`, `task_cards/TASK_INDEX.md`, and the untracked planning docs — all
+    confirmed pre-existing via the session's initial git status, none touched here).
+ISSUES:
+  - None. Both findings from the rev-1 review are fixed and independently re-verified against their
+    stated acceptance conditions; no new deviation introduced.
+NEXT CARD: TC-009
