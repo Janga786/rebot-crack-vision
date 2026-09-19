@@ -1505,3 +1505,113 @@ ISSUES:
   - None. Both findings from the rev-1 review are fixed and independently re-verified against their
     stated acceptance conditions; no new deviation introduced.
 NEXT CARD: TC-009
+
+---
+
+## TC-009 — Visualization pipeline
+
+```
+TASK: TC-009
+STATUS: COMPLETE
+CHANGES:
+  - src/crackvision/visualize.py — new. Implements docs/INTERFACES.md §3.3: `load_original_rgb`
+    (exif_transpose + convert("RGB"), the same treatment prepare_inputs (TC-007) gave the source
+    before deriving its recorded width/height — this is what keeps a EXIF-rotated original's shape
+    matching its prediction, per TC-007's review integration risk), `load_prediction`, `binarize`
+    (`pred > 0`, RISKS.md R-03), `render_mask` (`binary * 255`, single-channel uint8), `render_overlay`
+    (blend done in float32 then clipped/rounded to uint8 — never blended in uint8), `render_comparison`
+    (ORIGINAL | MASK | OVERLAY concatenated with an 8 px white gutter, each panel captioned via
+    `PIL.ImageDraw` + `ImageFont.load_default()` on a dark rectangle for legibility, no TTF
+    dependency), `visualize_case(cfg, case_entry, ...) -> dict` (per-case orchestration: missing
+    prediction/original -> failed+continue, shape mismatch -> failed+continue without writing
+    partial outputs, empty mask -> not an error), and `main() -> int` wiring `--cases`, `--alpha`,
+    `--color` plus the six common flags. Directories for predictions/overlays/comparisons are read
+    from `cfg.paths`, not from `naming.py`'s literal path helpers, per TC-007's review note that
+    those helpers are config-independent by design. No hard-coded `/home/` path (grep-verified).
+  - tests/test_visualize.py — new. 9 tests using the `tmp_project` fixture and hand-built
+    originals/predictions (no real model, no prepare_inputs/inference calls): `{0,1}` -> mask
+    `{0,255}`; `{0,255}` -> identical mask/crack-pixel count to the `{0,1}` case; all-zero prediction
+    -> valid outputs, exit 0, not an error; all-ones prediction -> overlay equals the float-blend
+    formula exactly (cross-checked against `render_overlay` directly); mask/overlay/comparison
+    dimensions (comparison width == `3*W + 2*gutter`); a shape-mismatched case is counted failed
+    while a healthy sibling case still completes, final exit 1; a grayscale original still yields a
+    3-channel RGB overlay; `--dry-run` writes zero files; missing `case_map.json` -> exit 3.
+  - docs/COMPLETION_LOG.md — this entry.
+  - task_cards/TASK_INDEX.md — TC-009 row set to `COMPLETE`; progress narrative and count (9/16)
+    updated. TC-010 was already `READY` (depends on TC-002, unaffected by this card); TC-011 stays
+    `BLOCKED` (still needs TC-010).
+TESTS:
+  - `./env.sh pytest tests/test_visualize.py -v` ->
+    ```
+    tests/test_visualize.py::test_prediction_values_0_1_yield_mask_0_255 PASSED
+    tests/test_visualize.py::test_prediction_values_0_255_yield_same_mask_and_crack_pixels PASSED
+    tests/test_visualize.py::test_all_zero_prediction_is_not_an_error PASSED
+    tests/test_visualize.py::test_all_ones_prediction_overlay_equals_blend_everywhere PASSED
+    tests/test_visualize.py::test_output_dimensions_match_frame_invariant PASSED
+    tests/test_visualize.py::test_shape_mismatch_fails_that_case_and_others_continue PASSED
+    tests/test_visualize.py::test_grayscale_original_yields_rgb_overlay PASSED
+    tests/test_visualize.py::test_dry_run_writes_zero_files PASSED
+    tests/test_visualize.py::test_missing_case_map_exits_precondition PASSED
+    9 passed in 0.26s
+    ```
+  - `./env.sh pytest tests/ -v` -> **46 passed in 0.44s** (37 pre-existing + 9 new; no regression in
+    `test_naming.py` / `test_prepare_inputs.py`).
+  - `./env.sh python -m crackvision.visualize --help` -> prints exactly `[--cases CASE_ID...]
+    [--alpha ALPHA] [--color R,G,B]` plus all six common flags (`--root --config -v/--verbose
+    -q/--quiet --dry-run --skip-existing`).
+  - `./env.sh python -m crackvision.visualize ; echo "exit=$?"` against the live repo (no
+    `data/case_map.json` exists yet — no real images have been dropped into
+    `data/input_originals/` by a user in this project's lifetime) -> `ERROR visualize: run:
+    ./env.sh python -m crackvision.prepare_inputs first`, `exit=3`. Confirmed afterward this left no
+    trace beyond the expected gitignored `logs/visualize_*` pair (`git status --porcelain` unchanged
+    except the pre-existing dirty files already present at session start).
+  - **Full real chain**, run against an **isolated scratch root** under the session scratchpad (not
+    the live project's `data/`, to avoid populating directories `data/input_originals/` and
+    `data/predictions/` that belong to the user/other cards) — `models/` and `nnunet/results/` were
+    symlinked read-only into the scratch root from the real project so real inference could run:
+    - Wrote one synthetic 256×256 RGB image with a hand-drawn dark polyline "crack" into the scratch
+      root's `data/input_originals/`.
+    - `./env.sh python -m crackvision.prepare_inputs --root <scratch>` -> `converted ... (RGB PNG ->
+      RGB, 256x256)`, `wrote .../data/case_map.json (1 case(s))`, exit 0.
+    - `./env.sh python -m crackvision.inference --root <scratch> -v` -> real
+      `nnUNetv2_predict_from_modelfolder` run on **CUDA** (RTX 3090, `nnUNet_extTrainer` shim
+      resolved `nnUNetTrainerSaveEvery10` exactly as TC-008 documented) -> `inference complete: 1
+      image(s) in 11.18s (11.185s/image)`, exit 0.
+    - `./env.sh python -m crackvision.visualize --root <scratch> -v` -> `case deck_crack: 1839 crack
+      pixels (2.806%)`, exit 0. `data/overlays/deck_crack_{mask,overlay}.png` and
+      `data/comparisons/deck_crack_comparison.png` all created.
+    - Card's own verification snippet re-run against the scratch outputs ->
+      `deck_crack orig (256, 256) mask (256, 256) overlay (256, 256) cmp (784, 256)`,
+      `mask unique [0 255]`, `mask mode L overlay mode RGB`, comparison width assertion
+      (`256*3 + 2*8 = 784`) held, `OK`.
+    - Visually inspected `deck_crack_comparison.png`: the model correctly segmented the synthetic
+      crack; ORIGINAL/MASK/OVERLAY captions render legibly on their dark rectangles with no TTF font
+      installed; the red overlay color and the white gutter both render correctly.
+    - `--alpha 0.8 --color 0,255,255` re-run on the same case -> mean RGB at masked pixels
+      `[15.78, 219.76, 219.76]` (trends cyan, consistent with the requested color and a high alpha),
+      confirming `--alpha`/`--color` are honoured.
+    - `--skip-existing` re-run -> logged `skip-existing: case deck_crack already has all three
+      outputs`; `deck_crack_mask.png` mtime unchanged across a 1 s sleep boundary.
+    - `--cases deck_crack nonexistent_case` -> `ERROR requested case_id not found in
+      case_map.json: nonexistent_case` plus the real case still processed and logged; exit **1**
+      (one failed + one processed).
+    - GPU memory before and after every real-inference run: `178 MiB / 24576 MiB` (idle baseline,
+      matches TC-002/TC-006/TC-008's pinned fact) — no growth, no compute process left running.
+    - `./env.sh python scripts/verify_model.py --check-hashes` after all real-inference runs ->
+      `14 PASS · 1 WARN · 0 FAIL`, `check_hashes PASS 6 files match .../config/model_manifest.json`
+      — model tree still intact.
+    - Scratch root deleted afterward (`rm -rf`); confirmed the live project's `data/input_originals/`,
+      `data/nnunet_input/`, `data/predictions/`, `data/overlays/`, `data/comparisons/` hold no new
+      files from this session (only the pre-existing `data/predictions/{dataset.json,plans.json,
+      predict_from_raw_data_args.json}` nnU-Net-copied leftovers from an earlier card, present since
+      before this session started).
+  - `grep -n "/home/" src/crackvision/visualize.py tests/test_visualize.py` -> no match (exit 1).
+  - `git status --porcelain` before commit -> exactly `src/crackvision/visualize.py` and
+    `tests/test_visualize.py` added beyond the pre-existing dirty state recorded at session start
+    (`config/model_manifest.json`, `task_cards/TASK_INDEX.md` modified; the ten planning-doc/
+    task-card paths untracked) — no other file touched.
+ISSUES:
+  - None. All nine acceptance checkboxes were exercised for real, including a full real-model GPU
+    run, and no deviation from `docs/INTERFACES.md` §3.3 or the card body was needed.
+NEXT CARD: TC-010
+```

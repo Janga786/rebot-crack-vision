@@ -19,7 +19,7 @@ prerequisites are now all satisfied from `BLOCKED` to `READY`.
 | TC-006 | Synthetic end-to-end smoke test (Level 2) | TC-003, TC-005 | MEDIUM | COMPLETE | Sonnet |
 | TC-007 | Input preparation + naming contract | TC-002 | MEDIUM | COMPLETE | Sonnet |
 | TC-008 | Batch inference runner | TC-005, TC-006, TC-007 | MEDIUM | COMPLETE | Sonnet |
-| TC-009 | Visualization pipeline | TC-007 | MEDIUM | **READY** | Sonnet |
+| TC-009 | Visualization pipeline | TC-007 | MEDIUM | COMPLETE | Sonnet |
 | TC-010 | Skeletonization utility | TC-002 (TC-007 for real data) | SMALL–MED | **READY** | Sonnet |
 | TC-011 | One-command runner `run_test.sh` | TC-003, TC-007, TC-008, TC-009, TC-010 | MEDIUM | BLOCKED | Sonnet |
 | TC-012 | RealSense software validation | TC-002 | SMALL | **READY** | Sonnet |
@@ -149,7 +149,7 @@ One card creates each file. Nothing else may create or rewrite it.
 ## Progress
 
 ```
-TC-001, TC-002, TC-003, TC-004, TC-005, TC-006, TC-007, TC-008 █████████░░░░░░░  8 / 16 complete
+TC-001, TC-002, TC-003, TC-004, TC-005, TC-006, TC-007, TC-008, TC-009 █████████░░░░░░░  9 / 16 complete
 ```
 
 TC-002 delivered the `crackvision` conda env (Python 3.11), CUDA torch 2.14.0+cu126, nnunetv2 2.8.1,
@@ -187,3 +187,18 @@ edit to that file, and still passes with byte-identical assertions. Both `-m` (d
 `--use-dataset-id` (`-d 501 -c 2d`, proving TC-005's symlink) invocation forms were run for real on
 CUDA and CPU. TC-009 remains READY (unaffected by this card); TC-010 flipped to READY when TC-007
 completed (harness-synced, not this card's doing).
+
+TC-009 built `src/crackvision/visualize.py` and is now COMPLETE: `visualize_case()` binarises
+defensively (`pred > 0`, proven against both `{0,1}` and `{0,255}` fixtures), renders
+`{case}_mask.png`/`{case}_overlay.png`/`{case}_comparison.png` (alpha-blended in float per
+`docs/INTERFACES.md` §3.3, never in uint8), and hard-fails only the mismatched case on a
+prediction/original shape mismatch while the rest of the batch continues. The original is loaded
+with the same `exif_transpose` + `convert("RGB")` treatment `prepare_inputs` gave it, so an
+EXIF-rotated source's dimensions still match its prediction — closing the integration risk TC-007's
+review flagged for this card. 9 new tests in `tests/test_visualize.py` all pass (46/46 total across
+the suite), and a full real run (`prepare_inputs` → real GPU `nnUNetv2_predict_from_modelfolder` →
+`visualize`) against a synthetic crack image in an isolated scratch root confirmed the whole chain
+end-to-end, including `--alpha`/`--color` overrides, `--skip-existing`, and an unknown `--cases` id
+being reported and counted as failed without aborting the batch; see `docs/COMPLETION_LOG.md` for
+the full evidence trail. TC-010 remains READY (unaffected by this card); TC-011 stays BLOCKED until
+TC-010 also completes.
