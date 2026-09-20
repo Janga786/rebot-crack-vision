@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Crack Vision Capstone</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface:        #fcfcfb;
+    --plane:          #f2f1ee;
+    --ink:            #0b0b0b;
+    --ink-2:          #52514e;
+    --muted:          #898781;
+    --hair:           #e1e0d9;
+    --blue:           #2a78d6;
+    --blue-wash:      #e6effb;
+    --orange:         #eb6834;
+    --aqua:           #1baf7a;
+    --good:           #0ca30c;
+    --good-wash:      #e8f6e8;
+    --critical:       #d03b3b;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--plane);
+    color: var(--ink);
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------- deck shell ---------- */
+  #deck { position: relative; }
+
+  .slide {
+    display: none;
+    position: relative;
+    width: min(100vw, calc((100vh - 46px) * 16 / 9));
+    height: min(calc(100vh - 46px), calc(100vw * 9 / 16));
+    margin: 0 auto;
+    background: var(--surface);
+    padding: 3.2vmin 4.2vmin 4.6vmin;
+    overflow: hidden;
+    container-type: size;
+  }
+  .slide.active { display: flex; flex-direction: column; }
+
+  /* type scale is tied to the slide box so it survives any window size */
+  .slide h1 { font-size: 5.6cqh; line-height: 1.12; margin: 0 0 1.4cqh; letter-spacing: -0.02em; }
+  .slide h2 { font-size: 4.6cqh; line-height: 1.14; margin: 0 0 1.2cqh; letter-spacing: -0.015em; }
+  .slide p, .slide li { font-size: 2.55cqh; line-height: 1.5; color: var(--ink-2); margin: 0 0 1.1cqh; }
+  .slide .lead { font-size: 3.0cqh; color: var(--ink-2); max-width: 58ch; }
+  .kicker {
+    font-size: 1.95cqh; font-weight: 700; letter-spacing: 0.13em; text-transform: uppercase;
+    color: var(--blue); margin: 0 0 1.6cqh;
+  }
+  .kicker.warm  { color: var(--orange); }
+  .kicker.muted { color: var(--muted); }
+  strong { color: var(--ink); font-weight: 650; }
+  code, .mono { font-family: var(--mono); font-size: 0.92em; }
+  a { color: var(--blue); }
+
+  .fill { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; justify-content: center; }
+  .figure { flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; }
+  .figure img { max-width: 100%; max-height: 100%; object-fit: contain; }
+  .caption { font-size: 1.95cqh; color: var(--muted); margin-top: 1.1cqh; }
+
+  .cols { display: flex; gap: 3.4cqw; flex: 1 1 auto; min-height: 0; }
+  .cols > * {
+    flex: 1 1 0; min-width: 0;
+    display: flex; flex-direction: column; justify-content: center;
+  }
+  .cols.tight { gap: 2.2cqw; }
+
+  ul { margin: 0; padding-left: 1.15em; }
+  li { margin-bottom: 1.0cqh; }
+  li::marker { color: var(--muted); }
+
+  /* ---------- stat tiles ---------- */
+  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.6cqw; }
+  .tiles.three { grid-template-columns: repeat(3, 1fr); }
+  .tile {
+    background: var(--plane); border-radius: 0.9cqh; padding: 3.4cqh 2.4cqh;
+    border-left: 0.5cqh solid var(--blue);
+  }
+  .tile.good { border-left-color: var(--good); }
+  .tile.warm { border-left-color: var(--orange); }
+  .tile .value { font-size: 6.8cqh; font-weight: 700; color: var(--ink); line-height: 1; letter-spacing: -0.03em; }
+  .tile .value .unit { font-size: 0.42em; font-weight: 600; color: var(--ink-2); letter-spacing: 0; }
+  .tile .label { font-size: 1.9cqh; color: var(--ink-2); margin-top: 1.0cqh; line-height: 1.35; }
+
+  /* ---------- misc blocks ---------- */
+  .note {
+    background: var(--blue-wash); border-left: 0.5cqh solid var(--blue);
+    padding: 1.8cqh 2.2cqh; border-radius: 0.6cqh;
+  }
+  .note.good { background: var(--good-wash); border-left-color: var(--good); }
+  .note.flag { background: #fdecec; border-left-color: var(--critical); }
+  .note p:last-child, .note ul:last-child { margin-bottom: 0; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 0.9cqh; margin-top: 1.4cqh; }
+  .chip {
+    font-size: 1.85cqh; font-family: var(--mono); color: var(--ink-2);
+    background: var(--plane); border: 1px solid var(--hair);
+    border-radius: 2em; padding: 0.55cqh 1.5cqh;
+  }
+
+  table { width: 100%; border-collapse: collapse; font-size: 2.2cqh; }
+  th, td { text-align: left; padding: 1.15cqh 0.8cqh; border-bottom: 1px solid var(--hair); color: var(--ink-2); }
+  th { color: var(--muted); font-size: 1.85cqh; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+  td.is { color: var(--ink); font-weight: 600; }
+
+  .title-slide { justify-content: center; }
+  .title-slide h1 { font-size: 7.6cqh; max-width: 22ch; }
+  .title-rule { width: 9cqw; height: 0.7cqh; background: var(--blue); margin: 0 0 3.2cqh; border-radius: 1em; }
+  .byline { font-size: 2.4cqh; color: var(--muted); margin-top: 3.4cqh; }
+
+  /* ---------- chrome ---------- */
+  #bar {
+    height: 46px; display: flex; align-items: center; gap: 14px;
+    padding: 0 18px; background: var(--surface); border-top: 1px solid var(--hair);
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 10;
+  }
+  #bar .name { font-size: 13px; font-weight: 650; color: var(--ink); }
+  #bar .sep { color: var(--hair); }
+  #bar .hint { font-size: 12px; color: var(--muted); margin-left: auto; }
+  #counter { font-size: 13px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  #progress { position: fixed; top: 0; left: 0; height: 3px; background: var(--blue); z-index: 11; transition: width .18s ease; }
+  button.nav {
+    font: inherit; font-size: 13px; color: var(--ink-2); background: var(--plane);
+    border: 1px solid var(--hair); border-radius: 6px; padding: 4px 10px; cursor: pointer;
+  }
+  button.nav:hover { color: var(--ink); }
+
+  /* ---------- print / PDF export ---------- */
+  @media print {
+    @page { size: 1600px 900px; margin: 0; }
+    body { background: #fff; }
+    #bar, #progress { display: none !important; }
+    .slide { display: flex !important; flex-direction: column;
+             width: 1600px; height: 900px; page-break-after: always; break-after: page; }
+  }
+</style>
+</head>
+<body>
+<div id="progress"></div>
+<div id="deck">
+
+  <!-- 1 ------------------------------------------------------------------ -->
+  <section class="slide title-slide">
+    <p class="kicker">reBot B601-DM capstone · week of 14–20 Sep 2026</p>
+    <h1>Finding the crack, then reaching it.</h1>
+    <div class="title-rule"></div>
+    <p class="lead">
+      A zero-shot crack-segmentation front-end for robotic concrete inspection — built,
+      reviewed and proven end to end on the GPU this week.
+    </p>
+    <p class="byline">rebot_crack_vision · OpenCrack nnU-Net v2 · RTX 3090</p>
+  </section>
+
+  <!-- 2 ------------------------------------------------------------------ -->
+  <section class="slide">
+    <p class="kicker">The problem</p>
+    <h2>A robot arm can only inspect a crack it can locate</h2>
+    <div class="cols">
+      <div>
+        <p>The capstone goal is a reBot B601-DM arm that follows a crack across a concrete
+        surface with a sensor on its tool — bridge and structure inspection without a human
+        tracing the defect by hand.</p>
+        <p>That needs perception first. Everything downstream — depth, path, trajectory —
+        is meaningless if the pixels marked "crack" are wrong.</p>
+        <div class="note">
+          <p><strong>This week's question:</strong> can a publicly released crack model work
+          <em>zero-shot</em> on our imagery, or does the capstone have to fund a labelling and
+          training effort of its own?</p>
+        </div>
+      </div>
+      <div>
+        <table>
+          <tr><th colspan="2">The candidate</th></tr>
+          <tr><td>Model</td><td class="is">OpenCrack nnU-Net v2, 2D</td></tr>
+          <tr><td>Weights</td><td class="is">268 MB · 92.5 M params · fold 0</td></tr>
+          <tr><td>Trained on</td><td class="is">49,531 images</td></tr>
+          <tr><td>Reported</td><td class="is">0.539 IoU · 0.641 clIoU</td></tr>
+          <tr><td>Licence</td><td class="is">CC-BY-4.0</td></tr>
+          <tr><td>Our cost</td><td class="is">zero training runs</td></tr>
+        </table>
+        <div class="chips">
+          <span class="chip">no fine-tuning</span>
+          <span class="chip">no labelling</span>
+          <span class="chip">no training GPU-hours</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 ------------------------------------------------------------------ -->
+  <section class="slide">
+    <p class="kicker">What shipped</p>
+    <h2>The week in numbers</h2>
+    <div class="fill">
+      <div class="tiles">
+        <div class="tile good"><div class="value">9<span class="unit"> / 16</span></div>
+          <div class="label">task cards shipped, each one independently reviewed before it counted</div></div>
+        <div class="tile good"><div class="value">46</div>
+          <div class="label">unit tests passing, 0 failures</div></div>
+        <div class="tile"><div class="value">12</div>
+          <div class="label">review gates run · 3 cards sent back for revision</div></div>
+        <div class="tile warm"><div class="value">5.8<span class="unit"> s/img</span></div>
+          <div class="label">wall-clock at 512², RTX 3090, incl. process start-up</div></div>
+      </div>
+      <div style="height:2.4cqh"></div>
+      <div class="tiles">
+        <div class="tile"><div class="value">10</div>
+          <div class="label">architecture decisions recorded as ADRs</div></div>
+        <div class="tile"><div class="value">20</div>
+          <div class="label">risks registered with named mitigations</div></div>
+        <div class="tile"><div class="value">6</div>
+          <div class="label">model files pinned by sha256 + revision</div></div>
+        <div class="tile good"><div class="value">0</div>
+          <div class="label">crack pixels on the blank negative control</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 ------------------------------------------------------------------ -->
+  <section class="slide">
+    <p class="kicker">Architecture</p>
+    <h2>The pipeline, and the contract underneath it</h2>
+    <div class="figure"><img src="figures/fig06_pipeline_diagram.png"
+      alt="Pipeline: capture, prepare_inputs, OpenCrack nnU-Net v2, binary mask, visualize; with skeleton, depth, hand-eye and arm trajectory deferred to the next phase"></div>
+    <p class="caption">The frame-invariant rule is the load-bearing decision: break it once and a
+      mis-registered trajectory shows up months later, far from the cause.</p>
+  </section>
+
+  <!-- 5 ------------------------------------------------------------------ -->
+  <section class="slide">
+    <p class="kicker">Result</p>
+    <h2>Image in, centerline out — on real GPU inference</h2>
+    <div class="figure"><img src="figures/fig01_pipeline_result.png"
+      alt="Four panels: input image, binary mask, red overlay, blue centerline"></div>
+    <p class="caption">Level-2 smoke test, run on demand: 4,577 crack pixels (1.75 % of frame),
+      reduced to a 657-pixel one-pixel-wide centerline.</p>
+  </section>
+
+  <!-- 6 ------------------------------------------------------------------ -->
+  <section class="slide">
+    <p class="kicker warm">Rigour</p>
+    <h2>Every run has to fail the blank frame too</h2>
+    <div class="figure"><img src="figures/fig02_negative_control.png"
+      alt="Negative control: blank textured input yields zero crack pixels; the positive case recovers the crack"></div>
+    <p class="caption">A pipeline stuck in the "on" position looks identical to a working one when
+      you only ever show it cracks.</p>
+  </section>
+
+  <!-- 7 ------------------------------------------------------------------ -->
+  <section class="slide">
+    <p class="kicker">Engineering</p>
+    <h2>Three failures worth designing against</h2>
+    <div class="cols tight">
+      <div>
+        <p class="kicker muted">R-01 · environment</p>
+        <p><strong>ROS poisons the interpreter.</strong> The shell profile puts ROS Humble's
+        Python 3.10 packages on the path of a 3.11 process — pure-Python packages shadow real
+        ones, compiled ones throw opaque ABI errors.</p>
+        <p><code>env.sh</code> scrubs <code>PYTHONPATH</code>, filters <code>/opt/ros</code> out of
+        the loader path, and the verifier <em>fails the build</em> if a ROS entry ever returns.</p>
+      </div>
+      <div>
+        <p class="kicker muted">R-02 · shared GPU</p>
+        <p><strong>The card is not ours alone.</strong> Other projects on this workstation park
+        multi-GB servers on GPU 0 without warning.</p>
+        <p>An OOM prints a five-step degradation ladder as literal next commands instead of a
+        traceback — <code>--not_on_device</code>, fewer workers, no TTA, downscale, CPU. No task may
+        ever kill another project's GPU process.</p>
+      </div>
+      <div>
+        <p class="kicker muted">R-03 · silent misread</p>
+        <p><strong>Predictions are {0,1}, not {0,255}.</strong> The mask PNG looks solid black in
+        any viewer. The natural reaction — "it detected nothing, let me rescale it" — corrupts the
+        data.</p>
+        <p>Documented, logged once per run, binarised as <code>&gt; 0</code> everywhere, and pinned
+        by a test so it can never drift.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8 ------------------------------------------------------------------ -->
+  <section class="slide">
+    <p class="kicker">Process</p>
+    <h2>Nothing counted as done until someone else checked it</h2>
+    <div class="figure"><img src="figures/fig03_scoreboard.png"
+      alt="Status board: TC-001 to TC-009 approved, TC-010 and TC-012 ready, the rest queued"></div>
+    <p class="caption">Spec → implementation → adversarial review that re-runs every acceptance
+      command → approve or send back. Three cards were sent back.</p>
+  </section>
+
+  <!-- 9 ------------------------------------------------------------------ -->
+  <section class="slide">
+    <p class="kicker warm">What review caught</p>
+    <h2>The bugs that would have surfaced much later</h2>
+    <div class="cols">
+      <div>
+        <div class="note flag">
+          <p><strong>A corrupt model file, downloaded clean.</strong> <code>plans.json</code> had a
+          duplicated JSON document appended to it — every parse threw
+          <code>Extra data: line 218</code>. Caught by semantic validation of the model tree, not by
+          a crash three cards later.</p>
+        </div>
+        <div style="height:1.6cqh"></div>
+        <div class="note flag">
+          <p><strong>A card marked complete that wasn't.</strong> TC-005 scored 7/10 at review and
+          was rejected. Approving it would have flipped downstream work to "ready" on a model tree
+          that could not be loaded.</p>
+        </div>
+      </div>
+      <div>
+        <div class="note">
+          <p><strong>Two upstream traps, found in planning.</strong> The model card documents a
+          filename that does not exist in the repository, and nnU-Net defaults to five folds and a
+          checkpoint this model does not ship. Both are now pinned in config and asserted by
+          tests.</p>
+        </div>
+        <div style="height:1.6cqh"></div>
+        <div class="note good">
+          <p><strong>Every approval re-derived from the filesystem.</strong> Reviews re-ran the
+          acceptance commands rather than reading the implementer's report — including a full
+          real-model GPU run, with GPU memory checked back to its idle baseline afterwards.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SIM SLIDES INSERTED HERE -->
+
+  <!-- 10 ----------------------------------------------------------------- -->
+  <section class="slide">
+    <p class="kicker muted">Honesty</p>
+    <h2>What is measured, and what is still declared</h2>
+    <div class="cols">
+      <div>
+        <p class="kicker good" style="color:var(--good)">Measured</p>
+        <ul>
+          <li>Real nnU-Net v2 inference on an RTX 3090, timed per image</li>
+          <li>Mask values, frame shape and channel handling, asserted by tests</li>
+          <li>Zero false positives on the blank control frame</li>
+          <li>Model tree integrity by sha256 against a pinned revision</li>
+          <li>46 unit tests across naming, input preparation and visualization</li>
+        </ul>
+      </div>
+      <div>
+        <p class="kicker warm">Declared, not yet measured</p>
+        <ul>
+          <li><strong>Zero-shot quality on real D405 imagery</strong> — the headline question;
+            no camera is attached yet, so nothing is claimed</li>
+          <li>Depth at the crack — a crack is often narrower than the stereo window</li>
+          <li>Camera→robot extrinsics — the demo transform is chosen, not hand-eye calibrated</li>
+          <li>IoU/Dice against labels — Level-3 evaluation, deliberately out of this phase</li>
+        </ul>
+        <p style="color:var(--muted)">The demo that follows the vision into the arm is scaffolding
+          for this talk, not a validated capability.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 11 ----------------------------------------------------------------- -->
+  <section class="slide">
+    <p class="kicker">Next</p>
+    <h2>What the remaining seven cards unlock</h2>
+    <div class="cols">
+      <div>
+        <table>
+          <tr><th>Card</th><th>Unlocks</th></tr>
+          <tr><td class="is">TC-010</td><td>skeletonization as a first-class stage</td></tr>
+          <tr><td class="is">TC-011</td><td>the whole chain behind one command</td></tr>
+          <tr><td class="is">TC-012/13</td><td>D405 RGB + aligned depth capture</td></tr>
+          <tr><td class="is">TC-014</td><td>integration and contract tests</td></tr>
+          <tr><td class="is">TC-015/16</td><td>evaluation manifests, reproducibility</td></tr>
+        </table>
+      </div>
+      <div>
+        <div class="note">
+          <p><strong>Then the real experiment.</strong> A D405 test plan is already written: a
+          distance sweep, and negative controls chosen to be hard — construction seams, stains,
+          aggregate, scratches, marker lines.</p>
+          <p>The point is to characterise the failure surface deliberately rather than discover it
+          by accident on the robot.</p>
+        </div>
+        <div style="height:1.6cqh"></div>
+        <p>Only after that does depth projection, hand-eye calibration and a real arm trajectory
+        become honest work rather than a demo.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 12 ----------------------------------------------------------------- -->
+  <section class="slide">
+    <p class="kicker">Takeaway</p>
+    <h2>A perception front-end you can trust the rest of the robot to</h2>
+    <div class="fill">
+      <div class="tiles three">
+        <div class="tile good"><div class="value">Works</div>
+          <div class="label">Public crack weights run zero-shot, end to end, on our hardware — no
+            training, no labelling, no licence problem</div></div>
+        <div class="tile"><div class="value">Pinned</div>
+          <div class="label">Environment, model bytes, mask convention and image frame are all
+            asserted by something that fails loudly</div></div>
+        <div class="tile warm"><div class="value">Honest</div>
+          <div class="label">The headline question — real D405 imagery — is scheduled and
+            instrumented, not quietly assumed</div></div>
+      </div>
+      <div style="height:3.2cqh"></div>
+      <p class="lead">Everything here is reproducible from the repository: pinned requirements, a
+      launcher that scrubs the environment, a hash-verified model tree, and a smoke test that proves
+      the GPU path in about fourteen seconds.</p>
+    </div>
+  </section>
+
+</div>
+
+<div id="bar">
+  <span class="name">Finding the crack, then reaching it</span>
+  <span class="sep">|</span>
+  <button class="nav" id="prev" aria-label="Previous slide">←</button>
+  <span id="counter">1 / 12</span>
+  <button class="nav" id="next" aria-label="Next slide">→</button>
+  <span class="hint">arrows / space to move · F for fullscreen · Ctrl-P exports a PDF</span>
+</div>
+
+<script>
+(function () {
+  var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  var i = 0;
+  var counter = document.getElementById('counter');
+  var progress = document.getElementById('progress');
+
+  function show(n) {
+    i = Math.max(0, Math.min(slides.length - 1, n));
+    slides.forEach(function (s, k) { s.classList.toggle('active', k === i); });
+    counter.textContent = (i + 1) + ' / ' + slides.length;
+    progress.style.width = ((i + 1) / slides.length * 100) + '%';
+    if (location.hash !== '#' + (i + 1)) history.replaceState(null, '', '#' + (i + 1));
+  }
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') { show(i + 1); e.preventDefault(); }
+    else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { show(i - 1); e.preventDefault(); }
+    else if (e.key === 'Home') { show(0); }
+    else if (e.key === 'End') { show(slides.length - 1); }
+    else if (e.key === 'f' || e.key === 'F') {
+      if (document.fullscreenElement) document.exitFullscreen();
+      else document.documentElement.requestFullscreen();
+    }
+  });
+  document.getElementById('next').addEventListener('click', function () { show(i + 1); });
+  document.getElementById('prev').addEventListener('click', function () { show(i - 1); });
+
+  var start = parseInt((location.hash || '#1').slice(1), 10);
+  show(isNaN(start) ? 0 : start - 1);
+})();
+</script>
+</body>
+</html>

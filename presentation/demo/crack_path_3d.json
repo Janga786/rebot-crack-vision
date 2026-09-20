@@ -1,0 +1,191 @@
+{
+  "generated_by": "presentation/demo/crack_to_path.py",
+  "status": "DEMO - not part of the validated phase-1 pipeline",
+  "source_mask": "presentation/assets/synthetic_crack_prediction.png",
+  "source_skeleton": "presentation/assets/synthetic_crack_skeleton.png",
+  "image_shape": [
+    512,
+    512
+  ],
+  "skeleton_pixels": 657,
+  "ordered_centerline_pixels": 591,
+  "waypoints": 18,
+  "assumptions": {
+    "coupon_size_m": 0.3,
+    "coupon_center_xy_m": [
+      0.42,
+      0.0
+    ],
+    "coupon_surface_z_m": 0.12,
+    "tool_standoff_m": 0.045,
+    "depth_source": "declared plane (D405 depth deferred - adr/002)",
+    "hand_eye": "declared transform (calibration deferred - adr/009)"
+  },
+  "path_length_m": 0.4052,
+  "pixel_waypoints_rc": [
+    [
+      451,
+      478
+    ],
+    [
+      447,
+      417
+    ],
+    [
+      439,
+      410
+    ],
+    [
+      404,
+      391
+    ],
+    [
+      355,
+      327
+    ],
+    [
+      310,
+      327
+    ],
+    [
+      300,
+      325
+    ],
+    [
+      295,
+      316
+    ],
+    [
+      285,
+      268
+    ],
+    [
+      281,
+      261
+    ],
+    [
+      273,
+      267
+    ],
+    [
+      263,
+      280
+    ],
+    [
+      258,
+      281
+    ],
+    [
+      201,
+      217
+    ],
+    [
+      125,
+      172
+    ],
+    [
+      100,
+      144
+    ],
+    [
+      85,
+      96
+    ],
+    [
+      27,
+      36
+    ]
+  ],
+  "world_waypoints_xyz_m": [
+    [
+      0.30574,
+      -0.13008,
+      0.165
+    ],
+    [
+      0.30809,
+      -0.09434,
+      0.165
+    ],
+    [
+      0.31277,
+      -0.09023,
+      0.165
+    ],
+    [
+      0.33328,
+      -0.0791,
+      0.165
+    ],
+    [
+      0.36199,
+      -0.0416,
+      0.165
+    ],
+    [
+      0.38836,
+      -0.0416,
+      0.165
+    ],
+    [
+      0.39422,
+      -0.04043,
+      0.165
+    ],
+    [
+      0.39715,
+      -0.03516,
+      0.165
+    ],
+    [
+      0.40301,
+      -0.00703,
+      0.165
+    ],
+    [
+      0.40535,
+      -0.00293,
+      0.165
+    ],
+    [
+      0.41004,
+      -0.00645,
+      0.165
+    ],
+    [
+      0.4159,
+      -0.01406,
+      0.165
+    ],
+    [
+      0.41883,
+      -0.01465,
+      0.165
+    ],
+    [
+      0.45223,
+      0.02285,
+      0.165
+    ],
+    [
+      0.49676,
+      0.04922,
+      0.165
+    ],
+    [
+      0.51141,
+      0.06563,
+      0.165
+    ],
+    [
+      0.5202,
+      0.09375,
+      0.165
+    ],
+    [
+      0.55418,
+      0.12891,
+      0.165
+    ]
+  ]
+}
