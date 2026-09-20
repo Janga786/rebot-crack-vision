@@ -166,7 +166,50 @@ Four panels, left to right: input · binary mask · overlay · centerline.
 - **Verification, not narration.** Approval requires the reviewer's own command output, not the
   implementer's paste.
 
-<!-- SIM NOTES INSERTED HERE -->
+## Sim 1 · Following the vision output into the arm
+
+**Figure:** `figures/fig04_trajectory.png`
+
+- The 18 ordered centerline waypoints from the real segmentation, fed through a damped
+  least-squares inverse-kinematics solve for the actual B601-DM joint chain (built straight from the
+  URDF's own joint origins and axes, not a simplified model).
+- **Max tool position error 0.089 mm, mean 0.031 mm** — every one of the 20 poses (18 crack points
+  plus an approach and a retract waypoint) is reachable well inside a 2 mm target, and every joint
+  stays inside its URDF limit for the full 30.3 s pass at a constant 2 cm/s.
+- One honest wrinkle, worth having ready if asked: the very first step (approach → first crack point)
+  needs an unusually large joint-4 swing. Checked and it's real local kinematic sensitivity at that
+  pose (confirmed via the Jacobian's singular values), not an unresolved elbow flip — and it's far
+  inside the joint's velocity rating for a 5 s window, so it isn't a practical problem.
+- **What's declared, not measured, here:** the coupon's pose and the camera→robot transform. This
+  slide is IK math on a real robot model following real vision output — it is not a claim that the
+  robot has done this.
+
+## Sim 2 · The same path, in Isaac Sim
+
+**Figure:** `renders/scene_overview.png`
+
+- The actual B601-DM URDF (not a simplified stand-in) imported into Isaac Sim, headless, on the same
+  RTX 3090 that ran the segmentation — a concrete coupon carrying the real crack image, the path drawn
+  above it in the scene.
+- If asked how long this took to build: Isaac Sim's first-ever shader compile on a machine takes 5-15
+  minutes; every render after that takes about 15-25 seconds for the whole scene.
+
+## Sim 3 · Does the path actually land on the crack?
+
+**Figure:** `renders/topdown_path.png` + `renders/closeup_coupon.png`
+
+- The orthographic top-down shot is the actual proof: camera dead-centre above the coupon, path
+  flattened to zero standoff, so there is no perspective to hide a misalignment behind.
+- **Say this plainly if anyone looks closely:** there is a small (few-millimetre) visual gap between
+  the rendered path and the painted crack in a few places. This was investigated, not waved away —
+  four colour-coded fiducials at the image's four corners land exactly on the coupon's geometric
+  corners (a rigid rotation that matches at all four corners is mathematically exact everywhere), and
+  a direct pixel comparison between the source image, the model's mask, and the skeleton found zero
+  systematic bias. The remaining fuzz is marker size and ordinary texture-filtering blur on a coupon
+  this size at this resolution — not a coordinate bug. Full investigation in
+  `presentation/sim/README.md`.
+- This is the right answer to "why didn't you just nudge it to line up?" — the task rule was that
+  waypoint math is never touched to make a picture agree, and that rule held here.
 
 ## 10 · What is measured, and what is still declared
 

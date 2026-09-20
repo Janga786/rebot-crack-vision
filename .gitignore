@@ -37,3 +37,9 @@ htmlcov/
 .idea/
 *.swp
 .DS_Store
+
+# Isaac Sim stage: ~40 MB because the URDF import bakes the robot meshes into it.
+# `presentation/sim/build_scene.py` regenerates it in about 25 s, so it is not worth
+# putting in git history.
+presentation/sim/*.usd
+presentation/sim/*.usda
