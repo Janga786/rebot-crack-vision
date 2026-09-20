@@ -335,7 +335,46 @@
     </div>
   </section>
 
-  <!-- SIM SLIDES INSERTED HERE -->
+  <!-- SIM 1 --------------------------------------------------------------- -->
+  <section class="slide">
+    <p class="kicker warm">Demo · not yet a validated capability</p>
+    <h2>Following the vision output into the arm</h2>
+    <div class="figure"><img src="figures/fig04_trajectory.png"
+      alt="Left: the 18 ordered waypoints drawn on the crack image. Right: six joint angles over 30 seconds"></div>
+    <p class="caption">18 ordered centerline waypoints → a 20-pose IK solve for the B601-DM:
+      max tool position error <strong>0.089 mm</strong>, every joint inside its limit, 30.3 s at a
+      constant 2 cm/s. The surface pose and the camera→robot transform are <em>declared</em>, not
+      calibrated.</p>
+  </section>
+
+  <!-- SIM 2 --------------------------------------------------------------- -->
+  <section class="slide">
+    <p class="kicker warm">Demo · not yet a validated capability</p>
+    <h2>The same path, in Isaac Sim</h2>
+    <div class="figure"><img src="renders/scene_overview.png"
+      alt="Isaac Sim render: the reBot B601-DM arm on a plinth beside a concrete coupon carrying the crack image, with the inspection path drawn above it"></div>
+    <p class="caption">The real B601-DM URDF, a concrete coupon carrying the actual image the model
+      ran on, and the vision-derived path in the scene — rendered headless on the same RTX 3090 that
+      ran the segmentation.</p>
+  </section>
+
+  <!-- SIM 3 --------------------------------------------------------------- -->
+  <section class="slide">
+    <p class="kicker warm">Demo · not yet a validated capability</p>
+    <h2>Does the path actually land on the crack?</h2>
+    <div class="cols">
+      <div class="figure"><img src="renders/topdown_path.png"
+        alt="Top-down orthographic render: the flat, zero-standoff path drawn directly on the coupon surface, following the painted crack"></div>
+      <div class="figure"><img src="renders/closeup_coupon.png"
+        alt="Close-up: the gripper hovering over the coupon with several waypoints and the path tube visible above the crack"></div>
+    </div>
+    <p class="caption">Orthographic, camera dead-centre above the coupon, path flattened to zero
+      standoff so there is no parallax to hide behind — this is the actual proof shot. Four
+      colour-coded fiducials (not shown here) confirm the texture's corners land exactly on the
+      coupon's geometric corners. A few millimetres of visible fuzz remain — sphere/tube size and
+      ordinary texture-filtering blur, not a coordinate bug — documented in
+      <code>presentation/sim/README.md</code>.</p>
+  </section>
 
   <!-- 10 ----------------------------------------------------------------- -->
   <section class="slide">
@@ -426,7 +465,7 @@
   <span class="name">Finding the crack, then reaching it</span>
   <span class="sep">|</span>
   <button class="nav" id="prev" aria-label="Previous slide">←</button>
-  <span id="counter">1 / 12</span>
+  <span id="counter">1 / 15</span>
   <button class="nav" id="next" aria-label="Next slide">→</button>
   <span class="hint">arrows / space to move · F for fullscreen · Ctrl-P exports a PDF</span>
 </div>
