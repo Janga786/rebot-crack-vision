@@ -32,7 +32,15 @@ OUT = ROOT / "presentation" / "demo"
 
 # --- scene definition (the declared, not-measured part) ---------------------
 COUPON_SIZE_M = 0.30      # the 512x512 frame images a 30 cm x 30 cm coupon
-COUPON_CENTER = (0.42, 0.0)   # (x, y) of the coupon centre in the robot base frame
+# (x, y) of the coupon centre in the robot base frame. Chosen for IK reachability,
+# not arbitrary: a sweep of candidate distances (0.42 down to 0.20 m) found that
+# at the original 0.42 m placement, only 5/18 crack waypoints held the corrected
+# tool-boresight-axis constraint (see arm_kinematics.py) within 2 mm; at 0.22 m,
+# all 18 do, to within 0.1 mm, with no per-waypoint recovery search needed at all.
+# This is a real, standard robotics fix -- place the part inside the arm's
+# comfortable reach envelope rather than fight the solver at its edge -- not a
+# tuning hack. See docs/TECHNICAL_APPROACH.md sec 2.5 for the full sweep.
+COUPON_CENTER = (0.22, 0.0)
 COUPON_Z = 0.12           # coupon top surface height above the robot base plane
 STANDOFF_M = 0.045        # tool tip hovers this far above the surface
 SIMPLIFY_TOL_PX = 1.6     # Ramer-Douglas-Peucker tolerance

@@ -20,16 +20,38 @@ parent frame), followed by a variable rotation of `theta` about the joint's loca
 
 and R(rpy) is the ROS/URDF fixed-axis (extrinsic) convention R = Rz(yaw) @ Ry(pitch) @ Rx(roll).
 
-TOOL BORESIGHT AXIS — determined empirically, not assumed:
-    Evaluating fk([0,0,0,0,0,0]) gives a tool rotation matrix whose 3rd column
-    (the tool frame's local +Z axis, expressed in world/base coordinates) is
-    (0, 0, -1) to numerical precision. That is: at the all-zero joint configuration
-    the tool's local **+Z axis points straight down** (world -Z), i.e. away from the
-    flange and into the coupon below. This is NOT true in general for other joint
-    configurations (a random sweep over q2..q6 shows the tool orientation is a
-    genuine function of all 6 joints), so IK below actively drives this same local
-    +Z axis to stay aligned with world -Z at every solved waypoint — see `ik()`
-    for why only this one axis (not the full 3x3 frame) is constrained.
+TOOL BORESIGHT AXIS — determined empirically, corrected once, re-verified:
+    An early version of this module assumed the tool frame's local **+Z** axis was
+    the gripper's physical "reach" direction, because fk([0,0,0,0,0,0]) happens to
+    put that axis at world (0,0,-1). That assumption was WRONG, and it silently
+    made every rendered pose in presentation/sim/ point the gripper sideways at the
+    coupon instead of straight down at it — a still image with the arm holding
+    still can hide this, but it is unmistakable in a video of the arm moving along
+    the path (the wrist visibly does not track the surface below it).
+
+    The fix: query the actual gripper mesh geometry instead of a coordinate-frame
+    coincidence. `presentation/sim/_probe_gripper_axis.py` loads the real URDF in
+    Isaac Sim at q=0, takes the world-space AABB centers of link6 / gripper_link /
+    gripper_left / gripper_right, and expresses each in the gripper_link frame:
+
+        link6          local center = (-0.1555,  0.0000, 0.0003)
+        gripper_link   local center = (-0.1120, -0.0000, 0.0004)
+        gripper_left   local center = (-0.0443, -0.0078, 0.0005)
+        gripper_right  local center = (-0.0443,  0.0078, 0.0006)
+
+    Every one of those local-Z coordinates is ~0 (all the geometry sits in a thin
+    slab through the frame's own XY plane), while X runs monotonically from -0.156
+    (link6, upstream) toward -0.044 (the fingers) — i.e. the physical gripper body
+    extends along the frame's local **+X** axis, not +Z. Local +Z is coincidentally
+    vertical at q=0 for unrelated reasons (link6's own wrist-roll geometry) and is
+    not where the jaws point at any other configuration.
+
+    IK below therefore drives the tool frame's local **+X** axis (not +Z) to stay
+    aligned with world -Z at every solved waypoint — see `ik()` for why only this
+    one axis (not the full 3x3 frame) is constrained. `fk(0)`'s local +Z pointing
+    down was a coincidence of one specific joint configuration, not a property of
+    the gripper; treat any future claim about "which axis is the boresight" as
+    unverified until it is checked against the actual mesh geometry the same way.
 """
 from __future__ import annotations
 
@@ -183,9 +205,9 @@ def clamp_to_limits(q: np.ndarray) -> np.ndarray:
     return np.clip(q, JOINT_LIMITS[:, 0], JOINT_LIMITS[:, 1])
 
 
-# World-frame direction the tool boresight (tool frame's local +Z axis — see the
-# module docstring's empirical derivation) must point along: straight down at the
-# coupon below.
+# World-frame direction the tool boresight (tool frame's local +X axis — see the
+# module docstring's empirical derivation against the actual gripper mesh) must
+# point along: straight down at the coupon below.
 TOOL_DOWN_AXIS = np.array([0.0, 0.0, -1.0])
 
 
@@ -199,19 +221,21 @@ class IKResult:
 
 
 def _boresight_and_jacobian(q: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """One FK+Jacobian pass. Returns (p_tool, z_tool, Jv (3x6), Jz (3x6)).
+    """One FK+Jacobian pass. Returns (p_tool, x_tool, Jv (3x6), Jx (3x6)).
 
     Reuses `geometric_jacobian` (whose bottom 3 rows are exactly the per-joint
     world-frame axes z_i, i.e. J_w) rather than re-deriving the frame loop: the
-    axis-Jacobian column is Jz_i = z_i x z_tool = J_w[:, i] x z_tool.
+    axis-Jacobian column is Jx_i = z_i x x_tool = J_w[:, i] x x_tool.
     """
     T_tool = fk(q)
     p_tool = T_tool[:3, 3]
-    z_tool = T_tool[:3, 2]  # boresight: tool frame's local +Z axis, in world coords
+    x_tool = T_tool[:3, 0]  # boresight: tool frame's local +X axis (see module
+                             # docstring -- this is where the gripper mesh actually
+                             # points, verified against the real geometry, not +Z)
     J = geometric_jacobian(q)
     Jv, Jw = J[:3, :], J[3:, :]
-    Jz = np.cross(Jw.T, z_tool).T
-    return p_tool, z_tool, Jv, Jz
+    Jx = np.cross(Jw.T, x_tool).T
+    return p_tool, x_tool, Jv, Jx
 
 
 def ik(target_pos: Sequence[float], target_axis: Sequence[float], q_seed: Sequence[float],
@@ -219,7 +243,7 @@ def ik(target_pos: Sequence[float], target_axis: Sequence[float], q_seed: Sequen
        damping: float = 0.02, max_step: float = 0.2) -> IKResult:
     """Damped least-squares IK: 3-DOF position + 2-DOF tool-boresight-axis pointing.
 
-    We deliberately constrain only the tool's local +Z axis direction (5 real
+    We deliberately constrain only the tool's local +X axis direction (5 real
     constraints: 3 position + 2 pointing), NOT a full 3x3 orientation. Task
     wording ("position + tool-axis orientation") and an earlier full-orientation
     attempt both point the same way: pinning the whole frame (including rotation
@@ -238,12 +262,12 @@ def ik(target_pos: Sequence[float], target_axis: Sequence[float], q_seed: Sequen
       pos:  e_pos = target_pos - p_tool ; d(e_pos)/dq_i = J_v_i (the usual
             geometric-Jacobian column), matching the dq = J^T(JJ^T+lam^2 I)^-1 e
             update used below.
-      axis: let z(q) be the tool's world-frame boresight axis. Its rate of
-            change under joint velocities is dz/dq_i = axis_i_world x z(q) (a
-            body-fixed unit vector under an angular-velocity field). Define
-            e_axis = target_axis - z(q); then d(e_axis)/dq_i = -axis_i_world x
-            z(q) = z(q) x axis_i_world, i.e. the Jacobian column used below
-            (`Jz[:, i] = cross(z_i, z_tool)`).
+      axis: let x(q) be the tool's world-frame boresight axis (local +X — see
+            module docstring). Its rate of change under joint velocities is
+            dx/dq_i = axis_i_world x x(q) (a body-fixed unit vector under an
+            angular-velocity field). Define e_axis = target_axis - x(q); then
+            d(e_axis)/dq_i = -axis_i_world x x(q) = x(q) x axis_i_world, i.e.
+            the Jacobian column used below (`Jx[:, i] = cross(z_i, x_tool)`).
 
     Joint limits are enforced by clamping q after every step, so the returned
     solution is always inside JOINT_LIMITS even when it has not converged.
@@ -266,11 +290,11 @@ def ik(target_pos: Sequence[float], target_axis: Sequence[float], q_seed: Sequen
     best_q, best_score = q.copy(), np.inf
     n_iter = 0
     for n_iter in range(1, max_iter + 1):
-        p_tool, z_tool, Jv, Jz = _boresight_and_jacobian(q)
+        p_tool, x_tool, Jv, Jx = _boresight_and_jacobian(q)
         e_pos = target_pos - p_tool
-        e_axis = target_axis - z_tool
+        e_axis = target_axis - x_tool
         pos_err = float(np.linalg.norm(e_pos))
-        axis_err_deg = float(np.degrees(np.arccos(np.clip(np.dot(z_tool, target_axis), -1.0, 1.0))))
+        axis_err_deg = float(np.degrees(np.arccos(np.clip(np.dot(x_tool, target_axis), -1.0, 1.0))))
         score = pos_err + axis_err_deg / 1000.0  # position dominates; axis breaks ties
         if score < best_score:
             best_score, best_q = score, q.copy()
@@ -278,7 +302,7 @@ def ik(target_pos: Sequence[float], target_axis: Sequence[float], q_seed: Sequen
         if pos_err < tol_pos and axis_err_deg < tol_axis_deg:
             return IKResult(q=q, converged=True, pos_err_m=pos_err,
                              axis_err_deg=axis_err_deg, iterations=n_iter)
-        J = np.vstack([Jv, Jz])
+        J = np.vstack([Jv, Jx])
         e = np.concatenate([e_pos, e_axis])
         lam2 = damping * damping
         dq = J.T @ np.linalg.solve(J @ J.T + lam2 * np.eye(6), e)
@@ -309,7 +333,14 @@ def solve_path(targets: Sequence[Sequence[float]],
 
 
 if __name__ == "__main__":
-    # tiny self-check: FK at zero should show the tool +Z axis pointing down.
+    # tiny self-check: the boresight axis is local +X (see module docstring for
+    # why, and _probe_gripper_axis.py for the mesh-geometry evidence). At q=0 it
+    # does NOT point down -- that was the old, wrong assumption; solve_path()'s
+    # IK is what drives it to world -Z at each waypoint, not q=0 by coincidence.
     T0 = fk(np.zeros(NUM_JOINTS))
     print("fk(0) tool position:", np.round(T0[:3, 3], 5))
-    print("fk(0) tool +Z axis (world):", np.round(T0[:3, 2], 5), "<- should be ~(0,0,-1)")
+    print("fk(0) tool +X axis (world, the boresight):", np.round(T0[:3, 0], 5),
+          "<- NOT expected to be (0,0,-1) at q=0; IK enforces this only at solved waypoints")
+    res = ik(T0[:3, 3], TOOL_DOWN_AXIS, np.zeros(NUM_JOINTS))
+    print(f"IK re-pointing q=0's own position straight down: converged={res.converged} "
+          f"pos_err_mm={res.pos_err_m*1000:.4f} axis_err_deg={res.axis_err_deg:.4f}")

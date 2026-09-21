@@ -43,3 +43,7 @@ htmlcov/
 # putting in git history.
 presentation/sim/*.usd
 presentation/sim/*.usda
+
+# Intermediate PNG frames from render_trajectory_video.py -- deleted after
+# ffmpeg encodes them into trajectory.mp4; never meant to be committed.
+presentation/sim/_video_frames/

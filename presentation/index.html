@@ -340,11 +340,14 @@
     <p class="kicker warm">Demo · not yet a validated capability</p>
     <h2>Following the vision output into the arm</h2>
     <div class="figure"><img src="figures/fig04_trajectory.png"
-      alt="Left: the 18 ordered waypoints drawn on the crack image. Right: six joint angles over 30 seconds"></div>
-    <p class="caption">18 ordered centerline waypoints → a 20-pose IK solve for the B601-DM:
-      max tool position error <strong>0.089 mm</strong>, every joint inside its limit, 30.3 s at a
-      constant 2 cm/s. The surface pose and the camera→robot transform are <em>declared</em>, not
-      calibrated.</p>
+      alt="Left: the 18 ordered waypoints drawn on the crack image. Right: six joint angles over 24 seconds"></div>
+    <p class="caption">18 ordered centerline waypoints → a 20-pose IK solve for the B601-DM: the 18
+      real inspection points converge to <strong>0.026 mm mean error</strong>, every joint inside
+      its limit, 24.3 s at a constant 2 cm/s. The two hover transitions (before/after the pass)
+      land 5.7–19.4 mm short even after a full recovery search — reported, not hidden; see
+      <code>docs/TECHNICAL_APPROACH.md</code>. The surface pose and the camera→robot transform are
+      <em>declared</em>, not calibrated — but the coupon's exact placement was chosen from a
+      measured IK-reachability sweep, not guessed.</p>
   </section>
 
   <!-- SIM 2 --------------------------------------------------------------- -->
@@ -356,6 +359,22 @@
     <p class="caption">The real B601-DM URDF, a concrete coupon carrying the actual image the model
       ran on, and the vision-derived path in the scene — rendered headless on the same RTX 3090 that
       ran the segmentation.</p>
+  </section>
+
+  <!-- SIM 2b -------------------------------------------------------------- -->
+  <section class="slide">
+    <p class="kicker warm">Demo · not yet a validated capability</p>
+    <h2>Watching it move</h2>
+    <div class="figure">
+      <video src="renders/trajectory.mp4" controls loop muted playsinline
+             style="max-width:100%; max-height:100%; border-radius:6px;"
+             aria-label="The reBot B601-DM tracing the vision-derived path, gripper held vertical throughout"></video>
+    </div>
+    <p class="caption">Every joint angle here is the actual solved IK, keyframe to keyframe — only
+      the motion <em>between</em> keyframes is interpolated, and playback runs at 2× real time
+      (both stated on-screen). Watch the wrist: it stays genuinely vertical across the whole
+      18-point inspection pass, and visibly tips at the very end — the one waypoint that didn't
+      fully converge, shown, not cut.</p>
   </section>
 
   <!-- SIM 3 --------------------------------------------------------------- -->
@@ -465,7 +484,7 @@
   <span class="name">Finding the crack, then reaching it</span>
   <span class="sep">|</span>
   <button class="nav" id="prev" aria-label="Previous slide">←</button>
-  <span id="counter">1 / 15</span>
+  <span id="counter">1 / 16</span>
   <button class="nav" id="next" aria-label="Next slide">→</button>
   <span class="hint">arrows / space to move · F for fullscreen · Ctrl-P exports a PDF</span>
 </div>

@@ -80,7 +80,7 @@ PATH_JSON = os.path.join(PRES_ROOT, "demo", "crack_path_3d.json")
 USD_OUT_PATH = os.path.join(SIM_DIR, "crack_inspection.usd")
 
 # scene geometry (metres)
-COUPON_CENTER = (0.42, 0.0)
+COUPON_CENTER = (0.22, 0.0)  # see crack_to_path.py -- chosen for IK reachability, verified by a sweep
 COUPON_SIZE = 0.30
 COUPON_TOP_Z = 0.12
 SLAB_THICK = 0.05
@@ -109,11 +109,27 @@ BLUE_HEX = (0x2A, 0x78, 0xD6)     # path tube
 ACCENT_RGB = tuple(c / 255.0 for c in ACCENT_HEX)
 BLUE_RGB = tuple(c / 255.0 for c in BLUE_HEX)
 
-# static "inspecting" arm pose (joint1..joint6, radians) -- solved offline with a
-# closed-form FK + L-BFGS-B fit so the gripper hovers, pointing straight down,
-# right at waypoint #9 of the path (see report / commit notes for the solver).
-STATIC_ARM_POSE_RAD = [0.41839, -1.90421, -0.57086, -1.33942, 1.15000, 0.00044]
+# static "inspecting" arm pose (joint1..joint6, radians): the REAL solved IK
+# waypoint "crack_09" from joint_trajectory.json, not a separately hand-tuned
+# pose -- single source of truth with everything else that uses that file
+# (fig04/fig05/fig07, render_trajectory_video.py). An earlier version of this
+# constant was solved independently before the tool-boresight-axis correction
+# (see arm_kinematics.py's module docstring / docs/TECHNICAL_APPROACH.md §2.3)
+# and pointed the gripper sideways at the coupon instead of straight down.
 STATIC_GRIPPER_OPEN_M = 0.02
+
+
+def _load_static_pose_from_trajectory(label: str = "crack_09"):
+    traj_path = os.path.join(PRES_ROOT, "demo", "joint_trajectory.json")
+    with open(traj_path) as f:
+        doc = json.load(f)
+    for w in doc["waypoints"]:
+        if w["label"] == label:
+            return w["q_rad"]
+    raise KeyError(f"no waypoint labeled {label!r} in {traj_path}")
+
+
+STATIC_ARM_POSE_RAD = _load_static_pose_from_trajectory()
 
 # retracted/home pose used only for the topdown shot, so the arm doesn't sweep
 # across the coupon and occlude the crack -- verified clear of the topdown
@@ -566,10 +582,15 @@ def main():
     set_visibility(stage, "/World/InspectionPathFlat", False)
     log("static inspection pose applied, floating path shown")
 
+    # Both shots below keep the exact camera-to-target OFFSET originally tuned
+    # against the coupon at x=0.42 (see git history), and re-centre it on the
+    # new x=0.22 coupon placement: new_target = new_coupon-relative point,
+    # new_position = new_target + (old_position - old_target). This preserves
+    # the composition/angle exactly rather than re-tuning by eye.
     results["scene_overview.png"] = shoot(
         camera,
-        position=(-1.0, -0.95, 0.85),
-        target=(0.34, 0.0, 0.18),
+        position=(-1.20, -0.95, 0.83),
+        target=(0.14, 0.0, 0.16),
         projection="perspective",
         resolution=(1600, 900),
         out_path=os.path.join(RENDER_DIR, "scene_overview.png"),
@@ -577,8 +598,8 @@ def main():
     )
     results["closeup_coupon.png"] = shoot(
         camera,
-        position=(0.60, -0.35, 0.30),
-        target=(0.40, -0.02, COUPON_TOP_Z),
+        position=(0.40, -0.35, 0.30),
+        target=(0.20, -0.02, COUPON_TOP_Z),
         projection="perspective",
         resolution=(1600, 900),
         out_path=os.path.join(RENDER_DIR, "closeup_coupon.png"),
