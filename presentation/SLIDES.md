@@ -4,7 +4,8 @@ Companion to [`index.html`](index.html). Same running order, with the numbers yo
 the things worth saying out loud. Figures are referenced by filename so you can rebuild this deck in
 PowerPoint, Google Slides or Keynote without opening the HTML.
 
-**Timing:** ~12 minutes at a comfortable pace, or ~7 if you skip slides 7 and 9.
+**Timing:** ~13 minutes at a comfortable pace (add ~15s if the video plays through once), or ~8 if
+you skip slides 7 and 9.
 
 **The one sentence, if you only get one:** *public crack-segmentation weights run zero-shot on our
 hardware, end to end, with every stage pinned by something that fails loudly — and the one question
@@ -173,14 +174,25 @@ Four panels, left to right: input · binary mask · overlay · centerline.
 - The 18 ordered centerline waypoints from the real segmentation, fed through a damped
   least-squares inverse-kinematics solve for the actual B601-DM joint chain (built straight from the
   URDF's own joint origins and axes, not a simplified model).
-- **Max tool position error 0.089 mm, mean 0.031 mm** — every one of the 20 poses (18 crack points
-  plus an approach and a retract waypoint) is reachable well inside a 2 mm target, and every joint
-  stays inside its URDF limit for the full 30.3 s pass at a constant 2 cm/s.
-- One honest wrinkle, worth having ready if asked: the very first step (approach → first crack point)
-  needs an unusually large joint-4 swing. Checked and it's real local kinematic sensitivity at that
-  pose (confirmed via the Jacobian's singular values), not an unresolved elbow flip — and it's far
-  inside the joint's velocity rating for a 5 s window, so it isn't a practical problem.
-- **What's declared, not measured, here:** the coupon's pose and the camera→robot transform. This
+- **All 18 real inspection points converge to a mean of 0.026 mm, max 0.099 mm** — every joint
+  stays inside its URDF limit for the full 24.3 s pass at a constant 2 cm/s.
+- **The honest wrinkle, worth having ready if asked:** the two *hover* poses bracketing the pass
+  (`approach`, `retract` — pure vertical retreats above the first/last crack point, not part of the
+  inspection itself) land 19.4 mm and 5.7 mm short even after a full recovery search. This was
+  chased down, not glossed over: a measured sweep found it's a workspace-placement effect (the
+  arm's tightest-limit joints running out of room near full extension), which is also *why* the
+  coupon sits where it does — moving it from an initial 0.42 m to 0.22 m from the base took the 18
+  real waypoints from 5/18 reaching a 2 mm target to all 18 landing under 0.1 mm. Full sweep table
+  in `docs/TECHNICAL_APPROACH.md` §2.5.
+- **A real bug was found and fixed getting here, worth telling if there's time:** an early version
+  of the kinematics assumed the wrong local axis of the gripper was "forward" (it happened to point
+  down at one specific joint configuration, which looked like confirmation but wasn't). Caught by
+  probing the actual mesh geometry in Isaac Sim rather than trusting the coincidence — and
+  independently corroborated afterward by a pre-existing MoveIt config for this exact arm, found
+  already sitting on the workstation, whose own tool-frame definition uses the same axis.
+- **What's declared, not measured, here:** the coupon's pose and the camera→robot transform (the
+  *placement* is backed by the reachability sweep above; the *fact* that this is where the surface
+  sits relative to the robot is not camera-calibrated, because there's no camera mounted yet). This
   slide is IK math on a real robot model following real vision output — it is not a claim that the
   robot has done this.
 
@@ -193,6 +205,23 @@ Four panels, left to right: input · binary mask · overlay · centerline.
   above it in the scene.
 - If asked how long this took to build: Isaac Sim's first-ever shader compile on a machine takes 5-15
   minutes; every render after that takes about 15-25 seconds for the whole scene.
+
+## Sim 2b · Watching it move
+
+**Figure:** `renders/trajectory.mp4` (video, ~12 s at 2x real time)
+
+- Press play. The joint angles at every one of the 20 keyframes are the actual solved IK — motion
+  *between* keyframes is linear interpolation, and playback is 2x real time, both stated in the
+  on-screen HUD rather than hidden.
+- The thing to point at while it plays: the wrist stays genuinely level across the whole 18-point
+  inspection pass — it doesn't wobble even while the shoulder and elbow sweep tens of degrees. That
+  holds because the IK is holding the gripper's actual reach axis vertical at every one of those
+  points, not because the camera angle is hiding a tilt.
+- At the very end the wrist visibly tips before lifting off. That's real, not a rendering glitch —
+  it's the `retract` waypoint, one of the two hover transitions that didn't fully converge (see
+  Sim 1). Left in deliberately: a video that only shows the good part isn't the honest version.
+- If asked why it took ~9 minutes to render: each frame is a real RTX-denoised capture, not a
+  cheap rasterization — about 2 seconds per frame at this quality setting, for 243 frames.
 
 ## Sim 3 · Does the path actually land on the crack?
 
@@ -294,3 +323,20 @@ project may kill another project's GPU process.
 Because each card carries acceptance criteria and an out-of-scope list, an independent reviewer can
 re-run them, and three of them failed that check. Without the gate, those three would be in the
 codebase right now.
+
+**"Why didn't every waypoint reach the target on the first try?"**
+It didn't need to — and pretending otherwise would be the wrong lesson to draw. The 18 real
+inspection points converge to a mean of 0.026 mm. The two that don't fully close (`approach`,
+`retract`, pure hover moves before/after the actual pass) are a genuine, measured effect: this arm's
+tightest-limit joints run out of comfortable range near full extension, and moving the coupon closer
+to the base (a real, standard fix — put the part where the arm is comfortable, don't fight the
+solver) took the real inspection points from 5/18 reaching a 2 mm target to 18/18 landing under
+0.1 mm. Full sweep in `docs/TECHNICAL_APPROACH.md` §2.5.
+
+**"Why not use MoveIt for the IK?"**
+There already is a MoveIt2 config for this exact arm on this machine (`rebotarm_moveit_config`) —
+found, not built for this. It uses the default KDL solver, not TRAC-IK, so it wouldn't automatically
+solve the reachability problem above; TRAC-IK plus MoveIt's `computeCartesianPath()` (the standard
+tool for tracing a sequence of Cartesian points) would likely do this more robustly than the
+from-scratch solver here. That's real, valuable follow-up work — a ROS2/MoveIt stack migration, not
+a same-session swap — not something skipped out of ignorance that it exists.

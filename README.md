@@ -44,6 +44,13 @@ export a PDF). [`presentation/SLIDES.md`](presentation/SLIDES.md) carries the sa
 speaker notes, and every figure is regenerated from committed artefacts by
 [`presentation/tools/make_figures.py`](presentation/tools/make_figures.py).
 
+**[`docs/TECHNICAL_APPROACH.md`](docs/TECHNICAL_APPROACH.md)** is the engineering write-up behind
+the deck: how the segmentation model actually works, how the mask becomes an ordered 3D path, the
+forward/inverse kinematics for the reBot B601-DM (including a real mistake in the gripper's
+boresight axis, found by checking the actual mesh geometry rather than a coordinate-frame
+coincidence, and fixed), the velocity analysis, and how the Isaac Sim scene and trajectory video
+are built. Read this if the deck raises "how does that actually work?" — it's written for that.
+
 ## Repository map
 
 ```

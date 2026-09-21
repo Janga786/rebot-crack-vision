@@ -1,0 +1,614 @@
+{
+  "generated_by": "presentation/demo/compute_velocities.py",
+  "status": "DEMO - segment-average finite differences over the 20 solved keyframes",
+  "method": "v_lin = dp/dt; omega = axis-angle(R_i+1 R_i^T)/dt; qdot = dq/dt",
+  "fk_cross_check_vs_stored_xyz_fk_mm_max": 0.00083,
+  "joint_velocity_limits_rad_s": {
+    "joint1": 50.0,
+    "joint2": 50.0,
+    "joint3": 50.0,
+    "joint4": 200.0,
+    "joint5": 200.0,
+    "joint6": 200.0
+  },
+  "summary": {
+    "max_linear_speed_m_s": 0.02018,
+    "max_angular_speed_rad_s": 0.60199,
+    "max_angular_speed_deg_s": 34.492,
+    "designed_constant_tool_speed_m_s": 0.02,
+    "max_joint_velocity_fraction_of_limit": 0.00301,
+    "worst_joint": "joint6",
+    "note": "tool angular velocity stays low across the 18-crack-waypoint inspection pass itself, because the IK holds the boresight straight down at every one of those keyframes (see axis_err_deg in joint_trajectory.json) -- the wrist does not wobble even though joints 1-3 sweep substantially (see fig04). It is NOT low at the retract transition: that waypoint is one of two (with 'approach') that did not fully converge (see joint_trajectory.json's per-waypoint 'reachable' flag and docs/TECHNICAL_APPROACH.md sec 2.5), so it exits on a different, farther solution branch and the resulting joint6 swing shows up here as this run's single largest angular-speed segment. Segment-average, not a finer resampling: a transient between keyframes could differ slightly."
+  },
+  "segments": [
+    {
+      "from": "approach",
+      "to": "crack_00",
+      "t_mid_s": 1.0,
+      "dt_s": 2.0,
+      "midpoint_xyz_m": [
+        0.11192,
+        -0.13708,
+        0.18243
+      ],
+      "v_lin_m_s": [
+        -0.00618,
+        0.007,
+        -0.01743
+      ],
+      "speed_m_s": 0.01978,
+      "omega_rad_s": [
+        0.03504,
+        0.01662,
+        -0.16898
+      ],
+      "angular_speed_rad_s": 0.17338,
+      "qdot_rad_s": [
+        -0.00511,
+        0.01213,
+        0.07837,
+        -0.02777,
+        -0.00313,
+        0.16407
+      ]
+    },
+    {
+      "from": "crack_00",
+      "to": "crack_01",
+      "t_mid_s": 2.8954500000000003,
+      "dt_s": 1.7909000000000002,
+      "midpoint_xyz_m": [
+        0.10688,
+        -0.1122,
+        0.16499
+      ],
+      "v_lin_m_s": [
+        0.00127,
+        0.01997,
+        -1e-05
+      ],
+      "speed_m_s": 0.02001,
+      "omega_rad_s": [
+        0.0,
+        -1e-05,
+        0.09515
+      ],
+      "angular_speed_rad_s": 0.09515,
+      "qdot_rad_s": [
+        0.09515,
+        0.0518,
+        0.02929,
+        0.0225,
+        -1e-05,
+        -0.0
+      ]
+    },
+    {
+      "from": "crack_01",
+      "to": "crack_02",
+      "t_mid_s": 3.9466,
+      "dt_s": 0.31139999999999946,
+      "midpoint_xyz_m": [
+        0.11039,
+        -0.09228,
+        0.16499
+      ],
+      "v_lin_m_s": [
+        0.01526,
+        0.01314,
+        7e-05
+      ],
+      "speed_m_s": 0.02014,
+      "omega_rad_s": [
+        -2e-05,
+        5e-05,
+        0.13807
+      ],
+      "angular_speed_rad_s": 0.13807,
+      "qdot_rad_s": [
+        0.13807,
+        -0.01268,
+        -0.00689,
+        -0.00577,
+        5e-05,
+        0.0
+      ]
+    },
+    {
+      "from": "crack_02",
+      "to": "crack_03",
+      "t_mid_s": 4.6857,
+      "dt_s": 1.1668000000000003,
+      "midpoint_xyz_m": [
+        0.12302,
+        -0.08466,
+        0.16499
+      ],
+      "v_lin_m_s": [
+        0.01757,
+        0.00955,
+        -1e-05
+      ],
+      "speed_m_s": 0.02,
+      "omega_rad_s": [
+        -0.0,
+        0.0,
+        0.11928
+      ],
+      "angular_speed_rad_s": 0.11928,
+      "qdot_rad_s": [
+        0.11928,
+        -0.03466,
+        -0.01874,
+        -0.01592,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "from": "crack_03",
+      "to": "crack_04",
+      "t_mid_s": 6.4498,
+      "dt_s": 2.3613999999999997,
+      "midpoint_xyz_m": [
+        0.14763,
+        -0.06034,
+        0.16499
+      ],
+      "v_lin_m_s": [
+        0.01216,
+        0.01588,
+        0.0
+      ],
+      "speed_m_s": 0.02,
+      "omega_rad_s": [
+        0.0,
+        0.0,
+        0.1203
+      ],
+      "angular_speed_rad_s": 0.1203,
+      "qdot_rad_s": [
+        0.12029,
+        -0.01989,
+        -0.01168,
+        -0.00821,
+        -0.0,
+        -0.0
+      ]
+    },
+    {
+      "from": "crack_04",
+      "to": "crack_05",
+      "t_mid_s": 8.28975,
+      "dt_s": 1.3185000000000002,
+      "midpoint_xyz_m": [
+        0.17517,
+        -0.04159,
+        0.16499
+      ],
+      "v_lin_m_s": [
+        0.02,
+        0.0,
+        -1e-05
+      ],
+      "speed_m_s": 0.02,
+      "omega_rad_s": [
+        -0.0,
+        -0.0,
+        0.02579
+      ],
+      "angular_speed_rad_s": 0.02579,
+      "qdot_rad_s": [
+        0.02579,
+        -0.07404,
+        -0.0489,
+        -0.02515,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "from": "crack_05",
+      "to": "crack_06",
+      "t_mid_s": 9.09835,
+      "dt_s": 0.2987000000000002,
+      "midpoint_xyz_m": [
+        0.19129,
+        -0.04101,
+        0.16499
+      ],
+      "v_lin_m_s": [
+        0.01964,
+        0.00388,
+        6e-05
+      ],
+      "speed_m_s": 0.02002,
+      "omega_rad_s": [
+        0.0,
+        1e-05,
+        0.04043
+      ],
+      "angular_speed_rad_s": 0.04043,
+      "qdot_rad_s": [
+        0.04043,
+        -0.06978,
+        -0.05065,
+        -0.01912,
+        -0.0,
+        0.0
+      ]
+    },
+    {
+      "from": "crack_06",
+      "to": "crack_07",
+      "t_mid_s": 9.39845,
+      "dt_s": 0.30150000000000077,
+      "midpoint_xyz_m": [
+        0.19564,
+        -0.03779,
+        0.16499
+      ],
+      "v_lin_m_s": [
+        0.0094,
+        0.01752,
+        -4e-05
+      ],
+      "speed_m_s": 0.01988,
+      "omega_rad_s": [
+        3e-05,
+        -2e-05,
+        0.09519
+      ],
+      "angular_speed_rad_s": 0.09519,
+      "qdot_rad_s": [
+        0.09519,
+        -0.02234,
+        -0.01631,
+        -0.00604,
+        -4e-05,
+        0.0
+      ]
+    },
+    {
+      "from": "crack_07",
+      "to": "crack_08",
+      "t_mid_s": 10.26755,
+      "dt_s": 1.4367,
+      "midpoint_xyz_m": [
+        0.20002,
+        -0.02109,
+        0.16499
+      ],
+      "v_lin_m_s": [
+        0.00413,
+        0.01957,
+        -0.0
+      ],
+      "speed_m_s": 0.02,
+      "omega_rad_s": [
+        -1e-05,
+        0.0,
+        0.09873
+      ],
+      "angular_speed_rad_s": 0.09873,
+      "qdot_rad_s": [
+        0.09873,
+        -0.00778,
+        -0.0058,
+        -0.00198,
+        1e-05,
+        -0.0
+      ]
+    },
+    {
+      "from": "crack_08",
+      "to": "crack_09",
+      "t_mid_s": 11.103950000000001,
+      "dt_s": 0.23609999999999864,
+      "midpoint_xyz_m": [
+        0.20414,
+        -0.00498,
+        0.16498
+      ],
+      "v_lin_m_s": [
+        0.00973,
+        0.01739,
+        -1e-05
+      ],
+      "speed_m_s": 0.01993,
+      "omega_rad_s": [
+        3e-05,
+        -0.0,
+        0.08623
+      ],
+      "angular_speed_rad_s": 0.08623,
+      "qdot_rad_s": [
+        0.08623,
+        -0.03518,
+        -0.02658,
+        -0.00861,
+        -3e-05,
+        0.0
+      ]
+    },
+    {
+      "from": "crack_09",
+      "to": "crack_10",
+      "t_mid_s": 11.3686,
+      "dt_s": 0.29320000000000057,
+      "midpoint_xyz_m": [
+        0.20766,
+        -0.00469,
+        0.16499
+      ],
+      "v_lin_m_s": [
+        0.0162,
+        -0.01203,
+        6e-05
+      ],
+      "speed_m_s": 0.02018,
+      "omega_rad_s": [
+        -3e-05,
+        1e-05,
+        -0.0561
+      ],
+      "angular_speed_rad_s": 0.0561,
+      "qdot_rad_s": [
+        -0.0561,
+        -0.06232,
+        -0.04825,
+        -0.01405,
+        3e-05,
+        0.0
+      ]
+    },
+    {
+      "from": "crack_10",
+      "to": "crack_11",
+      "t_mid_s": 11.7553,
+      "dt_s": 0.48019999999999996,
+      "midpoint_xyz_m": [
+        0.21297,
+        -0.01026,
+        0.165
+      ],
+      "v_lin_m_s": [
+        0.0122,
+        -0.01585,
+        -0.0
+      ],
+      "speed_m_s": 0.02,
+      "omega_rad_s": [
+        0.0,
+        -0.0,
+        -0.07147
+      ],
+      "angular_speed_rad_s": 0.07147,
+      "qdot_rad_s": [
+        -0.07147,
+        -0.04891,
+        -0.03875,
+        -0.01016,
+        -0.0,
+        0.0
+      ]
+    },
+    {
+      "from": "crack_11",
+      "to": "crack_12",
+      "t_mid_s": 12.0701,
+      "dt_s": 0.14939999999999998,
+      "midpoint_xyz_m": [
+        0.21735,
+        -0.01436,
+        0.16498
+      ],
+      "v_lin_m_s": [
+        0.01945,
+        -0.00394,
+        -0.00019
+      ],
+      "speed_m_s": 0.01985,
+      "omega_rad_s": [
+        -1e-05,
+        -4e-05,
+        -0.01218
+      ],
+      "angular_speed_rad_s": 0.01218,
+      "qdot_rad_s": [
+        -0.01218,
+        -0.07414,
+        -0.05936,
+        -0.01483,
+        1e-05,
+        0.0
+      ]
+    },
+    {
+      "from": "crack_12",
+      "to": "crack_13",
+      "t_mid_s": 13.40025,
+      "dt_s": 2.5108999999999995,
+      "midpoint_xyz_m": [
+        0.23552,
+        0.0041,
+        0.16498
+      ],
+      "v_lin_m_s": [
+        0.01331,
+        0.01493,
+        1e-05
+      ],
+      "speed_m_s": 0.02001,
+      "omega_rad_s": [
+        -0.0,
+        0.0,
+        0.06259
+      ],
+      "angular_speed_rad_s": 0.06259,
+      "qdot_rad_s": [
+        0.06259,
+        -0.05103,
+        -0.04518,
+        -0.00585,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "from": "crack_13",
+      "to": "crack_14",
+      "t_mid_s": 15.9495,
+      "dt_s": 2.587600000000002,
+      "midpoint_xyz_m": [
+        0.27449,
+        0.03603,
+        0.165
+      ],
+      "v_lin_m_s": [
+        0.01721,
+        0.01019,
+        -0.0
+      ],
+      "speed_m_s": 0.02,
+      "omega_rad_s": [
+        -0.0,
+        0.0,
+        0.0286
+      ],
+      "angular_speed_rad_s": 0.0286,
+      "qdot_rad_s": [
+        0.0286,
+        -0.07009,
+        -0.07354,
+        0.00345,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "from": "crack_14",
+      "to": "crack_15",
+      "t_mid_s": 17.79325,
+      "dt_s": 1.099899999999998,
+      "midpoint_xyz_m": [
+        0.30407,
+        0.05742,
+        0.16499
+      ],
+      "v_lin_m_s": [
+        0.0133,
+        0.01492,
+        -1e-05
+      ],
+      "speed_m_s": 0.01999,
+      "omega_rad_s": [
+        0.0,
+        -1e-05,
+        0.03941
+      ],
+      "angular_speed_rad_s": 0.03941,
+      "qdot_rad_s": [
+        0.03941,
+        -0.06202,
+        -0.07324,
+        0.01121,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "from": "crack_15",
+      "to": "crack_16",
+      "t_mid_s": 19.079749999999997,
+      "dt_s": 1.4730999999999987,
+      "midpoint_xyz_m": [
+        0.31578,
+        0.07968,
+        0.16498
+      ],
+      "v_lin_m_s": [
+        0.00596,
+        0.01908,
+        -1e-05
+      ],
+      "speed_m_s": 0.01999,
+      "omega_rad_s": [
+        0.0,
+        -0.0,
+        0.05233
+      ],
+      "angular_speed_rad_s": 0.05233,
+      "qdot_rad_s": [
+        0.05233,
+        -0.04189,
+        -0.05233,
+        0.01045,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "from": "crack_16",
+      "to": "crack_17",
+      "t_mid_s": 21.03875,
+      "dt_s": 2.4449000000000005,
+      "midpoint_xyz_m": [
+        0.33717,
+        0.11132,
+        0.16498
+      ],
+      "v_lin_m_s": [
+        0.01391,
+        0.01438,
+        1e-05
+      ],
+      "speed_m_s": 0.02001,
+      "omega_rad_s": [
+        -0.0,
+        0.0,
+        0.02627
+      ],
+      "angular_speed_rad_s": 0.02627,
+      "qdot_rad_s": [
+        0.02627,
+        -0.07655,
+        -0.1056,
+        0.02906,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "from": "crack_17",
+      "to": "retract",
+      "t_mid_s": 23.2612,
+      "dt_s": 2.0,
+      "midpoint_xyz_m": [
+        0.35615,
+        0.12924,
+        0.18296
+      ],
+      "v_lin_m_s": [
+        0.00198,
+        0.00033,
+        0.01797
+      ],
+      "speed_m_s": 0.01809,
+      "omega_rad_s": [
+        -0.01261,
+        -0.05125,
+        0.59967
+      ],
+      "angular_speed_rad_s": 0.60199,
+      "qdot_rad_s": [
+        -0.00125,
+        0.03014,
+        -0.02891,
+        0.0094,
+        -0.00062,
+        -0.60142
+      ]
+    }
+  ]
+}

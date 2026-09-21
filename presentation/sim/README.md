@@ -42,9 +42,15 @@ python -u /home/boosterk1/Projects/rebot_crack_vision/presentation/sim/build_sce
   floor plane. All geometry is procedural (`UsdGeom.Cube`/`Mesh`), no
   external assets besides the robot meshes and the crack PNG.
 - The coupon's top face is a **dedicated 0.30 x 0.30 m quad** (not a box's
-  top face) centred at `(0.42, 0.0)`, top at `z=0.1204`, textured with
-  `coupon_crack_texture.png` -- see "Texture orientation" below for why that
-  file is a rotated copy of the source image, not the source image itself.
+  top face) centred at `COUPON_CENTER = (0.22, 0.0)`, top at `z=0.1204`,
+  textured with `coupon_crack_texture.png` -- see "Texture orientation" below
+  for why that file is a rotated copy of the source image, not the source
+  image itself. That centre was originally `(0.42, 0.0)`; it moved after the
+  boresight-axis fix below made position+orientation reachability measurably
+  harder near full extension -- see "The gripper-boresight-axis bug" and
+  `docs/TECHNICAL_APPROACH.md` sec 2.5 for the reachability sweep that picked
+  0.22 m specifically (18/18 real inspection waypoints under 0.1 mm error,
+  versus 5/18 under 2 mm at the original placement).
 - Two copies of the 18-waypoint path from `presentation/demo/crack_path_3d.json`:
   - `/World/InspectionPath` -- the real path, spheres+tube at the JSON's own
     standoff height (surface + 45mm). Shown in `scene_overview.png` and
@@ -58,17 +64,47 @@ python -u /home/boosterk1/Projects/rebot_crack_vision/presentation/sim/build_sce
     markers at the source image's 4 corners via the exact
     `pixel_to_world` formula) used only for the `_fiducial_check.png`
     diagnostic (see below).
-- A static "inspecting" arm pose (`STATIC_ARM_POSE_RAD`), solved offline with
-  closed-form FK (from the URDF's own joint origins/axes) + `scipy`
-  `L-BFGS-B` so the gripper hovers, pointing straight down, at waypoint #9.
-  A second "retracted" pose (`RETRACTED_ARM_POSE_RAD`) swings the arm clear
-  of the coupon for the topdown shot (verified clear with the same FK, see
-  comments in the script) so the arm never occludes the crack in that shot.
-  `apply_joint_pose(articulation, joint_angles_rad, gripper_opening_m)` sets
-  these by **name** (`SingleArticulation.set_joint_positions`, a direct
-  "teleport" of the physics DOF state) and is the hook a future trajectory
-  playback should call once per animation frame -- see "Trajectory hook"
-  below.
+- A static "inspecting" arm pose (`STATIC_ARM_POSE_RAD`) loaded directly from
+  `joint_trajectory.json`'s `crack_09` waypoint -- the actual IK solution
+  `arm_kinematics.py` produces, not a separately hand-tuned pose. An earlier
+  version of this constant *was* solved independently (closed-form FK +
+  `scipy` `L-BFGS-B`) before the tool-boresight-axis bug described below was
+  found, and inherited that bug: it visibly pointed the gripper sideways at
+  the coupon. Loading the real trajectory instead means this file cannot
+  drift out of sync with the kinematics again. A second "retracted" pose
+  (`RETRACTED_ARM_POSE_RAD`) swings the arm clear of the coupon for the
+  topdown shot (verified clear with the same FK) so the arm never occludes
+  the crack in that shot. `apply_joint_pose(articulation, joint_angles_rad,
+  gripper_opening_m)` sets these by **name**
+  (`SingleArticulation.set_joint_positions`, a direct "teleport" of the
+  physics DOF state) and is the same hook `render_trajectory_video.py` calls
+  once per animation frame.
+
+## The gripper-boresight-axis bug (found while adding the trajectory video)
+
+The first version of the kinematics assumed the gripper's "pointing" direction
+was the tool frame's local **+Z** axis, because it happened to equal world
+`(0,0,-1)` at the all-zero joint configuration. That was a coincidence, not a
+property of the gripper, and it meant every rendered pose here held the
+*wrong* axis vertical -- invisible in a single still image, unmistakable in a
+moving video, where the wrist visibly failed to track the surface below it.
+
+The fix used the same "measure the real geometry" principle as the texture
+orientation below: `_probe_gripper_axis.py` loads the URDF in Isaac Sim at
+`q=0` and reads the world-space bounding-box center of `link6`, `gripper_link`
+and both finger links, expressed in the gripper's own frame. Every local-Z
+coordinate came back ~0 (the whole gripper body lies flat in the frame's own
+XY plane) while local-X ran monotonically from the wrist toward the fingers --
+the gripper physically points along local **+X**, not +Z.
+`arm_kinematics.py` was corrected to hold local +X vertical instead, and the
+whole trajectory was re-solved. Confirmed two ways after the fact: (1) an
+independent, pre-existing MoveIt2 config for this exact arm
+(`~/rebot_ws/src/rebotarm_moveit_config`) defines its own tool-centre-point
+frame as a pure translation along the same local X axis, with no rotation --
+built by someone else, for an unrelated purpose, and it agrees; (2)
+`scene_overview.png`/`closeup_coupon.png` now visibly show the gripper hanging
+straight down over the coupon, not reaching in sideways as they did before the
+fix. Full derivation and the exact numbers: `docs/TECHNICAL_APPROACH.md` §2.3.
 
 ## Renders (all 1600x900, `presentation/renders/`)
 
@@ -76,7 +112,7 @@ python -u /home/boosterk1/Projects/rebot_crack_vision/presentation/sim/build_sce
   reaching over to the coupon on its own pedestal, floating path + crack
   both visible, dark floor for separation, warm key light / cool fill.
 - **`topdown_path.png`** -- orthographic, camera centred exactly over the
-  coupon (`(0.42, 0, 1.15)` looking straight down), retracted arm pose,
+  coupon (`(COUPON_CENTER, 1.15)` looking straight down), retracted arm pose,
   **flat** zero-standoff path only. This is the shot that has to prove the
   vision path lands on the painted crack.
 - **`closeup_coupon.png`** -- perspective, arm still in the inspecting pose,
@@ -86,6 +122,21 @@ python -u /home/boosterk1/Projects/rebot_crack_vision/presentation/sim/build_sce
   deliverable) -- same topdown camera, corner fiducials shown instead of the
   path. Confirms the 4 markers (white/black/cyan/magenta, one per source
   image corner) land exactly on the coupon's 4 geometric corners.
+- **`trajectory.mp4`** -- built by `render_trajectory_video.py`, not
+  `build_scene.py`. Same scene-construction helpers (duplicated, not
+  imported, so a change to one script can't destabilize the other), plus a
+  frame loop: at each output frame it linearly interpolates joint angles
+  between the two solved keyframes bracketing that instant (an honest
+  approximation between validated poses, not a re-solved Cartesian path),
+  teleports the articulation there, and renders. Played back at 2x real time
+  (24.3 s of motion -> ~12 s of video at 20 fps) with an on-frame HUD stating
+  the real elapsed time and playback speed, so nothing about the speed-up is
+  hidden. Frames are written to `_video_frames/` and encoded with `ffmpeg`
+  (H.264/yuv420p); the PNG frames are deleted afterward, not committed.
+  Rerun with `python -u render_trajectory_video.py [--fps N] [--speed X]
+  [--max-frames N]` (the last one for a quick timing test before committing
+  to a full render -- each frame costs about 2s at the default settle
+  settings, so a full render is on the order of several minutes).
 
 ## Texture orientation -- what was wrong and how it was found
 

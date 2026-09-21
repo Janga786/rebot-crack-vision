@@ -331,9 +331,114 @@ def fig_workspace() -> Path:
     return p
 
 
+def fig_velocity() -> Path:
+    """Linear + angular tool velocity along the solved trajectory.
+
+    Left: the crack image with a quiver of the tool's linear-velocity vector
+    at each keyframe (direction + relative magnitude). Right: two stacked
+    time-series (never a dual-axis chart) -- linear speed on top, angular
+    speed on bottom, with the same approach/retract shading fig_trajectory
+    uses.
+    """
+    vel_doc = _load_json(DEMO / "velocity_trajectory.json")
+    crack_doc = _load_json(DEMO / "crack_path_3d.json")
+    img = np.array(Image.open(ASSETS / "synthetic_crack_input.png"))
+    shape = crack_doc["image_shape"]
+
+    segs = vel_doc["segments"]
+    t_mid = np.array([s["t_mid_s"] for s in segs])
+    speed = np.array([s["speed_m_s"] for s in segs])
+    ang_speed_deg = np.degrees(np.array([s["angular_speed_rad_s"] for s in segs]))
+
+    # midpoint world -> pixel (row, col), inverting crack_to_path.py's
+    # pixel_to_world exactly, so the quiver overlays the same image fig_trajectory uses
+    # read from the JSON rather than hardcoding -- this hardcoded (0.42, 0.0) once
+    # and silently mismatched crack_to_path.py's own coupon placement after that
+    # was moved for IK reachability, scattering the quiver arrows off the image
+    COUPON_SIZE_M = crack_doc["assumptions"]["coupon_size_m"]
+    COUPON_CENTER = tuple(crack_doc["assumptions"]["coupon_center_xy_m"])
+    m_per_px = COUPON_SIZE_M / shape[1]
+
+    def world_xy_to_rc(x, y):
+        r = shape[0] / 2.0 - (x - COUPON_CENTER[0]) / m_per_px
+        c = shape[1] / 2.0 - (y - COUPON_CENTER[1]) / m_per_px
+        return r, c
+
+    rc = np.array([world_xy_to_rc(*s["midpoint_xyz_m"][:2]) for s in segs])
+    v_world = np.array([s["v_lin_m_s"] for s in segs])
+    # velocity direction in the (row,col) image plane: dr/dt <-> -dx, dc/dt <-> -dy
+    v_rc = np.stack([-v_world[:, 0] / m_per_px, -v_world[:, 1] / m_per_px], axis=1)
+
+    fig = plt.figure(figsize=(16.5, 6.4))
+    gs = fig.add_gridspec(2, 2, width_ratios=[1.0, 1.35], height_ratios=[1, 1],
+                           hspace=0.55, wspace=0.22)
+    ax_img = fig.add_subplot(gs[:, 0])
+    ax_lin = fig.add_subplot(gs[0, 1])
+    ax_ang = fig.add_subplot(gs[1, 1])
+
+    ax_img.imshow(img, interpolation="nearest")
+    ax_img.quiver(rc[:, 1], rc[:, 0], v_rc[:, 1], v_rc[:, 0],
+                  color=JOINT_COLORS[0], scale=1.0, scale_units="xy", angles="xy",
+                  width=0.008, headwidth=4.5, headlength=5.5, zorder=3)
+    ax_img.set_xticks([]); ax_img.set_yticks([])
+    for s in ax_img.spines.values():
+        s.set_edgecolor(GRID); s.set_linewidth(1.0)
+    ax_img.text(0, 1.20, "1 · LINEAR VELOCITY FIELD", transform=ax_img.transAxes,
+                fontsize=13, fontweight="bold", color=INK, va="bottom")
+    ax_img.text(0, 1.08, "arrow = tool velocity direction, scaled by speed (all ~2 cm/s by design)",
+                transform=ax_img.transAxes, fontsize=9.5, color=INK_2, va="bottom")
+
+    def band(ax):
+        approach_end = next((s["t_mid_s"] + s["dt_s"] / 2 for s in segs if s["from"] == "approach"), 0)
+        retract_start = next((s["t_mid_s"] - s["dt_s"] / 2 for s in segs if s["to"] == "retract"), t_mid[-1])
+        ax.axvspan(0, approach_end, color=GRID, alpha=0.5, zorder=0)
+        ax.axvspan(retract_start, t_mid[-1] + segs[-1]["dt_s"] / 2, color=GRID, alpha=0.5, zorder=0)
+
+    ax_lin.plot(t_mid, speed * 100, color=JOINT_COLORS[0], linewidth=2.2, zorder=3)
+    band(ax_lin)
+    ax_lin.set_ylim(0, max(speed * 100) * 1.35)
+    ax_lin.set_ylabel("speed (cm/s)", fontsize=10, color=INK_2)
+    ax_lin.set_title("2 · LINEAR SPEED", fontsize=12, fontweight="bold", color=INK, loc="left")
+    ax_lin.text(0.99, 0.90, f"designed constant: 2.0 cm/s", transform=ax_lin.transAxes,
+                fontsize=9, color=INK_2, ha="right", va="top", style="italic")
+
+    ax_ang.plot(t_mid, ang_speed_deg, color=JOINT_COLORS[1], linewidth=2.2, zorder=3)
+    band(ax_ang)
+    ax_ang.set_ylim(0, max(ang_speed_deg) * 1.35 if max(ang_speed_deg) > 0 else 1)
+    ax_ang.set_xlabel("time (s)", fontsize=10, color=INK_2)
+    ax_ang.set_ylabel("angular speed (deg/s)", fontsize=10, color=INK_2)
+    ax_ang.set_title("3 · TOOL ANGULAR SPEED", fontsize=12, fontweight="bold", color=INK, loc="left")
+    ax_ang.text(0.99, 0.90, "wrist stays level along the inspection pass; the spike is the retract lift-off",
+                transform=ax_ang.transAxes, fontsize=9, color=INK_2, ha="right", va="top", style="italic")
+
+    for ax in (ax_lin, ax_ang):
+        ax.set_xlim(t_mid[0] - 1, t_mid[-1] + 1)
+        ax.grid(axis="y", color=GRID, linewidth=0.8, zorder=0)
+        ax.set_facecolor(SURFACE)
+        for spine in ("top", "right"):
+            ax.spines[spine].set_visible(False)
+        for spine in ("left", "bottom"):
+            ax.spines[spine].set_color(GRID)
+        ax.tick_params(colors=INK_2, labelsize=9)
+
+    fig.suptitle("Tool velocity along the inspection pass",
+                  fontsize=15.5, fontweight="bold", color=INK, x=0.012, ha="left", y=0.99)
+    fig.text(0.012, 0.925,
+              "Segment-average finite differences over the 20 solved keyframes — max linear speed "
+              f"{vel_doc['summary']['max_linear_speed_m_s']*100:.2f} cm/s, max angular speed "
+              f"{vel_doc['summary']['max_angular_speed_deg_s']:.2f} deg/s, worst joint at "
+              f"{vel_doc['summary']['max_joint_velocity_fraction_of_limit']*100:.2f}% of its rated speed.",
+              fontsize=10, color=INK_2, ha="left")
+    fig.subplots_adjust(top=0.72, bottom=0.11, left=0.03, right=0.985)
+    p = OUT / "fig07_velocity.png"
+    fig.savefig(p, dpi=170)
+    plt.close(fig)
+    return p
+
+
 def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
-    for fn in (fig_trajectory, fig_workspace):
+    for fn in (fig_trajectory, fig_workspace, fig_velocity):
         p = fn()
         print(f"wrote {p.relative_to(ROOT)}")
     return 0

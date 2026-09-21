@@ -29,7 +29,7 @@ committed artefacts in `assets/`. Rebuilding the Isaac Sim renders is separate a
 
 ## What is real and what is scaffolding
 
-This matters more than any figure, and the deck says it on slide 13 ("What is measured, and what is
+This matters more than any figure, and the deck says it on slide 14 ("What is measured, and what is
 still declared"):
 
 **Real** — the crack mask, the centerline and every number quoted about them come from an actual
@@ -39,10 +39,16 @@ attached yet.
 
 **Scaffolding** — `demo/` and `sim/` follow the vision output into a robot arm so the capstone story
 can be shown end to end. They assume a flat surface at a known pose and a declared camera→robot
-transform. Depth projection is deferred by [`docs/adr/002`](../docs/adr/002-rgb-first-depth-later.md),
-ordered path extraction by [`adr/008`](../docs/adr/008-mask-to-skeleton-endpoint.md), and robot
-integration by [`adr/009`](../docs/adr/009-robot-ros-integration-deferred.md). Nothing in `src/`
-imports any of it.
+transform (the *fact* that the surface is there is declared; where exactly to put it was chosen
+from a measured IK-reachability sweep, not guessed — see below). Depth projection is deferred by
+[`docs/adr/002`](../docs/adr/002-rgb-first-depth-later.md), ordered path extraction by
+[`adr/008`](../docs/adr/008-mask-to-skeleton-endpoint.md), and robot integration by
+[`adr/009`](../docs/adr/009-robot-ros-integration-deferred.md). Nothing in `src/` imports any of it.
+
+**The full engineering story** — including a real bug found and fixed in the kinematics (the wrong
+gripper axis was being held vertical), the reachability sweep that moved the coupon, and an
+independent, pre-existing MoveIt2 config for this exact arm that corroborates the fix — is in
+[`docs/TECHNICAL_APPROACH.md`](../docs/TECHNICAL_APPROACH.md), not just this file.
 
 ## Figure index
 
@@ -52,10 +58,12 @@ imports any of it.
 | `fig01_pipeline_result.png` | 5 | input → mask → overlay → centerline, from a real GPU run |
 | `fig02_negative_control.png` | 6 | the blank frame returning zero crack pixels, beside the positive case |
 | `fig03_scoreboard.png` | 8 | all 16 task cards and their review status |
-| `fig04_trajectory.png` | 10 | the 18 vision waypoints + the solved 6-joint trajectory (max error 0.089 mm) |
+| `fig04_trajectory.png` | 10 | the 18 vision waypoints + the solved 6-joint trajectory (0.026 mm mean error on the real inspection points; see the honesty note below) |
+| `renders/scene_overview.png` | 11 | Isaac Sim: the real B601-DM URDF beside the textured coupon and path, gripper genuinely pointing down |
+| `renders/trajectory.mp4` | 12 | the arm executing the trajectory, wrist held vertical throughout the inspection pass, 2x real time with an on-screen HUD |
+| `renders/topdown_path.png`, `renders/closeup_coupon.png` | 13 | the alignment proof shot + a close-up; see the honesty note in `sim/README.md` for the small residual visual gap that was measured, not hand-waved |
+| `fig07_velocity.png` | — (backup) | linear-velocity quiver on the crack image + linear/angular tool speed over time — not in the deck, kept as backup for a technical question |
 | `fig05_workspace.png` | — (backup) | 3D reach envelope: coupon, crack path, arm at 3 sampled poses — not in the deck, kept as a backup/appendix slide if a technical audience asks to see the workspace |
-| `renders/scene_overview.png` | 11 | Isaac Sim: the real B601-DM URDF beside the textured coupon and path |
-| `renders/topdown_path.png`, `renders/closeup_coupon.png` | 12 | the alignment proof shot + a close-up; see the honesty note in `sim/README.md` for the small residual visual gap that was measured, not hand-waved |
 
 Regenerate `fig04`/`fig05` with `./env.sh python presentation/tools/make_trajectory_figures.py`
 (needs `presentation/demo/joint_trajectory.json`, produced by
