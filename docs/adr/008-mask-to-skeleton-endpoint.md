@@ -1,6 +1,7 @@
 # ADR-008: This phase ends at a one-pixel skeleton raster — no graph, no ordered path
 
 **Status:** accepted · **Date:** 2026-09-16
+Status: Superseded in part by ADR-011 (2026-09-28)
 
 ## Context
 The eventual robot pipeline needs an *ordered* 3D path. Getting there from a binary mask means

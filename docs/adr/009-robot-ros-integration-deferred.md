@@ -1,6 +1,7 @@
 # ADR-009: Robot control, camera-robot calibration and ROS 2 integration are deferred
 
 **Status:** accepted · **Date:** 2026-09-16
+Status: Superseded in part by ADR-011 (2026-09-28)
 
 ## Context
 The capstone target is a reBot-DevArm B601-DM (a 4-DOF-class short-reach arm; an existing ROS 2 +
