@@ -1,6 +1,6 @@
 # Progress — week of Mon Sep 28 – Sun Oct 04, 2026
 
-**10 task(s) completed and independently audited this week** · project total **18/69** accepted
+**10 task(s) completed and independently audited this week** · project total **19/69** accepted
 
 ## Notes
 
@@ -31,14 +31,15 @@
 
 ## Quality loop
 
-- Implementation/review sessions run: 14 / 14
+- Implementation/review sessions run: 14 / 15
 - Audits that rejected work with evidence-backed findings: 3 (repairs created: 2)
+- Re-verified after an upstream change: TC-001
 
 ## Progress by work package
 
 | Work package | Accepted | Total |
 |---|---|---|
-| Host platform & reproducibility (L-HOST) | 3 | 9 |
+| Host platform & reproducibility (L-HOST) | 4 | 9 |
 | Local coding model (L-LLM) | 1 | 6 |
 | D405 capture (L-CAM) | 2 | 7 |
 | Perception (L-PERC) | 7 | 16 |
