@@ -1,6 +1,7 @@
 # ADR-002: RGB-only into the network; D405 depth is consumed after segmentation
 
 **Status:** accepted · **Date:** 2026-09-16
+Status: Superseded in part by ADR-011 (2026-09-28)
 
 ## Context
 The D405 gives synchronised colour and depth. A naive design would feed RGB-D to the segmentation

@@ -541,3 +541,10 @@ Full register with likelihood/impact/mitigation/owning-card: **`docs/RISKS.md`**
 Skeleton graph traversal / ordered path • depth→3D backprojection • hand-eye calibration • robot
 trajectories • ROS 2 nodes • fine-tuning or retraining • multi-fold ensembling • real-time streaming
 • crack width/severity measurement • model comparison against CrackSAM/OmniCrack30k • any GUI.
+
+## 17. Phase 2 scope
+
+Goal G-001 (`plan/goals.json`) puts the full pipeline in scope. `docs/adr/011-phase2-full-pipeline-scope.md`
+decides the order the phase-1 deferrals lift in (ordered paths → geometry/calibration → motion
+planning → gated commissioning) and what stays deferred. See that ADR and `plan/` for the current
+card set and dependencies.
