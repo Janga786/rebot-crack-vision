@@ -1,0 +1,39 @@
+{
+  "recorded_utc": "2026-09-28T12:04:08Z",
+  "schema_version": 1,
+  "versions": {
+    "bwrap": "bubblewrap 0.6.1",
+    "claude_cli": "2.1.283 (Claude Code)",
+    "crackvision": {
+      "nnunetv2": "2.8.1",
+      "numpy": "2.4.6",
+      "pyrealsense2": "2.58.4.10922",
+      "python": "3.11.16",
+      "torch": "2.14.0+cu126"
+    },
+    "cuda_toolkits": [
+      "11.8",
+      "12.6",
+      "12.8",
+      "13.2"
+    ],
+    "gz_sim": "Gazebo Sim, version 8.12.0",
+    "kernel": "6.8.0-124-generic",
+    "nvidia_driver": null,
+    "os": {
+      "id": "ubuntu",
+      "pretty_name": "Ubuntu 22.04.5 LTS",
+      "version_id": "22.04"
+    },
+    "ros": {
+      "distro": "humble",
+      "packages": {
+        "ros-humble-desktop": "0.10.0-1jammy.20260423.142311",
+        "ros-humble-librealsense2": "2.57.7-1jammy.20260324.115117",
+        "ros-humble-moveit": "2.5.9-1jammy.20260616.121430",
+        "ros-humble-realsense2-camera": "4.57.7-4jammy.20260422.083832",
+        "ros-humble-ros2-control": "2.54.0-1jammy.20260505.183920"
+      }
+    }
+  }
+}
