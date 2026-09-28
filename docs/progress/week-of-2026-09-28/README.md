@@ -1,6 +1,6 @@
 # Progress — week of Mon Sep 28 – Sun Oct 04, 2026
 
-**12 task(s) completed and independently audited this week** · project total **20/74** accepted
+**12 task(s) completed and independently audited this week** · project total **21/74** accepted
 
 ## Notes
 
@@ -35,7 +35,7 @@
 
 ## Quality loop
 
-- Implementation/review sessions run: 18 / 24
+- Implementation/review sessions run: 18 / 26
 - Audits that rejected work with evidence-backed findings: 5 (repairs created: 3)
 - Re-verified after an upstream change: GEOM-01, GEOM-01.R1, TC-001
 
@@ -51,7 +51,7 @@
 | Local coding model (L-LLM) | 1 | 6 |
 | D405 capture (L-CAM) | 2 | 7 |
 | Perception (L-PERC) | 9 | 16 |
-| Geometry & calibration (L-GEOM) | 1 | 9 |
+| Geometry & calibration (L-GEOM) | 2 | 9 |
 | Motion planning (L-MOTION) | 2 | 15 |
 | Integration & commissioning (L-INT) | 0 | 6 |
 | Operator workflow & handoff (L-OPS) | 0 | 4 |
