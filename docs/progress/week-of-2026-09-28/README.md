@@ -1,6 +1,6 @@
 # Progress — week of Mon Sep 28 – Sun Oct 04, 2026
 
-**10 task(s) completed and independently audited this week** · project total **19/69** accepted
+**11 task(s) completed and independently audited this week** · project total **20/74** accepted
 
 ## Notes
 
@@ -28,12 +28,18 @@
 …[519 chars clipped]
 - **MOT-02 — ROS 2 overlay workspace + headless MoveIt mock planning** ([details](MOT-02.md)): This repo now has its own ROS 2 overlay workspace that builds on top of the robot's existing ROS install and can plan robot arm motions entirely in software, with no hardware attached. Running the two
 …[451 chars clipped]
+- **PERC-02 — Skeleton graph: junctions, endpoints, spur pruning** ([details](PERC-02.md)): Built and tested a new perception module that turns a 1-pixel-wide crack skeleton into a graph of junctions, endpoints and loops with the full pixel path along each edge, all in original image coordin
+…[330 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 14 / 15
+- Implementation/review sessions run: 15 / 16
 - Audits that rejected work with evidence-backed findings: 3 (repairs created: 2)
 - Re-verified after an upstream change: TC-001
+
+## Planning changes
+
+- decomposed: MOT-04 → MOT-04.1, MOT-04.2, MOT-04.3, MOT-04.4, MOT-04.5
 
 ## Progress by work package
 
@@ -42,9 +48,9 @@
 | Host platform & reproducibility (L-HOST) | 4 | 9 |
 | Local coding model (L-LLM) | 1 | 6 |
 | D405 capture (L-CAM) | 2 | 7 |
-| Perception (L-PERC) | 7 | 16 |
+| Perception (L-PERC) | 8 | 16 |
 | Geometry & calibration (L-GEOM) | 2 | 9 |
-| Motion planning (L-MOTION) | 2 | 10 |
+| Motion planning (L-MOTION) | 2 | 15 |
 | Integration & commissioning (L-INT) | 0 | 6 |
 | Operator workflow & handoff (L-OPS) | 0 | 4 |
 | Imitation learning (later phase) (L-IL) | 0 | 1 |
