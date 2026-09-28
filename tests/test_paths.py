@@ -23,6 +23,7 @@ from crackvision.paths import (
     rdp_simplify,
     rdp_tolerance_from_config,
 )
+from crackvision.skeleton_graph import build_graph
 
 
 def _canvas(height: int, width: int) -> np.ndarray:
@@ -161,6 +162,71 @@ def test_min_spur_length_px_prunes_short_spur_before_extraction():
 
     assert pruned["components"][0]["branches"] == []
     assert unpruned["components"][0]["branches"] != []
+
+
+# ---------------------------------------------------------------------------
+# Junction clusters: edges that attach next to the merged node, not on it
+# ---------------------------------------------------------------------------
+
+
+def _assert_dense_is_8_connected(dense: list[tuple[int, int]]) -> None:
+    for a, b in zip(dense, dense[1:]):
+        assert max(abs(a[0] - b[0]), abs(a[1] - b[1])) <= 1, f"{a} -> {b} is not 8-connected"
+
+
+def test_two_pixel_junction_cluster_stays_connected_and_drops_no_pixel():
+    # A 2-pixel junction cluster: (5, 5) and (5, 6) both have degree >= 3 and get merged into one
+    # node keyed by the lexicographically-smallest pixel, (5, 5) (skeleton_graph.build_graph). Two
+    # of the four arms attach to (5, 6) — the non-representative cluster pixel — so their PERC-02
+    # edge ends one step short of the node's own pixel. This is the raw-pixel/node-pixel mismatch
+    # that a real skimage.skeletonize fork or crossing produces.
+    skel = _canvas(12, 12)
+    pixels = [
+        (3, 3), (4, 4), (5, 5), (5, 6), (4, 7), (3, 8),
+        (6, 4), (7, 3), (6, 7), (7, 8),
+    ]
+    _draw(skel, pixels)
+
+    doc = build_case_paths(skel, "cluster", min_spur_length_px=0, rdp_tolerance_px=1.0)
+
+    assert doc["component_count"] == 1
+    comp = doc["components"][0]
+    polylines = [comp["main_path"], *comp["branches"]]
+
+    covered: set[tuple[int, int]] = set()
+    for polyline in polylines:
+        dense = _points(polyline["dense"])
+        _assert_dense_is_8_connected(dense)
+        covered.update(dense)
+
+    expected = {p for edge in build_graph(skel).edges.values() for p in edge.pixels}
+    assert covered == expected  # no pixel of a traversed PERC-02 edge is dropped
+
+
+def test_t_shape_junction_cluster_paths_stay_connected_and_cover_every_pixel():
+    # Same T fixture as test_skeleton_graph.test_t_shape_one_junction_three_endpoints: the stem tip
+    # is 8-adjacent to three bar pixels, so PERC-02 merges several junction pixels into one node —
+    # the same cluster geometry skimage.morphology.skeletonize produces at a true T-intersection.
+    skel = _canvas(12, 15)
+    bar = [(6, c) for c in range(1, 11)]
+    stem = [(r, 6) for r in range(1, 6)]
+    _draw(skel, bar)
+    _draw(skel, stem)
+
+    doc = build_case_paths(skel, "t_cluster", min_spur_length_px=0, rdp_tolerance_px=1.0)
+
+    assert doc["component_count"] == 1
+    comp = doc["components"][0]
+    polylines = [comp["main_path"], *comp["branches"]]
+
+    covered: set[tuple[int, int]] = set()
+    for polyline in polylines:
+        dense = _points(polyline["dense"])
+        _assert_dense_is_8_connected(dense)
+        covered.update(dense)
+
+    expected = {p for edge in build_graph(skel).edges.values() for p in edge.pixels}
+    assert covered == expected  # no pixel of a traversed PERC-02 edge is dropped
 
 
 # ---------------------------------------------------------------------------

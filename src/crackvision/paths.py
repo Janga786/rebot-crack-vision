@@ -2,9 +2,9 @@
 
 Consumes the pixel graph PERC-02 builds over a `{0,255}` skeleton raster and turns it into a
 deterministic, ordered set of polylines per crack component, in the original `(row, col)` frame
-(docs/INTERFACES.md §0.5). Schema for the on-disk artifact is docs/INTERFACES.md §3.5.
+(docs/INTERFACES.md §0.5). Schema for the on-disk artifact is docs/INTERFACES.md §3.13.
 
-Policy (docs/INTERFACES.md §3.5), applied per connected component of the pruned graph:
+Policy (docs/INTERFACES.md §3.13), applied per connected component of the pruned graph:
 
 1. **Path decomposition = repeated graph-diameter extraction.** The component's *main path* is
    its graph diameter (docs/adr's usual sense: the longest shortest-path between any two nodes,
@@ -20,6 +20,12 @@ Policy (docs/INTERFACES.md §3.5), applied per connected component of the pruned
    component id. This does not attempt a globally optimal tour, only a cheap, reproducible one.
 3. **Simplification.** Both the dense (one point per skeleton pixel) and an RDP-simplified
    polyline (tolerance in px, from config) are kept for every path/branch, dense first.
+4. **Junction crossing.** A PERC-02 edge can end on a raw junction pixel next to the graph node
+   instead of on it (`skeleton_graph.build_graph` merges mutually-adjacent junction pixels into one
+   node keyed by their cluster's representative pixel). Wherever two consecutive edges in a
+   decomposed path don't meet on the same pixel, the node's own pixel is spliced in so the dense
+   path still passes through the junction/cluster and stays 8-connected (no step exceeds a
+   Chebyshev distance of 1) — no traversed edge pixel is ever dropped.
 """
 
 from __future__ import annotations
@@ -47,6 +53,7 @@ from crackvision.logging_setup import (
 )
 from crackvision.skeleton_graph import (
     Edge,
+    Node,
     SkeletonGraph,
     build_graph,
     prune_spurs,
@@ -227,14 +234,60 @@ def _decompose_edges(edges: dict[int, Edge]) -> list[tuple[int, list[Edge]]]:
     return decomposition
 
 
-def _edge_chain_to_pixels(path_edges: list[Edge], first_node: int) -> tuple[Pixel, ...]:
-    """Concatenate an ordered edge chain into one dense pixel path, starting at `first_node`."""
+def _chebyshev(a: Pixel, b: Pixel) -> int:
+    return max(abs(a[0] - b[0]), abs(a[1] - b[1]))
+
+
+def _step_path(a: Pixel, b: Pixel) -> list[Pixel]:
+    """8-connected straight-line steps from `a` to `b`, exclusive of `a`, inclusive of `b`."""
+    (r0, c0), (r1, c1) = a, b
+    dr, dc = r1 - r0, c1 - c0
+    steps = max(abs(dr), abs(dc))
+    return [(r0 + round(dr * i / steps), c0 + round(dc * i / steps)) for i in range(1, steps + 1)]
+
+
+def _bridge(last: Pixel, target: Pixel, via: Pixel) -> list[Pixel]:
+    """8-connected pixels from `last` to `target` (exclusive of `last`), routed through `via`.
+
+    PERC-02 edges can end on a raw junction pixel next to the merged junction node instead of on
+    it (`skeleton_graph.build_graph` merges mutually-adjacent junction pixels into one node, keyed
+    by the cluster's representative pixel — not necessarily the pixel any given edge happens to
+    touch). When that leaves a gap wider than one 8-connected step, this routes through the node's
+    own pixel (`via`) so the dense path still passes through the junction/cluster instead of
+    jumping over it.
+    """
+    if _chebyshev(last, target) <= 1:
+        return [target]
+    if via not in (last, target):
+        return _step_path(last, via) + _step_path(via, target)
+    return _step_path(last, target)
+
+
+def _edge_chain_to_pixels(path_edges: list[Edge], first_node: int, nodes: dict[int, Node]) -> tuple[Pixel, ...]:
+    """Concatenate an ordered edge chain into one dense, 8-connected pixel path.
+
+    Every point of every traversed edge is kept; a junction/cluster pixel (`nodes[node_id]`) is
+    inserted wherever consecutive edges don't meet on the same pixel, so no step exceeds a
+    Chebyshev distance of 1.
+    """
     pixels: list[Pixel] = []
     cur_node = first_node
     for edge in path_edges:
         oriented = _oriented_pixels(edge, cur_node)
-        pixels.extend(oriented if not pixels else oriented[1:])
-        cur_node = edge.node_b if edge.node_a == cur_node else edge.node_a
+        next_node = edge.node_b if edge.node_a == cur_node else edge.node_a
+        cur_node_pixel = (nodes[cur_node].row, nodes[cur_node].col)
+        for p in oriented:
+            if not pixels:
+                pixels.append(p)
+            elif pixels[-1] == p:
+                continue
+            else:
+                pixels.extend(_bridge(pixels[-1], p, cur_node_pixel))
+        cur_node = next_node
+
+    end_pixel = (nodes[cur_node].row, nodes[cur_node].col)
+    if pixels and pixels[-1] != end_pixel:
+        pixels.extend(_bridge(pixels[-1], end_pixel, end_pixel))
     return tuple(pixels)
 
 
@@ -285,7 +338,7 @@ def extract_component_paths(graph: SkeletonGraph, *, rdp_tolerance_px: float) ->
         decomposition = _decompose_edges(component_edges)
         polylines: list[Polyline] = []
         for start_node, path_edges in decomposition:
-            dense = _edge_chain_to_pixels(path_edges, start_node)
+            dense = _edge_chain_to_pixels(path_edges, start_node, graph.nodes)
             simplified = tuple(rdp_simplify(list(dense), rdp_tolerance_px))
             polylines.append(Polyline(kind="main", dense=dense, simplified=simplified))
 
@@ -377,7 +430,7 @@ def case_paths_to_dict(
     min_spur_length_px: int,
     rdp_tolerance_px: float,
 ) -> dict[str, Any]:
-    """Build the `data/paths/{case}_paths.json` document (docs/INTERFACES.md §3.5)."""
+    """Build the `data/paths/{case}_paths.json` document (docs/INTERFACES.md §3.13)."""
     return {
         "case_id": case_id,
         "schema_version": SCHEMA_VERSION,
@@ -422,14 +475,14 @@ def build_case_paths(
 
 
 # ---------------------------------------------------------------------------
-# CLI (docs/INTERFACES.md §3.5)
+# CLI (docs/INTERFACES.md §3.13)
 # ---------------------------------------------------------------------------
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="paths.py",
-        description="Ordered crack polylines from a skeleton raster (docs/INTERFACES.md §3.5).",
+        description="Ordered crack polylines from a skeleton raster (docs/INTERFACES.md §3.13).",
     )
     add_common_args(parser)
     parser.add_argument(
