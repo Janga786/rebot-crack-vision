@@ -1,6 +1,6 @@
 # Progress — week of Mon Sep 28 – Sun Oct 04, 2026
 
-**5 task(s) completed and independently audited this week** · project total **14/69** accepted
+**6 task(s) completed and independently audited this week** · project total **15/69** accepted
 
 ## Notes
 
@@ -18,17 +18,19 @@
 …[262 chars clipped]
 - **MOT-01 — Robot model reconciliation (vendor vs presentation URDF) + limits file** ([details](MOT-01.md)): Settled which robot model file is 'the' B601-DM model for planning, confirmed our simulation copy matches the vendor file exactly, and caught a real mismatch where the physical robot's driver currentl
 …[395 chars clipped]
+- **HOST-01 — Host version manifest + drift/isolation checker** ([details](HOST-01.md)): Added an automated host-health check that snapshots the machine's OS, driver, CUDA, ROS package, Gazebo, and crackvision-environment versions into a pinned manifest and re-verifies them on demand, cat
+…[289 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 7 / 7
+- Implementation/review sessions run: 8 / 8
 - Audits that rejected work with evidence-backed findings: 2 (repairs created: 1)
 
 ## Progress by work package
 
 | Work package | Accepted | Total |
 |---|---|---|
-| Host platform & reproducibility (L-HOST) | 3 | 9 |
+| Host platform & reproducibility (L-HOST) | 4 | 9 |
 | Local coding model (L-LLM) | 0 | 6 |
 | D405 capture (L-CAM) | 1 | 7 |
 | Perception (L-PERC) | 7 | 16 |
