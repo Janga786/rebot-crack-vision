@@ -1,5 +1,8 @@
 # TASK_INDEX.md — dependency map and status board
 
+> **Frozen 2026-09-28.** Canonical planning and status moved to claude-auto: `plan/` (cards, requirements, responsibility tree) + `.claude-auto/` (runtime state). Run `claude-auto status`. This board reflects the retired cv-harness as of 2026-09-19 and is kept as history; TC-001…016 were imported as claude-auto cards.
+
+
 **Statuses:** `READY` · `BLOCKED` (prerequisites unmet) · `IN PROGRESS` · `COMPLETE` · `PARTIAL` · `SKIPPED`
 
 Each agent updates this table at the end of its card: set its own row, then flip any card whose

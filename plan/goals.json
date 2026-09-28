@@ -1,0 +1,10 @@
+[
+  {
+    "id": "G-001",
+    "text": "Complete, reproducible pipeline: RealSense D405 capture \u2192 crack segmentation (OpenCrack) \u2192 ordered crack paths \u2192 calibrated 3D robot coordinates \u2192 MoveIt trajectory planning \u2192 validated reBot B601-DM execution (physical execution only through an operator-enabled commissioning mode).",
+    "fingerprint": "f735ac8c4344bebf",
+    "added": "2026-09-28T00:00:00Z",
+    "status": "active",
+    "source": "initial architecture session (Opus 5.5, max effort)"
+  }
+]
