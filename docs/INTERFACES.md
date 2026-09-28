@@ -556,8 +556,10 @@ the code ever disagree):
    `--rdp-tolerance-px`, default `path_extraction.rdp_tolerance_px` in `config/project.yaml`, else
    `1.5`) are kept for every main path and branch, dense first.
 4. Where two consecutive edges of a decomposed path don't meet on the same pixel (a PERC-02 edge
-   ended on a raw junction pixel next to the merged graph node instead of on it), the node's own
-   pixel is spliced into the dense path so it stays 8-connected across every junction/crossing and
+   ended on a raw junction pixel next to the merged graph node instead of on it), the gap is
+   bridged by the shortest 8-connected route through actual skeleton pixels (a breadth-first search
+   over the same raster PERC-02 built its graph from), not a straight line — the dense path stays
+   8-connected across every junction/crossing, every inserted pixel is itself on the skeleton, and
    no traversed edge pixel is dropped.
 
 `{case}_paths.json` schema:

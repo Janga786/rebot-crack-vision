@@ -12,6 +12,7 @@ from typing import Any
 import numpy as np
 import pytest
 from PIL import Image
+from skimage.morphology import dilation, disk
 
 from crackvision.config import Config
 from crackvision.logging_setup import EXIT_OK, EXIT_PRECONDITION
@@ -23,6 +24,7 @@ from crackvision.paths import (
     rdp_simplify,
     rdp_tolerance_from_config,
 )
+from crackvision.skeleton import clean_and_skeletonize
 from crackvision.skeleton_graph import build_graph
 
 
@@ -227,6 +229,69 @@ def test_t_shape_junction_cluster_paths_stay_connected_and_cover_every_pixel():
 
     expected = {p for edge in build_graph(skel).edges.values() for p in edge.pixels}
     assert covered == expected  # no pixel of a traversed PERC-02 edge is dropped
+
+
+# ---------------------------------------------------------------------------
+# Skeletonize-produced fixtures: real skimage.morphology.skeletonize output, not hand-listed
+# pixels, so a merged junction cluster's raw geometry (several mutually-adjacent junction pixels,
+# edges landing on different cluster members) is exactly what a real crossing/fork produces.
+# ---------------------------------------------------------------------------
+
+
+def _skeletonize_thick_lines(canvas: np.ndarray, *, radius: int = 2) -> np.ndarray:
+    dilated = dilation(canvas, disk(radius))
+    _cleaned, skel, _before, _after = clean_and_skeletonize(dilated, min_component_size=0)
+    return skel
+
+
+def _assert_dense_paths_cover_edges_and_stay_on_skeleton(doc: dict[str, Any], skel: np.ndarray) -> None:
+    expected = {p for edge in build_graph(skel).edges.values() for p in edge.pixels}
+    covered: set[tuple[int, int]] = set()
+    for comp in doc["components"]:
+        for polyline in [comp["main_path"], *comp["branches"]]:
+            dense = _points(polyline["dense"])
+            _assert_dense_is_8_connected(dense)
+            for r, c in dense:
+                assert skel[r, c], f"({r}, {c}) is not a skeleton pixel"
+            covered.update(dense)
+    assert expected <= covered  # no pixel of a traversed PERC-02 edge is dropped
+
+
+def test_skeletonize_crossing_dense_paths_are_8_connected_and_stay_on_skeleton():
+    # Two thick diagonal bars crossing in the middle: skeletonize produces a multi-pixel junction
+    # blob where several edges end on different cluster pixels, not the merged node's own pixel.
+    canvas = _canvas(60, 60)
+    for i in range(50):
+        canvas[5 + i, 5 + i] = True
+        canvas[5 + i, 54 - i] = True
+    skel = _skeletonize_thick_lines(canvas)
+
+    graph = build_graph(skel)
+    junction_nodes = [n for n in graph.nodes.values() if n.kind == "junction"]
+    assert junction_nodes  # sanity: the fixture actually produces a junction to bridge across
+
+    doc = build_case_paths(skel, "crossing", min_spur_length_px=0, rdp_tolerance_px=1.5)
+    _assert_dense_paths_cover_edges_and_stay_on_skeleton(doc, skel)
+
+
+def test_skeletonize_fork_dense_paths_are_8_connected_and_stay_on_skeleton():
+    # A thick stem forking into two thick diagonal arms: same merged-junction-cluster geometry as
+    # a real crack fork/T-intersection under skimage.morphology.skeletonize.
+    canvas = _canvas(50, 50)
+    canvas[15, 25] = True
+    for i in range(1, 21):
+        canvas[15 + i, 25] = True  # stem, straight down
+    for i in range(1, 16):
+        canvas[15 - i, 25 - i] = True  # arm to the upper-left
+        canvas[15 - i, 25 + i] = True  # arm to the upper-right
+    skel = _skeletonize_thick_lines(canvas)
+
+    graph = build_graph(skel)
+    junction_nodes = [n for n in graph.nodes.values() if n.kind == "junction"]
+    assert junction_nodes  # sanity: the fixture actually produces a junction to bridge across
+
+    doc = build_case_paths(skel, "fork", min_spur_length_px=0, rdp_tolerance_px=1.5)
+    _assert_dense_paths_cover_edges_and_stay_on_skeleton(doc, skel)
 
 
 # ---------------------------------------------------------------------------
