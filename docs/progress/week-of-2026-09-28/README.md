@@ -1,6 +1,6 @@
 # Progress — week of Mon Sep 28 – Sun Oct 04, 2026
 
-**3 task(s) completed and independently audited this week** · project total **12/69** accepted
+**4 task(s) completed and independently audited this week** · project total **13/69** accepted
 
 ## Notes
 
@@ -14,10 +14,12 @@
 …[344 chars clipped]
 - **TC-012 — RealSense software validation** ([details](TC-012.md)): Added a software-only health check for the RealSense D405 camera stack (scripts/check_realsense.py) that verifies the pyrealsense2 library, versions, and any attached device, and correctly reports "no
 …[300 chars clipped]
+- **TC-010 — Skeletonization utility** ([details](TC-010.md)): Implemented src/crackvision/skeleton.py per docs/INTERFACES.md §3.4: remove_small_objects + skeletonize (nothing more), writing {case}_skeleton.png, {case}_skeleton_overlay.png, {case}_skeleton_stats.
+…[262 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 5 / 5
+- Implementation/review sessions run: 6 / 6
 - Audits that rejected work with evidence-backed findings: 2 (repairs created: 1)
 
 ## Progress by work package
@@ -27,7 +29,7 @@
 | Host platform & reproducibility (L-HOST) | 3 | 9 |
 | Local coding model (L-LLM) | 0 | 6 |
 | D405 capture (L-CAM) | 1 | 7 |
-| Perception (L-PERC) | 6 | 16 |
+| Perception (L-PERC) | 7 | 16 |
 | Geometry & calibration (L-GEOM) | 1 | 9 |
 | Motion planning (L-MOTION) | 0 | 10 |
 | Integration & commissioning (L-INT) | 0 | 6 |
