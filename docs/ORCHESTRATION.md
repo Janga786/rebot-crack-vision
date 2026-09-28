@@ -4,7 +4,8 @@
 The cv-go/cv-review gate is **retired**. Work now runs through `claude-auto` (continuous impl → independent review loop
 with model/effort routing, repair cards, staleness tracking, a sandbox for every worker, an Opus-5.5-xhigh-gated privileged
 path, and operator-only physical motion). Plan: `plan/`. Runtime state: `.claude-auto/` (git-excluded).
-Operator guide: `~/claude-auto/docs/OPERATOR_GUIDE.md`. Architecture decisions: `~/claude-auto/setup/decisions/ARCHITECTURE.md`.
+Operator guide: `~/claude-auto/docs/OPERATOR_GUIDE.md`. Weekly progress write-ups (pushed to GitHub after every
+accepted audit): `docs/progress/`. Architecture decisions: `~/claude-auto/setup/decisions/ARCHITECTURE.md`.
 
     claude-auto status        claude-auto start | stop [--now] | resume        claude-auto-setup --goal "…"
 
