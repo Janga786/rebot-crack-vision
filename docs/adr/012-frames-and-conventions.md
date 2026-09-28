@@ -32,7 +32,7 @@ revision fixes the table to match what actually exists in TF:
 | `tool0` | **New fixed alias frame, not present in the URDF today.** Defined here as identical to `gripper_link` (zero offset) purely so this ADR's frame table can use the REP-103/MoveIt convention name for "last link of the arm's own kinematic chain, before the gripper's own tip frame." GEOM-06/07 (whichever of the two first brings up the calibration TF tree) is the card that publishes the static `gripper_link → tool0` identity transform; until it does, `tool0` does not resolve in `tf2` and no code may assume it does. |
 | `TCP` (tool-centre point) | **Not a new frame.** `TCP` is this ADR's name for the frame that already exists in the MoveIt config as `gripper_tcp` (`rebotarm.urdf.xacro:8-12`, SRDF tip link `rebotarm.srdf:4`). Any code that needs the tool-centre point must look up `gripper_tcp` in `tf2`, or a card may publish a `TCP` alias of it — but the frames are the same physical point. The `-0.0443 m` fixed offset along `gripper_link`'s +X (URDF) is accepted here as **prior evidence**, corroborating (but not identical in origin to) the pointing-axis direction `docs/TECHNICAL_APPROACH.md` §2.2–2.3 measured in Isaac Sim; GEOM-06 defines the pivot-calibration solver and **GEOM-07 is the operator card that measures the real offset and records residuals against this URDF prior.** |
 | `camera_link` | RealSense D405 body/mount frame, `+x` forward along the housing, per the vendor's REP-103-style mechanical convention. |
-| `camera_color_frame` | Intermediate ROS-convention frame between `camera_link` and the optical frame below; same physical origin as `camera_link` but with axes already rotated (see below). Present in `realsense2_camera`'s published TF tree (`BaseRealSenseNode::calcAndAppendTransformMsgs`). |
+| `camera_color_frame` | Intermediate ROS-convention frame between `camera_link` and the optical frame below; offset from `camera_link` by the per-device depth→colour extrinsic (real, generally non-zero translation — see below) and still expressed in `camera_link`'s **mechanical** axes (not yet rotated to the optical convention). Present in `realsense2_camera`'s published TF tree (`BaseRealSenseNode::calcAndAppendTransformMsgs`). |
 | `camera_color_optical_frame` | The frame the intrinsics in `INTERFACES.md` §3.10 project through: **`+z` forward (into the scene), `+x` right, `+y` down** — the standard ROS *optical* frame convention (REP-103), not `camera_link`'s mechanical axes. All pixel projection/deprojection math (below) happens in this frame. |
 
 **Corrected:** `camera_link` → `camera_color_optical_frame` is **not** a pure rotation and is **not**
@@ -43,12 +43,20 @@ T_camera_link_camera_color_optical_frame
     = T_camera_link_camera_color_frame · T_camera_color_frame_camera_color_optical_frame
 ```
 
-- `T_camera_link_camera_color_frame` carries the **per-device depth→colour extrinsic** — the same
-  `rotation`/`translation` pair recorded per-frame in `INTERFACES.md` §3.10 item 7
-  (`extrinsics_depth_to_color`, sourced from the device's own stream-profile extrinsics via
-  `realsense2_camera`'s `BaseRealSenseNode::calcAndAppendTransformMsgs`). It has a real, generally
-  non-zero translation and must be read from device metadata/driver, never hard-coded or assumed
-  zero.
+- `T_camera_link_camera_color_frame` carries the **per-device depth→colour extrinsic** and has a
+  real, generally non-zero translation. It is **not** simply the `rotation`/`translation` pair
+  recorded per-frame in `INTERFACES.md` §3.10 item 7 (`extrinsics_depth_to_color`) taken at face
+  value: `rs2_get_extrinsics(from, to)` (`librealsense2/h/rs_sensor.h`) transforms coordinates from
+  the *source* sensor frame to the *target* sensor frame, i.e. depth-frame point → colour-frame
+  point, the opposite direction from `T_camera_link_camera_color_frame` (`camera_color_frame`-point →
+  `camera_link`-point per this ADR's `T_a_b` convention), and `realsense2_camera`'s `camera_link`
+  coincides with the depth sensor's own frame in the driver's convention while `camera_color_frame`
+  is still in mechanical (not optical) axes — so naively assigning the metadata's `(R, t)` as
+  `T_camera_link_camera_color_frame` would use the wrong direction. Code must **not** hand-build this
+  transform from the per-frame metadata; it must be read from `realsense2_camera`'s own published
+  static TF (`BaseRealSenseNode::calcAndAppendTransformMsgs`), which already applies the correct
+  inversion and axis handling. The metadata's `extrinsics_depth_to_color` remains useful as a
+  record of the raw device calibration, not as a drop-in `T_camera_link_camera_color_frame`.
 - `T_camera_color_frame_camera_color_optical_frame` **is** the fixed, translation-free
   mechanical→optical rotation every ROS camera driver applies, and is the only part of this chain
   that is a device-independent convention.

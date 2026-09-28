@@ -595,7 +595,7 @@ the ADR is authoritative if the two ever disagree.
 | `tool0` | **Not present in the URDF today.** New fixed alias frame, identical to `gripper_link` (the actual last link of the arm's kinematic chain — `~/rebot_ws/src/rebotarm_bringup/.../reBot_B601_DM_with_gripper.urdf` has no `tool0`). GEOM-06/07 publishes the static `gripper_link → tool0` transform; nothing may assume it resolves in `tf2` before then. |
 | `TCP` | Not a new frame — this project's name for the MoveIt config's existing `gripper_tcp` frame (`rebotarm.urdf.xacro`, SRDF tip link), a fixed child of `gripper_link` offset `-0.0443 m` along its `+X` (prior evidence; GEOM-07 measures the real offset). |
 | `camera_link` | D405 body/mount frame, `+x` forward along the housing. |
-| `camera_color_frame` | Intermediate ROS driver frame between `camera_link` and the optical frame; carries the per-device depth→colour extrinsic from `camera_link` (see §6.2 note). |
+| `camera_color_frame` | Intermediate ROS driver frame between `camera_link` and the optical frame; offset from `camera_link` by the per-device depth→colour extrinsic (real translation, still `camera_link`'s mechanical axes — see §6.2 note). |
 | `camera_color_optical_frame` | `+z` forward, `+x` right, `+y` down (ROS optical-frame convention, REP-103). All pixel projection math (§6.3) happens here. |
 
 ### 6.2 Transform naming and units
@@ -605,9 +605,11 @@ the ADR is authoritative if the two ever disagree.
 everywhere except raw depth storage (§6.4), which is `uint16` device counts until scaled.
 
 `camera_link → camera_color_optical_frame` is **not** a single device-independent rotation: it
-composes the per-device `camera_link → camera_color_frame` extrinsic (§3.10 item 7's
-`extrinsics_depth_to_color`, from the driver/device metadata — real translation, not zero) with the
-fixed, translation-free `camera_color_frame → camera_color_optical_frame` mechanical→optical rotation
+composes the per-device `camera_link → camera_color_frame` extrinsic (real translation, not zero —
+related to but not directly usable as §3.10 item 7's `extrinsics_depth_to_color`, which is in the
+opposite direction and mechanical/optical axis convention; read this transform from
+`realsense2_camera`'s published static TF, never hand-built from the metadata) with the fixed,
+translation-free `camera_color_frame → camera_color_optical_frame` mechanical→optical rotation
 convention. See ADR-012 for the full derivation.
 
 ### 6.3 Pixel convention
