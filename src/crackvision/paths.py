@@ -23,9 +23,12 @@ Policy (docs/INTERFACES.md §3.13), applied per connected component of the prune
 4. **Junction crossing.** A PERC-02 edge can end on a raw junction pixel next to the graph node
    instead of on it (`skeleton_graph.build_graph` merges mutually-adjacent junction pixels into one
    node keyed by their cluster's representative pixel). Wherever two consecutive edges in a
-   decomposed path don't meet on the same pixel, the node's own pixel is spliced in so the dense
-   path still passes through the junction/cluster and stays 8-connected (no step exceeds a
-   Chebyshev distance of 1) — no traversed edge pixel is ever dropped.
+   decomposed path don't meet on the same pixel, the gap is bridged by the shortest 8-connected
+   route through *actual skeleton pixels* (a breadth-first search over the same raster PERC-02
+   built its graph from) rather than a straight line — this stays inside the junction cluster that
+   physically joins the two edges, so the dense path passes through it, every intermediate pixel is
+   itself a skeleton pixel, and no step exceeds a Chebyshev distance of 1. No traversed edge pixel
+   is ever dropped.
 """
 
 from __future__ import annotations
@@ -35,6 +38,7 @@ import json
 import logging
 import math
 import sys
+from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -238,56 +242,87 @@ def _chebyshev(a: Pixel, b: Pixel) -> int:
     return max(abs(a[0] - b[0]), abs(a[1] - b[1]))
 
 
-def _step_path(a: Pixel, b: Pixel) -> list[Pixel]:
-    """8-connected straight-line steps from `a` to `b`, exclusive of `a`, inclusive of `b`."""
-    (r0, c0), (r1, c1) = a, b
+def _shortest_skeleton_route(a: Pixel, b: Pixel, skel_pixels: frozenset[Pixel]) -> list[Pixel] | None:
+    """Shortest 8-connected path from `a` to `b` through `skel_pixels` only (BFS), `a` exclusive.
+
+    Returns `None` if `b` is unreachable from `a` within `skel_pixels` (cannot happen for two
+    pixels of the same PERC-02 graph component, since every edge pixel was itself walked along
+    this same raster — kept for defensiveness, not because it is expected to trigger).
+    """
+    if a == b:
+        return [b]
+    prev: dict[Pixel, Pixel] = {}
+    visited = {a}
+    queue: deque[Pixel] = deque([a])
+    while queue:
+        r, c = queue.popleft()
+        for dr in (-1, 0, 1):
+            for dc in (-1, 0, 1):
+                if dr == 0 and dc == 0:
+                    continue
+                nxt = (r + dr, c + dc)
+                if nxt in visited or nxt not in skel_pixels:
+                    continue
+                visited.add(nxt)
+                prev[nxt] = (r, c)
+                if nxt == b:
+                    route = [b]
+                    while route[-1] != a:
+                        route.append(prev[route[-1]])
+                    route.reverse()
+                    return route[1:]
+                queue.append(nxt)
+    return None
+
+
+def _bridge(last: Pixel, target: Pixel, skel_pixels: frozenset[Pixel]) -> list[Pixel]:
+    """8-connected pixels from `last` to `target` (exclusive of `last`), all on the skeleton.
+
+    PERC-02 edges can end on a raw junction pixel next to the merged junction node instead of on
+    it (`skeleton_graph.build_graph` merges mutually-adjacent junction pixels into one node, keyed
+    by the cluster's representative pixel — not necessarily the pixel any given edge happens to
+    touch). When that leaves a gap wider than one 8-connected step, this finds the shortest route
+    through the actual skeleton raster (`_shortest_skeleton_route`), which stays inside the
+    junction cluster that physically joins `last` and `target` — never a straight line that could
+    cut across pixels the skeleton never lit up.
+    """
+    if _chebyshev(last, target) <= 1:
+        return [target]
+    route = _shortest_skeleton_route(last, target, skel_pixels)
+    if route is not None:
+        return route
+    (r0, c0), (r1, c1) = last, target
     dr, dc = r1 - r0, c1 - c0
     steps = max(abs(dr), abs(dc))
     return [(r0 + round(dr * i / steps), c0 + round(dc * i / steps)) for i in range(1, steps + 1)]
 
 
-def _bridge(last: Pixel, target: Pixel, via: Pixel) -> list[Pixel]:
-    """8-connected pixels from `last` to `target` (exclusive of `last`), routed through `via`.
-
-    PERC-02 edges can end on a raw junction pixel next to the merged junction node instead of on
-    it (`skeleton_graph.build_graph` merges mutually-adjacent junction pixels into one node, keyed
-    by the cluster's representative pixel — not necessarily the pixel any given edge happens to
-    touch). When that leaves a gap wider than one 8-connected step, this routes through the node's
-    own pixel (`via`) so the dense path still passes through the junction/cluster instead of
-    jumping over it.
-    """
-    if _chebyshev(last, target) <= 1:
-        return [target]
-    if via not in (last, target):
-        return _step_path(last, via) + _step_path(via, target)
-    return _step_path(last, target)
-
-
-def _edge_chain_to_pixels(path_edges: list[Edge], first_node: int, nodes: dict[int, Node]) -> tuple[Pixel, ...]:
+def _edge_chain_to_pixels(
+    path_edges: list[Edge], first_node: int, nodes: dict[int, Node], skel_pixels: frozenset[Pixel]
+) -> tuple[Pixel, ...]:
     """Concatenate an ordered edge chain into one dense, 8-connected pixel path.
 
-    Every point of every traversed edge is kept; a junction/cluster pixel (`nodes[node_id]`) is
-    inserted wherever consecutive edges don't meet on the same pixel, so no step exceeds a
-    Chebyshev distance of 1.
+    Every point of every traversed edge is kept; wherever consecutive edges don't meet on the same
+    pixel, the gap is bridged through actual skeleton pixels (`_bridge`) so no step exceeds a
+    Chebyshev distance of 1 and no inserted pixel is off the skeleton.
     """
     pixels: list[Pixel] = []
     cur_node = first_node
     for edge in path_edges:
         oriented = _oriented_pixels(edge, cur_node)
         next_node = edge.node_b if edge.node_a == cur_node else edge.node_a
-        cur_node_pixel = (nodes[cur_node].row, nodes[cur_node].col)
         for p in oriented:
             if not pixels:
                 pixels.append(p)
             elif pixels[-1] == p:
                 continue
             else:
-                pixels.extend(_bridge(pixels[-1], p, cur_node_pixel))
+                pixels.extend(_bridge(pixels[-1], p, skel_pixels))
         cur_node = next_node
 
     end_pixel = (nodes[cur_node].row, nodes[cur_node].col)
     if pixels and pixels[-1] != end_pixel:
-        pixels.extend(_bridge(pixels[-1], end_pixel, end_pixel))
+        pixels.extend(_bridge(pixels[-1], end_pixel, skel_pixels))
     return tuple(pixels)
 
 
@@ -319,8 +354,14 @@ class ComponentPaths:
     branches: tuple[Polyline, ...]
 
 
-def extract_component_paths(graph: SkeletonGraph, *, rdp_tolerance_px: float) -> list[ComponentPaths]:
-    """Decompose every connected component of `graph` into an ordered main path + branches."""
+def extract_component_paths(
+    graph: SkeletonGraph, *, rdp_tolerance_px: float, skel_pixels: frozenset[Pixel]
+) -> list[ComponentPaths]:
+    """Decompose every connected component of `graph` into an ordered main path + branches.
+
+    `skel_pixels` is the full set of `True` pixels of the raster `graph` was built from — used to
+    bridge junction-cluster gaps through actual skeleton pixels (`_bridge`).
+    """
     components: list[ComponentPaths] = []
     for component_id, node_ids in enumerate(_node_components(graph)):
         component_edges = {
@@ -338,7 +379,7 @@ def extract_component_paths(graph: SkeletonGraph, *, rdp_tolerance_px: float) ->
         decomposition = _decompose_edges(component_edges)
         polylines: list[Polyline] = []
         for start_node, path_edges in decomposition:
-            dense = _edge_chain_to_pixels(path_edges, start_node, graph.nodes)
+            dense = _edge_chain_to_pixels(path_edges, start_node, graph.nodes, skel_pixels)
             simplified = tuple(rdp_simplify(list(dense), rdp_tolerance_px))
             polylines.append(Polyline(kind="main", dense=dense, simplified=simplified))
 
@@ -460,9 +501,13 @@ def build_case_paths(
 ) -> dict[str, Any]:
     """End-to-end: `{0,255}`/bool skeleton raster -> the `{case}_paths.json` document dict."""
     height, width = skeleton.shape[:2]
-    graph = build_graph(np.asarray(skeleton) > 0)
+    bool_skel = np.asarray(skeleton) > 0
+    skel_pixels: frozenset[Pixel] = frozenset(
+        (int(r), int(c)) for r, c in zip(*np.nonzero(bool_skel))
+    )
+    graph = build_graph(bool_skel)
     graph = prune_spurs(graph, min_spur_length_px)
-    components = extract_component_paths(graph, rdp_tolerance_px=rdp_tolerance_px)
+    components = extract_component_paths(graph, rdp_tolerance_px=rdp_tolerance_px, skel_pixels=skel_pixels)
     components = order_components(components)
     return case_paths_to_dict(
         case_id,
