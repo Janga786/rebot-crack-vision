@@ -592,9 +592,10 @@ the ADR is authoritative if the two ever disagree.
 | Frame | Meaning |
 |---|---|
 | `base_link` | Robot base, fixed. Calibrated 3D crack-path points are expressed here before MoveIt planning. |
-| `tool0` | Last link of the kinematic chain (URDF/MoveIt convention). |
-| `TCP` | Tool-centre point — the gripper's working point/axis, offset from `tool0` by pivot calibration (GEOM-06/07). |
+| `tool0` | **Not present in the URDF today.** New fixed alias frame, identical to `gripper_link` (the actual last link of the arm's kinematic chain — `~/rebot_ws/src/rebotarm_bringup/.../reBot_B601_DM_with_gripper.urdf` has no `tool0`). GEOM-06/07 publishes the static `gripper_link → tool0` transform; nothing may assume it resolves in `tf2` before then. |
+| `TCP` | Not a new frame — this project's name for the MoveIt config's existing `gripper_tcp` frame (`rebotarm.urdf.xacro`, SRDF tip link), a fixed child of `gripper_link` offset `-0.0443 m` along its `+X` (prior evidence; GEOM-07 measures the real offset). |
 | `camera_link` | D405 body/mount frame, `+x` forward along the housing. |
+| `camera_color_frame` | Intermediate ROS driver frame between `camera_link` and the optical frame; carries the per-device depth→colour extrinsic from `camera_link` (see §6.2 note). |
 | `camera_color_optical_frame` | `+z` forward, `+x` right, `+y` down (ROS optical-frame convention, REP-103). All pixel projection math (§6.3) happens here. |
 
 ### 6.2 Transform naming and units
@@ -602,6 +603,12 @@ the ADR is authoritative if the two ever disagree.
 `T_a_b` maps a point from frame `b` into frame `a`: `p_a = T_a_b · p_b`; composition is
 `T_a_c = T_a_b · T_b_c`. Quaternion order is **ROS `(x, y, z, w)`**. Units are **metres and radians**
 everywhere except raw depth storage (§6.4), which is `uint16` device counts until scaled.
+
+`camera_link → camera_color_optical_frame` is **not** a single device-independent rotation: it
+composes the per-device `camera_link → camera_color_frame` extrinsic (§3.10 item 7's
+`extrinsics_depth_to_color`, from the driver/device metadata — real translation, not zero) with the
+fixed, translation-free `camera_color_frame → camera_color_optical_frame` mechanical→optical rotation
+convention. See ADR-012 for the full derivation.
 
 ### 6.3 Pixel convention
 
