@@ -1,6 +1,6 @@
 # Progress — week of Mon Sep 28 – Sun Oct 04, 2026
 
-**6 task(s) completed and independently audited this week** · project total **15/69** accepted
+**7 task(s) completed and independently audited this week** · project total **16/69** accepted
 
 ## Notes
 
@@ -20,10 +20,12 @@
 …[395 chars clipped]
 - **HOST-01 — Host version manifest + drift/isolation checker** ([details](HOST-01.md)): Added an automated host-health check that snapshots the machine's OS, driver, CUDA, ROS package, Gazebo, and crackvision-environment versions into a pinned manifest and re-verifies them on demand, cat
 …[289 chars clipped]
+- **LLM-01 — Local coding model shortlist from primary sources (no downloads)** ([details](LLM-01.md)): For the local coding-model shortlist, I sourced exact GGUF files, sizes, cryptographic hashes and licenses directly from Hugging Face for three candidates that fit the 24 GB GPU with 32K+ token contex
+…[386 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 8 / 8
+- Implementation/review sessions run: 9 / 9
 - Audits that rejected work with evidence-backed findings: 2 (repairs created: 1)
 
 ## Progress by work package
@@ -31,7 +33,7 @@
 | Work package | Accepted | Total |
 |---|---|---|
 | Host platform & reproducibility (L-HOST) | 4 | 9 |
-| Local coding model (L-LLM) | 0 | 6 |
+| Local coding model (L-LLM) | 1 | 6 |
 | D405 capture (L-CAM) | 1 | 7 |
 | Perception (L-PERC) | 7 | 16 |
 | Geometry & calibration (L-GEOM) | 1 | 9 |
