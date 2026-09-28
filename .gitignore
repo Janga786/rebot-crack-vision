@@ -32,6 +32,11 @@ dist/
 .coverage
 htmlcov/
 
+# ROS 2 overlay workspace (MOT-02) — colcon build/install/log artifacts, never committed
+ros2_ws/build/
+ros2_ws/install/
+ros2_ws/log/
+
 # Editors / OS
 .vscode/
 .idea/
