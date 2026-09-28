@@ -7,7 +7,8 @@
   "sandbox": {
     "ro_in_repo": [
       "plan",
-      "task_cards"
+      "task_cards",
+      "docs/progress"
     ],
     "extra_rw": []
   },
@@ -41,5 +42,14 @@
     "Every CLI follows docs/INTERFACES.md \u00a70: exit codes 0/1/2/3 and the common flags.",
     "No robot motion from code paths reachable without the commissioning gate: default to mock/dry-run.",
     "The GPU is shared: never kill GPU processes; degrade per docs/ARCHITECTURE.md \u00a79."
-  ]
+  ],
+  "publish": {
+    "enabled": true,
+    "remote": "origin",
+    "branch": "main",
+    "dir": "docs/progress",
+    "push": true,
+    "week_start": "monday",
+    "include_models": false
+  }
 }
