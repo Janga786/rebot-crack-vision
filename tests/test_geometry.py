@@ -32,11 +32,20 @@ D405_COLOR_STREAM = {
         "ppx": 424.7,
         "ppy": 239.8,
         "model": "distortion.inverse_brown_conrady",
-        # Realistic D405-scale residual distortion (the colour stream is close to rectified);
-        # exercising the undistortion loop with coefficients this size is what keeps the
-        # <1e-6 m parity assertion below meaningful without hitting the reference SDK's own
-        # float32 accumulation floor, which only shows up at unrealistically large coefficients.
-        "coeffs": [0.001, -0.0005, 0.0001, -0.00005, 0.00002],
+        # Typical Brown-Conrady calibration magnitude (>=1e-2 for k1/k2/k3), large enough that
+        # getting the tangential-term scaling wrong (GEOM-02.R1) shows up as tens-to-hundreds of
+        # micrometres of parity error against pyrealsense2, not lost in float32 noise.
+        "coeffs": [-0.0547, 0.0576, 0.00036, 0.00066, -0.0187],
+    },
+}
+
+# A second coefficient set with |p1|, |p2| (tangential terms, coeffs[2]/coeffs[3]) >= 0.004,
+# to exercise the tangential-term scaling specifically (GEOM-02.R1).
+D405_COLOR_STREAM_STRONG_TANGENTIAL = {
+    **D405_COLOR_STREAM,
+    "intrinsics": {
+        **D405_COLOR_STREAM["intrinsics"],
+        "coeffs": [0.05, 0.03, 0.005, -0.004, 0.01],
     },
 }
 
@@ -59,7 +68,7 @@ def test_intrinsics_from_stream_dict():
     assert intr.height == 480
     assert intr.fx == pytest.approx(430.2)
     assert intr.model == "distortion.inverse_brown_conrady"
-    assert intr.coeffs == (0.001, -0.0005, 0.0001, -0.00005, 0.00002)
+    assert intr.coeffs == (-0.0547, 0.0576, 0.00036, 0.00066, -0.0187)
 
 
 def test_intrinsics_rejects_wrong_coeff_count():
@@ -96,9 +105,14 @@ def test_deproject_matches_pyrealsense2_none_model():
         assert np.max(np.abs(np.array(actual) - expected)) < 1e-6
 
 
-def test_deproject_matches_pyrealsense2_inverse_brown_conrady():
+@pytest.mark.parametrize(
+    "stream", [D405_COLOR_STREAM, D405_COLOR_STREAM_STRONG_TANGENTIAL], ids=["k-heavy", "p-heavy"]
+)
+def test_deproject_matches_pyrealsense2_inverse_brown_conrady(stream):
+    """GEOM-02.R1: xq=x/icdist, yq=y/icdist tangential scaling, matched at realistic (>=1e-2)
+    coefficient magnitudes -- not just the small coefficients that hide the missing scaling."""
     rs = pytest.importorskip("pyrealsense2")
-    intr = make_intrinsics()
+    intr = Intrinsics.from_stream_dict(stream)
     rs_intr = _to_rs_intrinsics(rs, intr)
 
     rng = np.random.default_rng(1)
@@ -116,20 +130,28 @@ def test_deproject_matches_pyrealsense2_inverse_brown_conrady():
     assert max_err < 1e-6
 
 
-def test_deproject_matches_pyrealsense2_brown_conrady():
+@pytest.mark.parametrize(
+    "stream", [D405_COLOR_STREAM, D405_COLOR_STREAM_STRONG_TANGENTIAL], ids=["k-heavy", "p-heavy"]
+)
+def test_deproject_matches_pyrealsense2_brown_conrady(stream):
     rs = pytest.importorskip("pyrealsense2")
-    intr = make_intrinsics(model="distortion.brown_conrady")
+    base = Intrinsics.from_stream_dict(stream)
+    from dataclasses import replace
+
+    intr = replace(base, model="distortion.brown_conrady")
     rs_intr = _to_rs_intrinsics(rs, intr)
 
     rng = np.random.default_rng(2)
-    rows = rng.uniform(0, intr.height - 1, size=50)
-    cols = rng.uniform(0, intr.width - 1, size=50)
-    depths = rng.uniform(0.07, 0.5, size=50)
+    rows = rng.uniform(0, intr.height - 1, size=200)
+    cols = rng.uniform(0, intr.width - 1, size=200)
+    depths = rng.uniform(0.07, 0.5, size=200)
 
     mine = deproject_pixels(intr, rows, cols, depths)
+    max_err = 0.0
     for row, col, depth, expected in zip(rows, cols, depths, mine):
         actual = rs.rs2_deproject_pixel_to_point(rs_intr, [float(col), float(row)], float(depth))
-        assert np.max(np.abs(np.array(actual) - expected)) < 1e-6
+        max_err = max(max_err, float(np.max(np.abs(np.array(actual) - expected))))
+    assert max_err < 1e-6
 
 
 def _to_rs_intrinsics(rs, intr: Intrinsics):
@@ -352,20 +374,28 @@ def test_fit_plane_recovers_tilted_noisy_plane():
     cos_angle = float(np.clip(np.dot(fit.normal, true_normal), -1.0, 1.0))
     angle_deg = np.degrees(np.arccos(abs(cos_angle)))
     assert angle_deg < 2.0
-
-    # centroid should sit near the true plane through the origin-facing surface, i.e.
-    # normal . centroid ~ z0 * normal[2] for this Z = a X + b Y + Z0 parameterisation.
     assert fit.rms_residual_m < 0.003
+
+    # GEOM-02.R1: the fitted plane's offset along its own normal, normal . centroid, must equal
+    # z0 * true_normal[2] (the true plane's offset along that same normal) to within 1 mm -- this
+    # is what catches a depth-scale/distance bug (RISKS.md R-09) that a normal-angle-only check
+    # would miss (e.g. depths scaled x2 barely moves the angle but moves the offset by ~0.25 m).
+    offset_err_m = abs(float(np.dot(fit.normal, fit.centroid)) - z0 * true_normal[2])
+    assert offset_err_m < 1e-3
 
 
 def test_fit_plane_flat_surface_low_residual():
     intr = make_intrinsics(model="none", coeffs=(0.0, 0.0, 0.0, 0.0, 0.0))
-    points, true_normal, _ = _synthetic_plane_points(intr, a=0.0, b=0.0, z0=0.3, noise_std_m=0.0, seed=4)
+    points, true_normal, z0 = _synthetic_plane_points(intr, a=0.0, b=0.0, z0=0.3, noise_std_m=0.0, seed=4)
 
     fit = fit_plane(points)
 
     assert fit.rms_residual_m < 1e-9
     assert np.allclose(np.abs(fit.normal), np.abs(true_normal), atol=1e-6)
+
+    # GEOM-02.R1: also check the recovered offset, not just the normal direction/residual.
+    offset_err_m = abs(float(np.dot(fit.normal, fit.centroid)) - z0 * true_normal[2])
+    assert offset_err_m < 1e-3
 
 
 def test_fit_plane_requires_at_least_three_points():

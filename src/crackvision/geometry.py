@@ -42,7 +42,16 @@ D405_NOMINAL_BASELINE_M = 0.018
 D405_NOMINAL_DISPARITY_SIGMA_PX = 0.08
 
 _IDENTITY_MODELS = frozenset({"none", "synthetic"})
-_UNDISTORT_MODELS = frozenset({"inverse_brown_conrady", "brown_conrady"})
+# librealsense's rsutil.h uses *different* Newton iterations for these two models: plain
+# Brown-Conrady computes the tangential terms directly from the running (x, y) estimate, while
+# Inverse Brown-Conrady first rescales it by 1/icdist (`xq = x / icdist`, `yq = y / icdist`)
+# before computing the tangential terms. Verified empirically against `pyrealsense2` 2.58.4
+# (see tests/test_geometry.py) — conflating the two under one formula reproduces the correct
+# result for `brown_conrady` but is wrong by up to ~1e-3 m for `inverse_brown_conrady` at
+# realistic (>=1e-2 magnitude) distortion coefficients.
+_PLAIN_UNDISTORT_MODELS = frozenset({"brown_conrady"})
+_RESCALED_UNDISTORT_MODELS = frozenset({"inverse_brown_conrady"})
+_UNDISTORT_MODELS = _PLAIN_UNDISTORT_MODELS | _RESCALED_UNDISTORT_MODELS
 
 
 @dataclass(frozen=True)
@@ -101,7 +110,19 @@ def deproject_pixels(intrinsics: Intrinsics, rows, cols, depth_m) -> np.ndarray:
 
     if model in _IDENTITY_MODELS:
         x, y = x0, y0
-    elif model in _UNDISTORT_MODELS:
+    elif model in _RESCALED_UNDISTORT_MODELS:
+        c = intrinsics.coeffs
+        x, y = x0.copy(), y0.copy()
+        for _ in range(_UNDISTORT_ITERATIONS):
+            r2 = x * x + y * y
+            icdist = 1.0 / (1 + ((c[4] * r2 + c[1]) * r2 + c[0]) * r2)
+            xq = x / icdist
+            yq = y / icdist
+            dx = 2 * c[2] * xq * yq + c[3] * (r2 + 2 * xq * xq)
+            dy = 2 * c[3] * xq * yq + c[2] * (r2 + 2 * yq * yq)
+            x = (x0 - dx) * icdist
+            y = (y0 - dy) * icdist
+    elif model in _PLAIN_UNDISTORT_MODELS:
         c = intrinsics.coeffs
         x, y = x0.copy(), y0.copy()
         for _ in range(_UNDISTORT_ITERATIONS):
