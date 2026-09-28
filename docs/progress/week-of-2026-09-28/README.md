@@ -1,6 +1,6 @@
 # Progress — week of Mon Sep 28 – Sun Oct 04, 2026
 
-**11 task(s) completed and independently audited this week** · project total **20/74** accepted
+**12 task(s) completed and independently audited this week** · project total **20/74** accepted
 
 ## Notes
 
@@ -30,10 +30,12 @@
 …[451 chars clipped]
 - **PERC-02 — Skeleton graph: junctions, endpoints, spur pruning** ([details](PERC-02.md)): Built and tested a new perception module that turns a 1-pixel-wide crack skeleton into a graph of junctions, endpoints and loops with the full pixel path along each edge, all in original image coordin
 …[330 chars clipped]
+- **PERC-03 — Ordered crack paths + path contract** ([details](PERC-03.md)): Added the crack-path extraction stage: given a 1-pixel skeleton, the pipeline now produces an ordered, simplified centerline path for the main crack plus any side branches, with multiple cracks in one
+…[196 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 17 / 23
+- Implementation/review sessions run: 18 / 24
 - Audits that rejected work with evidence-backed findings: 5 (repairs created: 3)
 - Re-verified after an upstream change: GEOM-01, GEOM-01.R1, TC-001
 
@@ -48,8 +50,8 @@
 | Host platform & reproducibility (L-HOST) | 4 | 9 |
 | Local coding model (L-LLM) | 1 | 6 |
 | D405 capture (L-CAM) | 2 | 7 |
-| Perception (L-PERC) | 8 | 16 |
-| Geometry & calibration (L-GEOM) | 2 | 9 |
+| Perception (L-PERC) | 9 | 16 |
+| Geometry & calibration (L-GEOM) | 1 | 9 |
 | Motion planning (L-MOTION) | 2 | 15 |
 | Integration & commissioning (L-INT) | 0 | 6 |
 | Operator workflow & handoff (L-OPS) | 0 | 4 |
