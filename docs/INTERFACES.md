@@ -579,3 +579,52 @@ over the YAML.**
 Exactly one card creates any given file. No card edits another card's file except where the table in
 `task_cards/TASK_INDEX.md` §File ownership explicitly permits an append (e.g.
 `docs/COMPLETION_LOG.md`, which every card appends to, and `README.md`, which TC-016 finalises).
+
+---
+
+## 6. Frames, units and pixel conventions
+
+**Normative source:** `docs/adr/012-frames-and-conventions.md`. This section is a lookup summary;
+the ADR is authoritative if the two ever disagree.
+
+### 6.1 Frames
+
+| Frame | Meaning |
+|---|---|
+| `base_link` | Robot base, fixed. Calibrated 3D crack-path points are expressed here before MoveIt planning. |
+| `tool0` | Last link of the kinematic chain (URDF/MoveIt convention). |
+| `TCP` | Tool-centre point — the gripper's working point/axis, offset from `tool0` by pivot calibration (GEOM-06/07). |
+| `camera_link` | D405 body/mount frame, `+x` forward along the housing. |
+| `camera_color_optical_frame` | `+z` forward, `+x` right, `+y` down (ROS optical-frame convention, REP-103). All pixel projection math (§6.3) happens here. |
+
+### 6.2 Transform naming and units
+
+`T_a_b` maps a point from frame `b` into frame `a`: `p_a = T_a_b · p_b`; composition is
+`T_a_c = T_a_b · T_b_c`. Quaternion order is **ROS `(x, y, z, w)`**. Units are **metres and radians**
+everywhere except raw depth storage (§6.4), which is `uint16` device counts until scaled.
+
+### 6.3 Pixel convention
+
+- **On disk / in arrays:** `(row, col)` — `numpy`/`PIL` indexing, `arr.shape == (height, width)`.
+- **`pyrealsense2` projection (`rs2_project_point_to_pixel` / `rs2_deproject_pixel_to_point`):**
+  `pixel = (u, v) = (col, row)` — the transpose of the array convention. Never pass `(row, col)`
+  into these calls.
+- **Pixel-centre convention:** an integer pixel coordinate addresses that pixel's *centre*, with
+  **no `+0.5` corner offset** — confirmed against the librealsense reference implementation
+  (`rsutil.h`, `x = (pixel[0] - ppx) / fx`; see ADR-012 for the exact cited source). GEOM-02's
+  projection/deprojection tests must match this exactly.
+
+### 6.4 Depth
+
+`depth_m = uint16_value * depth_scale_m_per_unit`, where `depth_scale_m_per_unit` comes from that
+frame's own metadata JSON (§3.10 item 7) — never hard-coded. Invalid depth is `uint16_value == 0`,
+or a value outside the documented valid band for the device/use-case (D405 default: **≈ 0.07 m –
+0.50 m**, per `docs/ARCHITECTURE.md`). Both cases must be treated as absent, never projected as a 3D
+point at the camera origin.
+
+### 6.5 Boresight / TCP
+
+The gripper's measured pointing axis in `docs/TECHNICAL_APPROACH.md` §2.2–2.3 (simulation-derived:
+local `+X`) is **prior evidence only**, informing but not substituting for GEOM-07's physical
+pivot/boresight calibration. No code may treat it as calibrated fact before GEOM-07 reports measured
+residuals.
