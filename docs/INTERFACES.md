@@ -590,6 +590,70 @@ the code ever disagree):
 - **OUT OF SCOPE — do not implement here:** anything past pixel space — no 3D deprojection, no MoveIt
   waypoints, no robot motion. That is GEOM-0x's job, downstream of this file.
 
+### 3.14 `crackvision.recording` (CAM-02)
+
+Lossless RGB-D recording and deterministic, camera-free replay. This module never imports
+`pyrealsense2` — it is pure file I/O over the frame type defined here, so any code written against
+it also works with no camera attached.
+
+**`CaptureFrame`** — the frame type every crackvision D405 source (live or recorded) yields:
+`frame_index`, `color_rgb` (`uint8`, `(H, W, 3)`), `depth_u16` (`uint16`, `(H, W)`, raw z16 device
+units — `depth_u16[r, c]` corresponds to `color_rgb[r, c]`, the frame invariant, §0.5),
+`color_timestamp` / `color_timestamp_domain`, `depth_timestamp` / `depth_timestamp_domain`,
+`color_frame_number`, `depth_frame_number`, `host_monotonic_ns` (`time.monotonic_ns()` at capture),
+and an open `extra` dict for anything else (e.g. `exposure_us`, `gain`). Constructing one with the
+wrong dtype/ndim for either array raises `ValueError`.
+
+**`RecordingWriter(root, *, session, device, color, depth, color_intrinsics,
+depth_scale_m_per_unit, extrinsics_depth_to_color, aligned_to="color")`** writes a session under
+`root`:
+
+```
+root/session.json
+root/color/{NNNNNN}_color.png   -- uint8 RGB, lossless PNG
+root/depth/{NNNNNN}_depth.png   -- uint16 z16 units, lossless 16-bit PNG (PIL "I;16"), never scaled
+root/frames/{NNNNNN}.json       -- per-frame sidecar
+```
+
+`.write_frame(frame)` rejects (raises `ValueError`, writes nothing) any frame whose `color_rgb` /
+`depth_u16` shape doesn't match the session's declared `color`/`depth` stream config — the frame
+invariant applies to recordings too: no resize/crop, ever. `.close()` (also called by `__exit__`)
+writes `session.json`:
+
+```json
+{"schema_version":1,"session":"sess01",
+ "device":{"serial":"…","firmware":"…","usb_type":"3.2"},
+ "color":{"width":848,"height":480,"fps":30,"format":"rgb8"},
+ "depth":{"width":848,"height":480,"fps":30,"format":"z16"},
+ "color_intrinsics":{"fx":...,"fy":...,"ppx":...,"ppy":...,"model":"…","coeffs":[...],
+                      "width":848,"height":480},
+ "depth_scale_m_per_unit":0.0001,
+ "extrinsics_depth_to_color":{"rotation":[9 floats],"translation":[3 floats]},
+ "aligned_to":"color","frame_count":123}
+```
+
+`device` must carry `serial`, `firmware`, `usb_type`; `color_intrinsics` must carry `fx`, `fy`,
+`ppx`, `ppy`, `model`, `coeffs`, `width`, `height`; `extrinsics_depth_to_color` must carry
+`rotation`, `translation` — `RecordingWriter.__init__` raises `ValueError` if any are missing.
+**`depth_scale_m_per_unit` must be the value the caller read from `depth_sensor.get_depth_scale()`**
+(§3.10 item 7) — this module has no default and never guesses one.
+
+Per-frame sidecar JSON: `schema_version`, `frame_index`, `color_timestamp`,
+`color_timestamp_domain`, `depth_timestamp`, `depth_timestamp_domain`, `color_frame_number`,
+`depth_frame_number`, `host_monotonic_ns`, `extra`, `files: {color, depth}` (paths relative to
+`root`).
+
+**`RecordingReader(root)`** reads a session back: `.session_info` is the parsed `session.json`;
+`len(reader)` is the frame count; `.read_frame(i)` / iteration yield bit-exact `CaptureFrame`s in
+recorded order — `color_rgb`/`depth_u16` compare equal (`np.array_equal`) to what was written,
+because PNG (RGB8 and 16-bit grayscale) is a lossless codec and both arrays round-trip through it
+unchanged.
+
+**`ReplaySource(root)`** wraps a `RecordingReader` as a deterministic, no-camera stand-in for a live
+source: `.session_info`, `len(...)`, and iteration yielding the same `CaptureFrame`s, in the same
+order, on every pass — so code written against a live D405 stream can consume a recorded session
+with no branch.
+
 ---
 
 ## 4. `config/project.yaml`
