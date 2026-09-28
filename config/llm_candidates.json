@@ -1,0 +1,83 @@
+{
+  "checked_date": "2026-09-28",
+  "vram_budget_gb": 24,
+  "min_context_tokens": 32768,
+  "serving_route": "llama.cpp llama-server (OpenAI-compatible API, started on demand, never co-resident with nnU-Net/MoveIt GPU use), consumed by ~/claude-auto/claude_auto/localcoder.py",
+  "deletion_policy": "Only the model selected in LLM-05's project benchmark is kept under models/llm/; the other candidates' GGUF files are deleted from local disk (not from Hugging Face) immediately after the LLM-05 benchmark run completes. No candidate GGUF is downloaded by this card (LLM-01) -- sizes/hashes below are taken from the Hugging Face API without downloading.",
+  "candidates": [
+    {
+      "name": "Qwen3.6-27B (Q4_K_M GGUF)",
+      "repo": "unsloth/Qwen3.6-27B-GGUF",
+      "file": "Qwen3.6-27B-Q4_K_M.gguf",
+      "size_bytes": 16817244384,
+      "sha256": "5ed60d0af4650a854b1755bd392f9aef4872643dc25a254bc68043fa638392a0",
+      "license": "apache-2.0",
+      "quant": "Q4_K_M",
+      "context": 262144,
+      "architecture": "dense 27B, hybrid Gated-DeltaNet/Gated-Attention (16 of 64 layers are full attention; rest are linear/Gated DeltaNet)",
+      "vram_estimate_gb": "16.82 GiB weights + ~2.1 GiB KV @32K (only 16 full-attention layers, GQA 4 KV heads x256 dim) + ~0.5-1 GiB linear-attn state/compute buffers = ~19.5-20.5 GiB, fits 24 GB on-demand-exclusive",
+      "tool_calling": "llama.cpp llama-server --jinja; base template has documented bugs (thinking-block handling, premature stops) fixed by community templates (froggeric/Qwen-Fixed-Chat-Templates, spiritbuun/buun-Qwen3.6-chat_template) layered on the official chat template via --chat-template-file",
+      "source_urls": [
+        "https://huggingface.co/Qwen/Qwen3.6-27B",
+        "https://huggingface.co/Qwen/Qwen3.6-27B/raw/main/config.json",
+        "https://huggingface.co/unsloth/Qwen3.6-27B-GGUF",
+        "https://huggingface.co/api/models/unsloth/Qwen3.6-27B-GGUF/tree/main",
+        "https://huggingface.co/ggml-org/Qwen3.6-27B-GGUF",
+        "https://github.com/ggml-org/llama.cpp/blob/master/docs/function-calling.md",
+        "https://huggingface.co/froggeric/Qwen-Fixed-Chat-Templates",
+        "https://huggingface.co/spiritbuun/buun-Qwen3.6-chat_template"
+      ]
+    },
+    {
+      "name": "Laguna-XS-2.1 (Q3_K_M GGUF)",
+      "repo": "bartowski/Laguna-XS-2.1-GGUF",
+      "file": "Laguna-XS-2.1-Q3_K_M.gguf",
+      "size_bytes": 15575904128,
+      "sha256": "00dda85ab74afccafa99b66e4d564a6ef76278a8c633d358cad630e7622cf618",
+      "license": "openmdw-1.1",
+      "quant": "Q3_K_M",
+      "context": 262144,
+      "architecture": "MoE 33B total / 3B active per token, 40 full-attention GQA layers (48 Q heads, 8 KV heads, head_dim 128), 256 experts / 8 active",
+      "vram_estimate_gb": "14.51 GiB weights + ~5.2 GiB KV @32K (dense GQA KV cache over all 40 layers) = ~19.7 GiB, fits 24 GB on-demand-exclusive. NOTE: the official poolside/Laguna-XS-2.1-GGUF release ships only Q4_K_M (20.27 GiB) and BF16; Q4_K_M + 32K KV (~25.5 GiB) exceeds the 24 GB budget, which is why the smaller bartowski Q3_K_M requant (imatrix, base_model:quantized:poolside/Laguna-XS-2.1) was selected instead",
+      "tool_calling": "llama.cpp llama-server --jinja against the model's chat_template.jinja (vLLM/llama.cpp-compatible per model card); community jlens/chat-template forks exist (e.g. gghfez/Laguna-XS.2-jlens-GGUF) for reliability tuning, not required for basic tool calls",
+      "source_urls": [
+        "https://huggingface.co/poolside/Laguna-XS-2.1",
+        "https://huggingface.co/poolside/Laguna-XS-2.1/raw/main/config.json",
+        "https://huggingface.co/poolside/Laguna-XS-2.1-GGUF/raw/main/LICENSE.md",
+        "https://huggingface.co/api/models/poolside/Laguna-XS-2.1-GGUF/tree/main",
+        "https://huggingface.co/bartowski/Laguna-XS-2.1-GGUF",
+        "https://huggingface.co/api/models/bartowski/Laguna-XS-2.1-GGUF/tree/main",
+        "https://huggingface.co/ggml-org/Laguna-XS-2.1-GGUF"
+      ]
+    },
+    {
+      "name": "Qwen3-Coder-30B-A3B-Instruct (IQ4_XS GGUF)",
+      "repo": "unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF",
+      "file": "Qwen3-Coder-30B-A3B-Instruct-IQ4_XS.gguf",
+      "size_bytes": 16378076320,
+      "sha256": "26cd4fef3ada9de84c6c59c4b93f9bc5df4d69a71e18cfe8a17369c2f8374ce7",
+      "license": "apache-2.0",
+      "quant": "IQ4_XS",
+      "context": 262144,
+      "architecture": "MoE 30B total / 3B active per token, 48 full-attention GQA layers (32 Q heads, 4 KV heads, head_dim 128), 128 experts",
+      "vram_estimate_gb": "16.38 GiB weights + ~3.15 GiB KV @32K = ~19.5 GiB, largest headroom of the three (~4.5 GiB free for compute buffers)",
+      "tool_calling": "llama.cpp llama-server --jinja; this model's native Hermes-style tool-call format is a long-established llama.cpp target (unsloth GGUF discussion documents chat-template + tool-calling fixes as of 2025-08-05)",
+      "source_urls": [
+        "https://huggingface.co/Qwen/Qwen3-Coder-30B-A3B-Instruct",
+        "https://huggingface.co/Qwen/Qwen3-Coder-30B-A3B-Instruct/raw/main/config.json",
+        "https://huggingface.co/unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF",
+        "https://huggingface.co/api/models/unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF/tree/main",
+        "https://huggingface.co/unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF/discussions/10"
+      ]
+    }
+  ],
+  "considered_not_selected": [
+    {
+      "name": "Gemma 4 26B-A4B-it",
+      "reason": "Hugging Face repo tags list license:apache-2.0, but Google's Gemma family has historically shipped under the separate Gemma Terms of Use (usage-restriction clauses, not plain Apache-2.0); the HF tag alone is not sufficient primary-source confirmation of an unrestricted license and needs the actual LICENSE/Gemma-Terms text checked before it can be a candidate. Deferred rather than spending part of the 3-candidate cap on an unverified license.",
+      "source_urls": [
+        "https://huggingface.co/google/gemma-4-26B-A4B-it"
+      ]
+    }
+  ]
+}
