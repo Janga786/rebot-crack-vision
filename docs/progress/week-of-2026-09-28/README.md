@@ -1,6 +1,6 @@
 # Progress — week of Mon Sep 28 – Sun Oct 04, 2026
 
-**8 task(s) completed and independently audited this week** · project total **17/69** accepted
+**9 task(s) completed and independently audited this week** · project total **18/69** accepted
 
 ## Notes
 
@@ -24,11 +24,13 @@
 …[386 chars clipped]
 - **TC-013 — D405 capture utility (hardware-optional)** ([details](TC-013.md)): The D405 camera capture tool (crackvision.realsense_capture) now works end-to-end in synthetic mode with no camera attached: it writes aligned color/depth PNGs plus full intrinsics/extrinsics metadata
 …[493 chars clipped]
+- **GEOM-02 — Depth projection library with invalid-depth policy** ([details](GEOM-02.md)): Built the depth-projection library (GEOM-02) that turns a pixel + its aligned D405 depth + camera intrinsics into a 3D point in the colour camera frame, matching Intel's own librealsense formula to we
+…[519 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 11 / 11
-- Audits that rejected work with evidence-backed findings: 2 (repairs created: 1)
+- Implementation/review sessions run: 13 / 13
+- Audits that rejected work with evidence-backed findings: 3 (repairs created: 2)
 
 ## Progress by work package
 
@@ -38,7 +40,7 @@
 | Local coding model (L-LLM) | 1 | 6 |
 | D405 capture (L-CAM) | 2 | 7 |
 | Perception (L-PERC) | 7 | 16 |
-| Geometry & calibration (L-GEOM) | 1 | 9 |
+| Geometry & calibration (L-GEOM) | 2 | 9 |
 | Motion planning (L-MOTION) | 1 | 10 |
 | Integration & commissioning (L-INT) | 0 | 6 |
 | Operator workflow & handoff (L-OPS) | 0 | 4 |
