@@ -1,6 +1,6 @@
 # Progress — week of Mon Sep 28 – Sun Oct 04, 2026
 
-**4 task(s) completed and independently audited this week** · project total **13/69** accepted
+**5 task(s) completed and independently audited this week** · project total **14/69** accepted
 
 ## Notes
 
@@ -16,10 +16,12 @@
 …[300 chars clipped]
 - **TC-010 — Skeletonization utility** ([details](TC-010.md)): Implemented src/crackvision/skeleton.py per docs/INTERFACES.md §3.4: remove_small_objects + skeletonize (nothing more), writing {case}_skeleton.png, {case}_skeleton_overlay.png, {case}_skeleton_stats.
 …[262 chars clipped]
+- **MOT-01 — Robot model reconciliation (vendor vs presentation URDF) + limits file** ([details](MOT-01.md)): Settled which robot model file is 'the' B601-DM model for planning, confirmed our simulation copy matches the vendor file exactly, and caught a real mismatch where the physical robot's driver currentl
+…[395 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 6 / 6
+- Implementation/review sessions run: 7 / 7
 - Audits that rejected work with evidence-backed findings: 2 (repairs created: 1)
 
 ## Progress by work package
@@ -31,7 +33,7 @@
 | D405 capture (L-CAM) | 1 | 7 |
 | Perception (L-PERC) | 7 | 16 |
 | Geometry & calibration (L-GEOM) | 1 | 9 |
-| Motion planning (L-MOTION) | 0 | 10 |
+| Motion planning (L-MOTION) | 1 | 10 |
 | Integration & commissioning (L-INT) | 0 | 6 |
 | Operator workflow & handoff (L-OPS) | 0 | 4 |
 | Imitation learning (later phase) (L-IL) | 0 | 1 |
