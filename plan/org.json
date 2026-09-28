@@ -1,0 +1,54 @@
+{
+  "nodes": {
+    "A0": {
+      "title": "Root architect",
+      "parent": null,
+      "accountable_for": "end-to-end goal G-001, cross-branch decisions, escalations"
+    },
+    "L-HOST": {
+      "title": "Host platform & reproducibility",
+      "parent": "A0",
+      "accountable_for": "pinned versions, env isolation, device access, storage"
+    },
+    "L-LLM": {
+      "title": "Local coding model",
+      "parent": "A0",
+      "accountable_for": "selection, serving, benchmark, qualification of the local route"
+    },
+    "L-CAM": {
+      "title": "D405 capture",
+      "parent": "A0",
+      "accountable_for": "discovery, aligned capture, metadata, recording/replay, diagnostics"
+    },
+    "L-PERC": {
+      "title": "Perception",
+      "parent": "A0",
+      "accountable_for": "OpenCrack pipeline, skeleton, branches, ordered paths, evaluation"
+    },
+    "L-GEOM": {
+      "title": "Geometry & calibration",
+      "parent": "A0",
+      "accountable_for": "projection, conventions, hand-eye, TCP, uncertainty, boresight"
+    },
+    "L-MOTION": {
+      "title": "Motion planning",
+      "parent": "A0",
+      "accountable_for": "B601-DM model, MoveIt, scene, reachability, Cartesian paths, timing, execution gate"
+    },
+    "L-INT": {
+      "title": "Integration & commissioning",
+      "parent": "A0",
+      "accountable_for": "sim + recorded-data tests, safety cases, gated physical commissioning"
+    },
+    "L-OPS": {
+      "title": "Operator workflow & handoff",
+      "parent": "A0",
+      "accountable_for": "operator CLI, runbooks, recovery, reproducible handoff"
+    },
+    "L-IL": {
+      "title": "Imitation learning (later phase)",
+      "parent": "A0",
+      "accountable_for": "only after the conventional baseline is measured and reliable"
+    }
+  }
+}

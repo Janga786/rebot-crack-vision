@@ -1,0 +1,112 @@
+{
+  "REQ-PERC-0": {
+    "text": "Phase-1 perception deliverables (cv-harness TC-001\u2026TC-016) complete and honest",
+    "owner": "L-PERC",
+    "track": "software"
+  },
+  "REQ-HOST-1": {
+    "text": "Reproducible host setup with pinned, recorded versions and an automated drift check",
+    "owner": "L-HOST",
+    "track": "software"
+  },
+  "REQ-HOST-2": {
+    "text": "Isolation between ROS (system py3.10), perception (conda crackvision py3.11) and local inference, verified automatically",
+    "owner": "L-HOST",
+    "track": "software"
+  },
+  "REQ-HOST-3": {
+    "text": "Device access (RealSense, arm adapter) granted by reviewed least-privilege actions",
+    "owner": "L-HOST",
+    "track": "software"
+  },
+  "REQ-LLM-1": {
+    "text": "Local coding model chosen from current primary sources + a project benchmark (quantization, context, tool reliability, latency, license, VRAM coexistence) with bounded downloads",
+    "owner": "L-LLM",
+    "track": "automation"
+  },
+  "REQ-LLM-2": {
+    "text": "Local model served by a pinned runtime; only benchmark-qualified task classes are routed to it",
+    "owner": "L-LLM",
+    "track": "automation"
+  },
+  "REQ-CAM-1": {
+    "text": "D405 discovery with actionable diagnostics (USB 3, firmware, permissions)",
+    "owner": "L-CAM",
+    "track": "camera"
+  },
+  "REQ-CAM-2": {
+    "text": "Aligned colour/depth capture with timestamps, intrinsics, depth scale, extrinsics and metadata",
+    "owner": "L-CAM",
+    "track": "camera"
+  },
+  "REQ-CAM-3": {
+    "text": "Lossless recording and deterministic replay usable without the camera",
+    "owner": "L-CAM",
+    "track": "camera"
+  },
+  "REQ-PERC-1": {
+    "text": "Existing OpenCrack zero-shot segmentation + visualization preserved (OpenCrack is not replaced)",
+    "owner": "L-PERC",
+    "track": "software"
+  },
+  "REQ-PERC-2": {
+    "text": "1-px skeleton, branch handling and ordered crack paths in the original pixel frame",
+    "owner": "L-PERC",
+    "track": "software"
+  },
+  "REQ-PERC-3": {
+    "text": "Evaluation on representative real D405 imagery",
+    "owner": "L-PERC",
+    "track": "camera"
+  },
+  "REQ-GEOM-1": {
+    "text": "Correct depth projection with invalid-depth handling and per-point uncertainty",
+    "owner": "L-GEOM",
+    "track": "calibration"
+  },
+  "REQ-GEOM-2": {
+    "text": "Camera-to-robot calibration with explicit transform conventions and residuals",
+    "owner": "L-GEOM",
+    "track": "calibration"
+  },
+  "REQ-GEOM-3": {
+    "text": "TCP calibration and physical boresight verification",
+    "owner": "L-GEOM",
+    "track": "calibration"
+  },
+  "REQ-MOT-1": {
+    "text": "MoveIt integration with the real B601-DM model: limits, controllers, collision scene",
+    "owner": "L-MOTION",
+    "track": "simulation"
+  },
+  "REQ-MOT-2": {
+    "text": "Reachability, Cartesian paths along cracks, time parameterization within vel/acc limits",
+    "owner": "L-MOTION",
+    "track": "simulation"
+  },
+  "REQ-INT-1": {
+    "text": "Simulation and recorded-data integration tests of the full pipeline",
+    "owner": "L-INT",
+    "track": "simulation"
+  },
+  "REQ-INT-2": {
+    "text": "Separately gated hardware commissioning with verified limits, collision checks, e-stop, controlled conditions and operator-sourced evidence",
+    "owner": "L-INT",
+    "track": "physical"
+  },
+  "REQ-OPS-1": {
+    "text": "Operator workflow: clean launch \u2192 capture \u2192 plan \u2192 preview \u2192 controlled execution, with failure recovery",
+    "owner": "L-OPS",
+    "track": "software"
+  },
+  "REQ-OPS-2": {
+    "text": "Reproducible install/config/tests/evaluation results, handoff docs, requirements\u2192evidence map, honest readiness report",
+    "owner": "L-OPS",
+    "track": "software"
+  },
+  "REQ-IL-1": {
+    "text": "Imitation learning only after the baseline is measured and reliable, and only if confirmed in capstone scope",
+    "owner": "L-IL",
+    "track": "software"
+  }
+}

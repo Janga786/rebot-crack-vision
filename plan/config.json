@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "project": "rebot_crack_vision",
+  "branch": "main",
+  "state_dir": ".claude-auto",
+  "claude_bin": "claude",
+  "sandbox": {
+    "ro_in_repo": [
+      "plan",
+      "task_cards"
+    ],
+    "extra_rw": []
+  },
+  "timeouts_min": {
+    "impl": 60,
+    "review": 30,
+    "rereview": 20,
+    "integration": 30,
+    "decompose": 30,
+    "priv_review": 15,
+    "plan": 45
+  },
+  "idle_timeout_min": 30,
+  "usage": {
+    "five_hour_max": 0.9,
+    "seven_day_max": 0.85,
+    "on_quota": "wait",
+    "abort_on_overage": true,
+    "session_budget_usd": {
+      "haiku": 2,
+      "sonnet": 12,
+      "opus": 25
+    }
+  },
+  "conventions": [
+    "Run all project Python through ./env.sh (./env.sh python \u2026, ./env.sh pytest \u2026): ROS Humble leaks py3.10 paths into conda envs and env.sh scrubs them (docs/adr/007).",
+    "ROS 2 work: rclpy nodes use /usr/bin/python3; `set +u` before sourcing /opt/ros/humble/setup.bash; keep ROS_LOCALHOST_ONLY=1 and the ROS_DOMAIN_ID already set in your environment.",
+    "Never modify ~/rebot_ws, ~/rebot_lerobot or other projects: consume ~/rebot_ws/install as a read-only underlay; new ROS packages live in this repo under ros2_ws/src/.",
+    "Never commit data/, models/, logs/, build outputs or large binaries (git-lfs is not installed).",
+    "docs/INTERFACES.md contracts are normative, especially \u00a70.5 frame invariant: mask, skeleton and aligned depth share (row, col) in the original colour frame. New contracts are APPENDED as new numbered sections.",
+    "Every CLI follows docs/INTERFACES.md \u00a70: exit codes 0/1/2/3 and the common flags.",
+    "No robot motion from code paths reachable without the commissioning gate: default to mock/dry-run.",
+    "The GPU is shared: never kill GPU processes; degrade per docs/ARCHITECTURE.md \u00a79."
+  ]
+}
