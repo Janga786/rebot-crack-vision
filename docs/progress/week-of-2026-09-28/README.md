@@ -33,8 +33,8 @@
 
 ## Quality loop
 
-- Implementation/review sessions run: 16 / 20
-- Audits that rejected work with evidence-backed findings: 4 (repairs created: 3)
+- Implementation/review sessions run: 17 / 23
+- Audits that rejected work with evidence-backed findings: 5 (repairs created: 3)
 - Re-verified after an upstream change: GEOM-01, GEOM-01.R1, TC-001
 
 ## Planning changes
