@@ -15,20 +15,46 @@ convention once, before any code depends on a guess.
 ## Decision
 
 ### Frames
-Named per REP-103 (units and axis orientation) and REP-105 (standard frame semantics), consistent
-with the ROS 2 / MoveIt config already present at `~/rebot_ws/src/rebotarm_moveit_config`:
+Named per REP-103 (units and axis orientation) and REP-105 (standard frame semantics). **Corrected
+from the first revision of this ADR:** `~/rebot_ws/src/rebotarm_bringup/description/urdf/reBot_B601_DM_with_gripper.urdf`
+does **not** define a `tool0` link — its kinematic chain ends `base_link → link1…link6 → gripper_link
+→ gripper_left/gripper_right`. `~/rebot_ws/src/rebotarm_moveit_config/config/rebotarm.urdf.xacro:8-12`
+adds one further fixed frame, `gripper_tcp`, as a child of `gripper_link` with a fixed offset
+`xyz="-0.0443 0 0"` (i.e. -0.0443 m along `gripper_link`'s **+X**), and `rebotarm.srdf:4` sets
+`<chain base_link="base_link" tip_link="gripper_tcp"/>`. So the prior claim that this frame table was
+"consistent with the ROS 2 / MoveIt config already present" was false for `tool0`/`TCP` as originally
+named — no code in `~/rebot_ws/src` mentions `tool0`, and `grep -c tool0` over that tree is `0`. This
+revision fixes the table to match what actually exists in TF:
 
 | Frame | Meaning |
 |---|---|
 | `base_link` | Robot base, fixed. All calibrated 3D crack-path points are expressed here before MoveIt planning. |
-| `tool0` | The kinematic chain's last link, per the URDF/MoveIt convention — not necessarily where the gripper physically points. |
-| `TCP` (tool-centre point) | The gripper's *working* point/axis, offset from `tool0` by the pivot calibration (GEOM-06/07). Distinct from `tool0` on purpose: `docs/TECHNICAL_APPROACH.md` §2.2–2.3 already documents a real bug caused by conflating "the last URDF frame" with "the frame the gripper actually points along." |
+| `tool0` | **New fixed alias frame, not present in the URDF today.** Defined here as identical to `gripper_link` (zero offset) purely so this ADR's frame table can use the REP-103/MoveIt convention name for "last link of the arm's own kinematic chain, before the gripper's own tip frame." GEOM-06/07 (whichever of the two first brings up the calibration TF tree) is the card that publishes the static `gripper_link → tool0` identity transform; until it does, `tool0` does not resolve in `tf2` and no code may assume it does. |
+| `TCP` (tool-centre point) | **Not a new frame.** `TCP` is this ADR's name for the frame that already exists in the MoveIt config as `gripper_tcp` (`rebotarm.urdf.xacro:8-12`, SRDF tip link `rebotarm.srdf:4`). Any code that needs the tool-centre point must look up `gripper_tcp` in `tf2`, or a card may publish a `TCP` alias of it — but the frames are the same physical point. The `-0.0443 m` fixed offset along `gripper_link`'s +X (URDF) is accepted here as **prior evidence**, corroborating (but not identical in origin to) the pointing-axis direction `docs/TECHNICAL_APPROACH.md` §2.2–2.3 measured in Isaac Sim; GEOM-06 defines the pivot-calibration solver and **GEOM-07 is the operator card that measures the real offset and records residuals against this URDF prior.** |
 | `camera_link` | RealSense D405 body/mount frame, `+x` forward along the housing, per the vendor's REP-103-style mechanical convention. |
+| `camera_color_frame` | Intermediate ROS-convention frame between `camera_link` and the optical frame below; same physical origin as `camera_link` but with axes already rotated (see below). Present in `realsense2_camera`'s published TF tree (`BaseRealSenseNode::calcAndAppendTransformMsgs`). |
 | `camera_color_optical_frame` | The frame the intrinsics in `INTERFACES.md` §3.10 project through: **`+z` forward (into the scene), `+x` right, `+y` down** — the standard ROS *optical* frame convention (REP-103), not `camera_link`'s mechanical axes. All pixel projection/deprojection math (below) happens in this frame. |
 
-`camera_link` → `camera_color_optical_frame` is a fixed rotation (no translation), the same fixed
-rotation every ROS camera driver applies between a sensor's mechanical frame and its optical frame.
-It is not calibrated per-device; it is a convention.
+**Corrected:** `camera_link` → `camera_color_optical_frame` is **not** a pure rotation and is **not**
+device-independent. It factors as:
+
+```
+T_camera_link_camera_color_optical_frame
+    = T_camera_link_camera_color_frame · T_camera_color_frame_camera_color_optical_frame
+```
+
+- `T_camera_link_camera_color_frame` carries the **per-device depth→colour extrinsic** — the same
+  `rotation`/`translation` pair recorded per-frame in `INTERFACES.md` §3.10 item 7
+  (`extrinsics_depth_to_color`, sourced from the device's own stream-profile extrinsics via
+  `realsense2_camera`'s `BaseRealSenseNode::calcAndAppendTransformMsgs`). It has a real, generally
+  non-zero translation and must be read from device metadata/driver, never hard-coded or assumed
+  zero.
+- `T_camera_color_frame_camera_color_optical_frame` **is** the fixed, translation-free
+  mechanical→optical rotation every ROS camera driver applies, and is the only part of this chain
+  that is a device-independent convention.
+
+Only the second half is rotation-only; the first half is per-device and must come from the driver or
+recorded metadata, not from this ADR.
 
 ### Transform naming
 `T_a_b` transforms a point from frame `b` into frame `a`:
@@ -39,7 +65,10 @@ p_a = T_a_b · p_b
 
 Composition follows the matching-subscript rule: `T_a_c = T_a_b · T_b_c`. So the camera-to-robot
 calibration this ADR anticipates (REQ-GEOM-2) is named `T_base_link_camera_color_optical_frame`, and
-the boresight/pivot calibration (GEOM-06/07) is `T_tool0_TCP`.
+the boresight/pivot calibration (GEOM-06/07) is `T_tool0_TCP` — both sides of that name resolve to
+frames that exist in TF per the Frames section above (`tool0` once GEOM-06/07 publishes its static
+alias of `gripper_link`; `TCP` as the existing `gripper_tcp` frame or an alias of it), not the
+invented frames named in the first revision of this ADR.
 
 - **Rotation representation:** quaternion, **ROS order `(x, y, z, w)`** — matches `geometry_msgs/Quaternion`
   and `tf2`. Any code using `scipy.spatial.transform.Rotation` (which is also `xyzw`) needs no
@@ -102,12 +131,16 @@ the camera origin.
 ### Boresight / TCP — status of prior evidence
 `docs/TECHNICAL_APPROACH.md` §2.2–2.3 already measured the reBot B601-DM gripper's physical pointing
 axis in simulation (Isaac Sim URDF probe: local **+X**, not +Z, corroborated by the arm's own solved
-IK behaviour and by `~/rebot_ws/src/rebotarm_moveit_config`). That measurement is accepted here as
-**prior evidence only** — it grounds the `T_tool0_TCP` convention defined above in a real,
-previously-verified fact rather than a fresh guess, but it does not substitute for a physical
-calibration. GEOM-06 defines the pivot-calibration solver and procedure; **GEOM-07 is the operator
-card that executes it against the real arm and records residuals.** Nothing in this pipeline may
-treat the boresight axis as calibrated fact until GEOM-07 reports measured numbers.
+IK behaviour and by `~/rebot_ws/src/rebotarm_moveit_config`). The MoveIt config's own fixed URDF
+offset for `gripper_tcp` — `xyz="-0.0443 0 0"` relative to `gripper_link`, i.e. -0.0443 m along
+`gripper_link`'s +X (`rebotarm.urdf.xacro:8-12`) — is a second, independent piece of prior evidence
+pointing the same direction (local X, not Z). Both are accepted here as **prior evidence only** — they
+ground the `T_tool0_TCP` convention defined above in real, previously-recorded facts rather than a
+fresh guess, but neither substitutes for a physical calibration, and the `-0.0443 m` figure is a
+design-time CAD/URDF value, not a measured one. GEOM-06 defines the pivot-calibration solver and
+procedure; **GEOM-07 is the operator card that executes it against the real arm and records residuals
+against this prior.** Nothing in this pipeline may treat the boresight axis or the `-0.0443 m` offset
+as calibrated fact until GEOM-07 reports measured numbers.
 
 ## Consequences
 + Every later geometry card (GEOM-02…07) has one document to cite instead of re-deriving a
