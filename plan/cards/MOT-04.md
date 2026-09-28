@@ -2,7 +2,7 @@
 
 ```json card
 {
-  "kind": "impl",
+  "kind": "branch",
   "depends_on": [
     "MOT-02",
     "GEOM-01"
@@ -11,7 +11,6 @@
     "REQ-MOT-1",
     "REQ-MOT-2"
   ],
-  "spec_state": "draft",
   "refine_after": [
     "MOT-02"
   ],
@@ -30,3 +29,6 @@
 ```
 
 Draft: Reuse the presentation §2.5 sweep idea with MoveIt IK.
+
+## Decomposed 2026-09-28T17:02:06Z by L-MOTION (claude-opus-5-5, high)
+Children: MOT-04.1, MOT-04.2, MOT-04.3, MOT-04.4, MOT-04.5
