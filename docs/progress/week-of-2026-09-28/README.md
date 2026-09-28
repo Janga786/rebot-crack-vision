@@ -1,6 +1,6 @@
 # Progress — week of Mon Sep 28 – Sun Oct 04, 2026
 
-**0 task(s) completed and independently audited this week** · project total **9/69** accepted
+**1 task(s) completed and independently audited this week** · project total **10/69** accepted
 
 ## Notes
 
@@ -8,11 +8,12 @@
 
 ## Completed this week
 
-- none yet
+- **ARCH-01 — ADR-011: Phase-2 scope lifts the phase-1 deferrals in a controlled order** ([details](ARCH-01.md)): Documented the project's move from phase-1 (perception-only) to phase-2 (full pipeline) scope in a new architecture decision record, ADR-011, which spells out the order deferred work resumes in: order
+…[288 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 0 / 0
+- Implementation/review sessions run: 1 / 1
 - Audits that rejected work with evidence-backed findings: 0 (repairs created: 0)
 
 ## Progress by work package
