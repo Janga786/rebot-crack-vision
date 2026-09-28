@@ -1,6 +1,6 @@
 # Progress — week of Mon Sep 28 – Sun Oct 04, 2026
 
-**13 task(s) completed and independently audited this week** · project total **22/74** accepted
+**14 task(s) completed and independently audited this week** · project total **21/74** accepted
 
 ## Notes
 
@@ -34,10 +34,12 @@
 …[196 chars clipped]
 - **TC-011 — One-command runner run_test.sh** ([details](TC-011.md)): Built the project's single "run everything" command: ./run_test.sh takes images dropped in data/input_originals/ through environment checks, input prep, GPU/CPU inference, visualization and skeletoniz
 …[495 chars clipped]
+- **CAM-02 — Lossless RGB-D recording + deterministic replay** ([details](CAM-02.md)): Added a lossless recording/replay layer for the D405 RGB-D pipeline: sessions record colour (lossless PNG) and raw depth (lossless 16-bit PNG) frames plus full device/intrinsics/extrinsics metadata, a
+…[233 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 19 / 28
+- Implementation/review sessions run: 20 / 29
 - Audits that rejected work with evidence-backed findings: 5 (repairs created: 3)
 - Re-verified after an upstream change: GEOM-01, GEOM-01.R1, TC-001
 
@@ -51,9 +53,9 @@
 |---|---|---|
 | Host platform & reproducibility (L-HOST) | 4 | 9 |
 | Local coding model (L-LLM) | 1 | 6 |
-| D405 capture (L-CAM) | 2 | 7 |
-| Perception (L-PERC) | 10 | 16 |
-| Geometry & calibration (L-GEOM) | 2 | 9 |
+| D405 capture (L-CAM) | 3 | 7 |
+| Perception (L-PERC) | 9 | 16 |
+| Geometry & calibration (L-GEOM) | 1 | 9 |
 | Motion planning (L-MOTION) | 2 | 15 |
 | Integration & commissioning (L-INT) | 0 | 6 |
 | Operator workflow & handoff (L-OPS) | 0 | 4 |
