@@ -522,6 +522,68 @@ source of truth. `validate` checks required columns, enum membership, `image_id`
 each referenced colour/depth file exists. **No image data is collected or labelled in this phase** —
 this card delivers the tooling and an empty, header-only manifest only.
 
+### 3.13 `crackvision.paths` (PERC-03)
+
+```
+./env.sh python -m crackvision.paths [--cases A B ...] [--rdp-tolerance-px PX]
+                                     [--min-spur-length-px N] [common flags]
+```
+
+| | |
+|---|---|
+| **Reads** | `data/case_map.json`, `data/skeletons/{case}_skeleton.png` |
+| **Writes** | `data/paths/{case}_paths.json` |
+
+Builds the PERC-02 8-connected pixel graph over the `{0,255}` skeleton raster, prunes spurs shorter
+than `--min-spur-length-px` (`skeleton_graph.prune_spurs`, default from `skeleton.min_spur_length_px`
+in `config/project.yaml`, else 5), then decomposes each connected component into ordered polylines.
+
+**Path-decomposition policy** (`crackvision.paths`, module docstring is normative if this summary and
+the code ever disagree):
+
+1. Per component, repeatedly extract the current **graph diameter** — the longest shortest-path
+   between any two nodes, found by the standard two-sweep Dijkstra (edge weight = pixel-step count).
+   This is exact for tree-shaped components (the large majority of real cracks) and the conventional
+   heuristic when a component contains a cycle. The first extraction is the component's **main path**;
+   each subsequent extraction, over whatever edges remain, is a **branch**. This repeats until every
+   edge is claimed. Branches are then sorted by pixel length, longest first, in the output.
+2. **Multi-component ordering** is a deterministic greedy nearest-endpoint tour: components are
+   visited in `skeleton_graph` discovery order for the first pick, then each next component is
+   whichever remaining one has an endpoint (start or end of its main path — a direction choice)
+   nearest the current position; ties break on the lower `component_id`. Not a globally optimal tour —
+   cheap and reproducible only.
+3. Both the dense path (one point per skeleton pixel) and an RDP-simplified path (tolerance
+   `--rdp-tolerance-px`, default `path_extraction.rdp_tolerance_px` in `config/project.yaml`, else
+   `1.5`) are kept for every main path and branch, dense first.
+
+`{case}_paths.json` schema:
+
+```json
+{"case_id":"Deck_Crack_01","schema_version":1,
+ "image_height":720,"image_width":1280,
+ "min_spur_length_px":5,"rdp_tolerance_px":1.5,
+ "component_count":1,
+ "components":[
+   {"order_index":0,"component_id":0,
+    "main_path":{"kind":"main","length_px":812,
+      "dense":[{"row":10,"col":20,"u":20,"v":10}, "... one entry per skeleton pixel ..."],
+      "simplified":[{"row":10,"col":20,"u":20,"v":10}, "... RDP-simplified corners only ..."]},
+    "branches":[
+      {"kind":"branch","length_px":34,"dense":["..."],"simplified":["..."]}
+    ]}
+ ]}
+```
+
+- Every point is `{"row": int, "col": int, "u": int, "v": int}`: `(row, col)` is the array-convention
+  pixel coordinate in the **original** image frame (docs/INTERFACES.md §0.5 — never resized, cropped
+  or padded relative to the source); `(u, v) = (col, row)` is the same point in the `pyrealsense2`/
+  projection convention (§6.3), spelled out per-point so no downstream consumer has to re-derive it.
+- `branches` is `[]` for a component with no branch points; `components` is `[]` for an empty skeleton.
+- A component whose entire skeleton is a single isolated pixel emits a one-point `main_path` (`dense
+  == simplified == [that pixel]`, `length_px: 0`) and no branches.
+- **OUT OF SCOPE — do not implement here:** anything past pixel space — no 3D deprojection, no MoveIt
+  waypoints, no robot motion. That is GEOM-0x's job, downstream of this file.
+
 ---
 
 ## 4. `config/project.yaml`
@@ -561,6 +623,8 @@ visualization:
   panel_gutter_px: 8
 skeleton:
   min_component_size: 64
+path_extraction:
+  rdp_tolerance_px: 1.5
 realsense:
   color: {width: 848, height: 480, fps: 30, format: bgr8}
   depth: {width: 848, height: 480, fps: 30, format: z16}
