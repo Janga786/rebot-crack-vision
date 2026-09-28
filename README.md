@@ -76,18 +76,10 @@ interpreter (`docs/RISKS.md` R-01):
 ./env.sh pytest tests/ -v                     # 46 unit tests
 ```
 
-Then, on your own imagery:
-
-```bash
-cp your_images/*.png data/input_originals/
-./env.sh python -m crackvision.prepare_inputs   # force 3-channel RGB PNG, write case_map.json
-./env.sh python -m crackvision.inference        # nnUNetv2_predict_from_modelfolder, fold 0
-./env.sh python -m crackvision.visualize        # mask · overlay · 3-panel comparison
-```
-
-> The full operator quickstart (`run_test.sh`, one command for the whole chain) is `TC-011`'s
-> deliverable and is not written yet; `TC-016` finalises this file. What is above is verified to
-> work today.
+## Quickstart
+1. Put images in `data/input_originals/`
+2. Run `./run_test.sh`
+3. Open `data/comparisons/`
 
 Model weights are **not** in this repository (268 MB, and git-lfs is not available here) —
 `./env.sh python scripts/fetch_model.py` downloads them from Hugging Face and writes
