@@ -1,6 +1,6 @@
 # Progress — week of Mon Sep 28 – Sun Oct 04, 2026
 
-**9 task(s) completed and independently audited this week** · project total **18/69** accepted
+**10 task(s) completed and independently audited this week** · project total **18/69** accepted
 
 ## Notes
 
@@ -26,22 +26,24 @@
 …[493 chars clipped]
 - **GEOM-02 — Depth projection library with invalid-depth policy** ([details](GEOM-02.md)): Built the depth-projection library (GEOM-02) that turns a pixel + its aligned D405 depth + camera intrinsics into a 3D point in the colour camera frame, matching Intel's own librealsense formula to we
 …[519 chars clipped]
+- **MOT-02 — ROS 2 overlay workspace + headless MoveIt mock planning** ([details](MOT-02.md)): This repo now has its own ROS 2 overlay workspace that builds on top of the robot's existing ROS install and can plan robot arm motions entirely in software, with no hardware attached. Running the two
+…[451 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 13 / 13
+- Implementation/review sessions run: 14 / 14
 - Audits that rejected work with evidence-backed findings: 3 (repairs created: 2)
 
 ## Progress by work package
 
 | Work package | Accepted | Total |
 |---|---|---|
-| Host platform & reproducibility (L-HOST) | 4 | 9 |
+| Host platform & reproducibility (L-HOST) | 3 | 9 |
 | Local coding model (L-LLM) | 1 | 6 |
 | D405 capture (L-CAM) | 2 | 7 |
 | Perception (L-PERC) | 7 | 16 |
 | Geometry & calibration (L-GEOM) | 2 | 9 |
-| Motion planning (L-MOTION) | 1 | 10 |
+| Motion planning (L-MOTION) | 2 | 10 |
 | Integration & commissioning (L-INT) | 0 | 6 |
 | Operator workflow & handoff (L-OPS) | 0 | 4 |
 | Imitation learning (later phase) (L-IL) | 0 | 1 |
