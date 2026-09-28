@@ -1,6 +1,6 @@
 # Progress — week of Mon Sep 28 – Sun Oct 04, 2026
 
-**11 task(s) completed and independently audited this week** · project total **19/74** accepted
+**11 task(s) completed and independently audited this week** · project total **20/74** accepted
 
 ## Notes
 
@@ -33,7 +33,7 @@
 
 ## Quality loop
 
-- Implementation/review sessions run: 16 / 19
+- Implementation/review sessions run: 16 / 20
 - Audits that rejected work with evidence-backed findings: 4 (repairs created: 3)
 - Re-verified after an upstream change: GEOM-01, GEOM-01.R1, TC-001
 
@@ -45,7 +45,7 @@
 
 | Work package | Accepted | Total |
 |---|---|---|
-| Host platform & reproducibility (L-HOST) | 3 | 9 |
+| Host platform & reproducibility (L-HOST) | 4 | 9 |
 | Local coding model (L-LLM) | 1 | 6 |
 | D405 capture (L-CAM) | 2 | 7 |
 | Perception (L-PERC) | 8 | 16 |
