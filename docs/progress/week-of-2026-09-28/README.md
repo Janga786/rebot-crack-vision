@@ -1,6 +1,6 @@
 # Progress — week of Mon Sep 28 – Sun Oct 04, 2026
 
-**16 task(s) completed and independently audited this week** · project total **25/74** accepted
+**17 task(s) completed and independently audited this week** · project total **25/74** accepted
 
 ## Notes
 
@@ -40,10 +40,12 @@
 …[510 chars clipped]
 - **TC-015 — Evaluation-manifest tooling** ([details](TC-015.md)): Built the evaluation-manifest CLI (tools/dataset_manifest.py) that will let us track distance, angle, lighting, surface and crack labels for every D405 evaluation image before any real images are capt
 …[467 chars clipped]
+- **MOT-04.1 — Reachability config + boresight-down target/pose generator (pure Python)** ([details](MOT-04.1.md)): Built the pure-Python geometry and config layer for the arm's reachability sweep: a validated YAML config describing the sweep grid, boresight-down orientation sampling, and IK/placement parameters, p
+…[383 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 22 / 35
+- Implementation/review sessions run: 23 / 36
 - Audits that rejected work with evidence-backed findings: 5 (repairs created: 3)
 - Re-verified after an upstream change: GEOM-01, GEOM-01.R1, PERC-03, PERC-03.R1, TC-001
 
