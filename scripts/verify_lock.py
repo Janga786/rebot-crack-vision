@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import difflib
+import re
 import shutil
 import subprocess
 import sys
@@ -43,6 +44,26 @@ def _strip_header(lines: list[str]) -> list[str]:
     while idx < len(lines) and lines[idx].startswith("#"):
         idx += 1
     return lines[idx:]
+
+
+_SELF_EDITABLE_RE = re.compile(
+    r"^-e git\+https://github\.com/Janga786/rebot-crack-vision\.git@[0-9a-f]+#egg=crackvision$"
+)
+
+
+def _normalize_self_editable(lines: list[str]) -> list[str]:
+    """Replace this repo's own editable-install commit pin with a placeholder.
+
+    That line's commit hash always matches the current HEAD, which changes with
+    every commit (including the one that updates the lock files themselves), so
+    comparing it verbatim would report permanent false-positive drift.
+    """
+    return [
+        "-e git+https://github.com/Janga786/rebot-crack-vision.git@HEAD#egg=crackvision"
+        if _SELF_EDITABLE_RE.match(line)
+        else line
+        for line in lines
+    ]
 
 
 def _find_conda() -> str | None:
@@ -111,9 +132,9 @@ def main(argv: list[str] | None = None) -> int:
     live_pip_lines = out.splitlines()
 
     locked_conda_lines = _strip_header(conda_lock_path.read_text().splitlines())
-    locked_pip_lines = _strip_header(pip_lock_path.read_text().splitlines())
+    locked_pip_lines = _normalize_self_editable(_strip_header(pip_lock_path.read_text().splitlines()))
     live_conda_lines_body = _strip_header(live_conda_lines)
-    live_pip_lines_body = _strip_header(live_pip_lines)
+    live_pip_lines_body = _normalize_self_editable(_strip_header(live_pip_lines))
 
     diffs: list[str] = []
     diffs += _diff(CONDA_LOCK_FILE, locked_conda_lines, live_conda_lines_body)
