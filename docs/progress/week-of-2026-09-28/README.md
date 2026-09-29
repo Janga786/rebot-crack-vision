@@ -1,6 +1,6 @@
 # Progress — week of Mon Sep 28 – Sun Oct 04, 2026
 
-**27 task(s) completed and independently audited this week** · project total **34/74** accepted
+**28 task(s) completed and independently audited this week** · project total **35/74** accepted
 
 ## Notes
 
@@ -58,10 +58,12 @@
 …[248 chars clipped]
 - **HOST-02 — Lock the crackvision environment + verify-lock script** ([details](HOST-02.md)): The crackvision perception environment can now be locked and its drift automatically checked: `verify_lock.py` correctly reports a clean match against the committed lock files, and `rebuild_env.sh --d
 …[416 chars clipped]
+- **PERC-09 — Path accuracy metrics on synthetic ground truth** ([details](PERC-09.md)): Added a synthetic crack generator with known ground-truth centerlines (straight, curved, branched, and noisy variants) and a test suite that measures the crack-path-extraction pipeline's accuracy agai
+…[232 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 43 / 81
+- Implementation/review sessions run: 44 / 82
 - Audits that rejected work with evidence-backed findings: 6 (repairs created: 6)
 - Re-verified after an upstream change: CAM-02, GEOM-01, GEOM-01.R1, MOT-02, MOT-04.1, MOT-04.1.R1, MOT-04.2, MOT-04.3, MOT-04.3.R1, MOT-04.4, MOT-04.4.R1, PERC-03, PERC-03.R1, TC-001, TC-011
 
@@ -76,7 +78,7 @@
 | Host platform & reproducibility (L-HOST) | 5 | 9 |
 | Local coding model (L-LLM) | 1 | 6 |
 | D405 capture (L-CAM) | 4 | 7 |
-| Perception (L-PERC) | 12 | 16 |
+| Perception (L-PERC) | 13 | 16 |
 | Geometry & calibration (L-GEOM) | 3 | 9 |
 | Motion planning (L-MOTION) | 6 | 15 |
 | Integration & commissioning (L-INT) | 1 | 6 |
