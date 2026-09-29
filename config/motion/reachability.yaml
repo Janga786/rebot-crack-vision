@@ -25,14 +25,18 @@ boresight:
   source: "docs/INTERFACES.md §6.5 / docs/TECHNICAL_APPROACH.md §2.2-2.3 (simulation-derived local +X); GEOM-07 measures the real boresight"
 
 grid:
+  # MOT-04.5 runtime change: step 0.025 -> 0.03 (and y extent +-0.40 -> +-0.39 so the span is
+  # integral in the new step). At 0.025 the full sweep (6270 targets, ~0.42 s each) needs ~44 min,
+  # which exceeded the run's session budget (attempt 1 timed out at 90%). Orientation, IK and
+  # collision settings are unchanged. See docs/motion/REACHABILITY.md "Grid change".
   x_m:
     min: 0.05
     max: 0.50
-    step: 0.025
+    step: 0.03
   y_m:
-    min: -0.40
-    max: 0.40
-    step: 0.025
+    min: -0.39
+    max: 0.39
+    step: 0.03
   surface_z_m: [0.00, 0.04, 0.08, 0.12, 0.16]
   standoffs_m: [0.01, 0.04]
 
