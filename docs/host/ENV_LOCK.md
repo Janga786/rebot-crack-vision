@@ -13,6 +13,13 @@ files so it can be recreated exactly and drift can be detected automatically.
 Both files carry a header comment recording the generation date (UTC) and source command;
 `verify_lock.py` and `rebuild_env.sh` skip leading `#` lines when comparing/consuming content.
 
+`crackvision` is itself installed editable from this repo's own git checkout, so `pip freeze`
+includes a `-e git+...@<commit-sha>#egg=crackvision` line pinned to the current `HEAD`. That
+hash changes on every commit to this repo — including the commit that updates the lock files —
+so comparing it verbatim would report permanent false-positive drift. `verify_lock.py`
+normalizes that one line (both sides) to a fixed placeholder before diffing; every other
+package version is still compared exactly.
+
 ## Regenerating the lock files
 
 After deliberately changing the environment (e.g. adding a dependency to
