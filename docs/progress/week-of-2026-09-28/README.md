@@ -1,6 +1,6 @@
 # Progress — week of Mon Sep 28 – Sun Oct 04, 2026
 
-**24 task(s) completed and independently audited this week** · project total **31/74** accepted
+**25 task(s) completed and independently audited this week** · project total **31/74** accepted
 
 ## Notes
 
@@ -52,10 +52,12 @@
 …[758 chars clipped]
 - **CAM-03 — Recording validator with actionable diagnostics** ([details](CAM-03.md)): Built a one-command recording validator (scripts/validate_recording.py) that checks a D405 recording for metadata completeness, plausible depth scale, timestamp sync/monotonicity, dropped frames, USB-
 …[182 chars clipped]
+- **PERC-04 — Path visualization + pipeline stage** ([details](PERC-04.md)): Added a new pipeline stage that draws crack path overlays on top of the original photos — numbered labels show which crack is visited first/second/etc., arrows show the direction each crack is traced,
+…[194 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 37 / 77
+- Implementation/review sessions run: 39 / 78
 - Audits that rejected work with evidence-backed findings: 6 (repairs created: 6)
 - Re-verified after an upstream change: CAM-02, GEOM-01, GEOM-01.R1, MOT-02, MOT-04.1, MOT-04.1.R1, MOT-04.2, MOT-04.3, MOT-04.3.R1, MOT-04.4, MOT-04.4.R1, PERC-03, PERC-03.R1, TC-001, TC-011
 
@@ -82,6 +84,8 @@
 - GEOM-03: operator_decision — Camera mounting (eye-in-hand vs eye-to-hand) for the D405 is not documented anywhere in this repo or ~/rebot_ws — ARCHIT
 …[181 chars clipped]
 - LLM-02: other — This attempt's bwrap sandbox invocation (visible via /proc/1/cmdline) does not include a --bind for ~/opt/llama.cpp, eve
+…[181 chars clipped]
+- MOT-03: other — MOT-03's card scope.write omits scripts/ros/** (unlike MOT-02 and MOT-04.4, which included their respective wrapper scri
 …[181 chars clipped]
 - MOT-04.5: operator_decision — The committed standoffs [0.01, 0.04] m give no collision-free boresight-down IK solution anywhere: the gripper body exte
 …[181 chars clipped]
