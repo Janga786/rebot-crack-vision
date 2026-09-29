@@ -1,6 +1,6 @@
 # Progress — week of Mon Sep 28 – Sun Oct 04, 2026
 
-**15 task(s) completed and independently audited this week** · project total **24/74** accepted
+**16 task(s) completed and independently audited this week** · project total **25/74** accepted
 
 ## Notes
 
@@ -38,10 +38,12 @@
 …[233 chars clipped]
 - **TC-014 — Integration + contract + hygiene tests** ([details](TC-014.md)): Added the integration and contract test suite for the crack-vision pipeline (TC-014): it runs the real prepare-inputs to visualize to skeleton chain end-to-end on synthetic images (including a non-squ
 …[510 chars clipped]
+- **TC-015 — Evaluation-manifest tooling** ([details](TC-015.md)): Built the evaluation-manifest CLI (tools/dataset_manifest.py) that will let us track distance, angle, lighting, surface and crack labels for every D405 evaluation image before any real images are capt
+…[467 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 21 / 34
+- Implementation/review sessions run: 22 / 35
 - Audits that rejected work with evidence-backed findings: 5 (repairs created: 3)
 - Re-verified after an upstream change: GEOM-01, GEOM-01.R1, PERC-03, PERC-03.R1, TC-001
 
@@ -56,7 +58,7 @@
 | Host platform & reproducibility (L-HOST) | 4 | 9 |
 | Local coding model (L-LLM) | 1 | 6 |
 | D405 capture (L-CAM) | 3 | 7 |
-| Perception (L-PERC) | 10 | 16 |
+| Perception (L-PERC) | 11 | 16 |
 | Geometry & calibration (L-GEOM) | 2 | 9 |
 | Motion planning (L-MOTION) | 2 | 15 |
 | Integration & commissioning (L-INT) | 1 | 6 |
