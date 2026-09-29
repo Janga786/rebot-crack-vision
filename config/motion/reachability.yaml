@@ -1,0 +1,75 @@
+# config/motion/reachability.yaml — reachability sweep config for MOT-04 (boresight-down
+# crack-inspection target/pose generation over the canonical B601-DM model).
+#
+# Schema id: crackvision.reachability_config/1 (validated by
+# ros2_ws/src/crackvision_motion/crackvision_motion/reachability_core.py:load_config).
+#
+# value_status: every numeric value below is `nominal` -- a starting engineering choice, not a
+# measured or calibrated quantity. See `sources` at the bottom for a one-line rationale per
+# block. MOT-10 measures the real workcell; GEOM-07 measures the real gripper boresight/pivot.
+# This card (MOT-04.1) only writes and validates this schema; MOT-04.2..5 add the map/CLI
+# contract, placement scoring, the ROS sweep node and the real sweep run.
+
+frame: base_link
+group: arm
+ik_link: gripper_tcp   # SRDF planning-group tip link; docs/motion/ROBOT_MODEL.md §4.
+
+boresight:
+  # Gripper pointing axis: prior evidence only (docs/INTERFACES.md §6.5), not yet calibrated by
+  # GEOM-07. down_world is the fixed world-frame "point straight down" target used to build
+  # every sweep pose. Both are directions (magnitude not meaningful); reachability_core
+  # normalises both on load.
+  axis_local: [1.0, 0.0, 0.0]
+  down_world: [0.0, 0.0, -1.0]
+  provenance: prior_evidence
+  source: "docs/INTERFACES.md §6.5 / docs/TECHNICAL_APPROACH.md §2.2-2.3 (simulation-derived local +X); GEOM-07 measures the real boresight"
+
+grid:
+  x_m:
+    min: 0.05
+    max: 0.50
+    step: 0.025
+  y_m:
+    min: -0.40
+    max: 0.40
+    step: 0.025
+  surface_z_m: [0.00, 0.04, 0.08, 0.12, 0.16]
+  standoffs_m: [0.01, 0.04]
+
+orientation:
+  roll_samples: 8
+  tilt_deg: [0.0]
+  tilt_azimuth_samples: 4
+
+ik:
+  timeout_s: 0.02
+  avoid_collisions: true
+  seed: neighbour
+  roll_search: best
+
+surface_collision:
+  enabled: true
+  thickness_m: 0.02
+  margin_m: 0.05
+  allowed_links: [base_link, link1]
+
+prefilter:
+  enabled: true
+
+placement:
+  footprint_m: [0.20, 0.20]
+  yaw_candidates_rad: [0.0, 1.5707963267948966]
+  tolerance_m: 0.02
+  top_k: 5
+
+value_status: nominal
+
+sources:
+  frame_group_ik_link: "base_link is the fixed planning frame (docs/INTERFACES.md §6.1 base_link); group/ik_link per docs/motion/ROBOT_MODEL.md §4 (SRDF 'arm' group, tip 'gripper_tcp')."
+  boresight: "docs/INTERFACES.md §6.5 (prior_evidence only, not calibrated) / docs/TECHNICAL_APPROACH.md §2.2-2.3 simulation-derived local +X; GEOM-07 supersedes this with a measured value."
+  grid: "x/y bounds+step and surface_z_m are a nominal sweep resolution over the workcell, not a measured footprint; standoff 0.04 m reuses docs/TECHNICAL_APPROACH.md §2.5's STANDOFF_APPROACH_M, standoff 0.01 m is a nominal near-surface inspection clearance; MOT-10 measures the real workcell."
+  orientation: "8 roll samples / 4 azimuth samples is a nominal coarse angular sweep resolution chosen for this card, not a measured or optimised value; tilt_deg=[0.0] keeps the first sweep pure boresight-down."
+  ik: "timeout_s/seed/roll_search are nominal MoveIt IK-call tuning defaults for MOT-04.4's sweep node; avoid_collisions=true is the safe default per REQ-MOT-2."
+  surface_collision: "thickness_m/margin_m are nominal clearances bracketing the inspected surface for MOT-04.4's collision object; allowed_links follows docs/motion/ROBOT_MODEL.md's base-of-chain links, which may legitimately sit near the coupon mount."
+  prefilter: "enabled=true turns on reach_bound_from_urdf's cheap norm-based prefilter ahead of any IK call; a boolean toggle, not a measured value."
+  placement: "footprint_m reuses the nominal coupon footprint; yaw_candidates_rad = {0, 90deg} covers landscape and portrait placement; tolerance_m/top_k are nominal search-grid parameters for MOT-04.3's placement scoring."
