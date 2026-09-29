@@ -11,19 +11,22 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEVICE=""
 SKIP_SKELETON=0
 CLEAN=0
+PATHS=0
 
 usage() {
     cat <<'EOF'
-Usage: run_test.sh [--device cuda|cpu] [--skip-skeleton] [--clean] [--help]
+Usage: run_test.sh [--device cuda|cpu] [--skip-skeleton] [--paths] [--clean] [--help]
 
 Runs the whole crack-vision chain on data/input_originals/ and prints a summary table.
 
   --device cuda|cpu   inference device, passed to crackvision.inference (default: config/project.yaml)
   --skip-skeleton      skip the skeletonization stage (stage 5); summary shows "-" for its columns
+  --paths               opt-in: also extract ordered crack paths and render path overlays
+                         (crackvision.paths + crackvision.visualize_paths); requires skeleton to run
   --clean               remove existing data/nnunet_input/*.png before converting inputs
   --help, -h            show this message and exit 0
 
-Stages: check_env -> prepare_inputs -> inference -> visualize -> skeleton -> summarize_run.
+Stages: check_env -> prepare_inputs -> inference -> visualize -> skeleton -> [paths] -> summarize_run.
 Put images in data/input_originals/ first, then run this script, then open data/comparisons/.
 EOF
 }
@@ -46,6 +49,10 @@ while [ $# -gt 0 ]; do
             SKIP_SKELETON=1
             shift
             ;;
+        --paths)
+            PATHS=1
+            shift
+            ;;
         --clean)
             CLEAN=1
             shift
@@ -64,6 +71,11 @@ done
 
 if [ -n "$DEVICE" ] && [ "$DEVICE" != "cuda" ] && [ "$DEVICE" != "cpu" ]; then
     echo "run_test.sh: --device must be cuda or cpu, got: $DEVICE" >&2
+    exit 2
+fi
+
+if [ "$PATHS" -eq 1 ] && [ "$SKIP_SKELETON" -eq 1 ]; then
+    echo "run_test.sh: --paths requires the skeleton stage; drop --skip-skeleton" >&2
     exit 2
 fi
 
@@ -125,6 +137,14 @@ if [ "$SKIP_SKELETON" -eq 0 ]; then
 else
     echo
     echo "── skeleton ── (skipped: --skip-skeleton)"
+fi
+
+if [ "$PATHS" -eq 1 ]; then
+    run_stage "paths" "$ROOT/env.sh" python -m crackvision.paths
+    run_stage "visualize_paths" "$ROOT/env.sh" python -m crackvision.visualize_paths
+else
+    echo
+    echo "── paths ── (skipped: opt-in via --paths)"
 fi
 
 run_stage "summarize_run" "$ROOT/env.sh" python "$ROOT/scripts/summarize_run.py"
