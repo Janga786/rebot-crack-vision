@@ -1,6 +1,6 @@
 # Progress — week of Mon Sep 28 – Sun Oct 04, 2026
 
-**23 task(s) completed and independently audited this week** · project total **30/74** accepted
+**24 task(s) completed and independently audited this week** · project total **31/74** accepted
 
 ## Notes
 
@@ -50,10 +50,12 @@
 …[391 chars clipped]
 - **MOT-04.4 — MoveIt reachability sweep node (compute_ik + independent FK re-check) + headless run/test scripts** ([details](MOT-04.4.md)): Built the MoveIt reachability-sweep tool for the robot arm: it queries the real IK/FK solver (via move_group's compute_ik/compute_fk services, never an action client, so it can't move the arm) across 
 …[758 chars clipped]
+- **CAM-03 — Recording validator with actionable diagnostics** ([details](CAM-03.md)): Built a one-command recording validator (scripts/validate_recording.py) that checks a D405 recording for metadata completeness, plausible depth scale, timestamp sync/monotonicity, dropped frames, USB-
+…[182 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 33 / 69
+- Implementation/review sessions run: 35 / 70
 - Audits that rejected work with evidence-backed findings: 6 (repairs created: 6)
 - Re-verified after an upstream change: CAM-02, GEOM-01, GEOM-01.R1, MOT-02, MOT-04.1, MOT-04.2, MOT-04.3, MOT-04.4, MOT-04.4.R1, PERC-03, PERC-03.R1, TC-001, TC-011
 
@@ -67,7 +69,7 @@
 |---|---|---|
 | Host platform & reproducibility (L-HOST) | 4 | 9 |
 | Local coding model (L-LLM) | 1 | 6 |
-| D405 capture (L-CAM) | 3 | 7 |
+| D405 capture (L-CAM) | 4 | 7 |
 | Perception (L-PERC) | 11 | 16 |
 | Geometry & calibration (L-GEOM) | 2 | 9 |
 | Motion planning (L-MOTION) | 6 | 15 |
@@ -77,5 +79,7 @@
 
 ## Waiting on the operator / hardware (snapshot)
 
+- GEOM-03: operator_decision — Camera mounting (eye-in-hand vs eye-to-hand) for the D405 is not documented anywhere in this repo or ~/rebot_ws — ARCHIT
+…[181 chars clipped]
 - MOT-04.5: operator_decision — The committed standoffs [0.01, 0.04] m give no collision-free boresight-down IK solution anywhere: the gripper body exte
 …[181 chars clipped]
