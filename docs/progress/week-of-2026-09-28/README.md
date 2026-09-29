@@ -1,6 +1,6 @@
 # Progress — week of Mon Sep 28 – Sun Oct 04, 2026
 
-**25 task(s) completed and independently audited this week** · project total **32/74** accepted
+**26 task(s) completed and independently audited this week** · project total **33/74** accepted
 
 ## Notes
 
@@ -54,10 +54,12 @@
 …[182 chars clipped]
 - **PERC-04 — Path visualization + pipeline stage** ([details](PERC-04.md)): Added a new pipeline stage that draws crack path overlays on top of the original photos — numbered labels show which crack is visited first/second/etc., arrows show the direction each crack is traced,
 …[194 chars clipped]
+- **GEOM-06 — TCP (pivot) calibration solver + boresight procedure** ([details](GEOM-06.md)): Added the software and procedure for calibrating the robot arm's tool-centre point (the exact 3D offset of the physical tip relative to the wrist). The solver recovers a known test offset to within 0.
+…[248 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 39 / 79
+- Implementation/review sessions run: 40 / 80
 - Audits that rejected work with evidence-backed findings: 6 (repairs created: 6)
 - Re-verified after an upstream change: CAM-02, GEOM-01, GEOM-01.R1, MOT-02, MOT-04.1, MOT-04.1.R1, MOT-04.2, MOT-04.3, MOT-04.3.R1, MOT-04.4, MOT-04.4.R1, PERC-03, PERC-03.R1, TC-001, TC-011
 
@@ -73,7 +75,7 @@
 | Local coding model (L-LLM) | 1 | 6 |
 | D405 capture (L-CAM) | 4 | 7 |
 | Perception (L-PERC) | 12 | 16 |
-| Geometry & calibration (L-GEOM) | 2 | 9 |
+| Geometry & calibration (L-GEOM) | 3 | 9 |
 | Motion planning (L-MOTION) | 6 | 15 |
 | Integration & commissioning (L-INT) | 1 | 6 |
 | Operator workflow & handoff (L-OPS) | 1 | 4 |
