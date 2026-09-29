@@ -68,6 +68,22 @@ _SCENE_CALL_TIMEOUT_S = 10.0
 _SRDF_TIMEOUT_S = 5.0
 _TOPIC_SPIN_STEP_S = 0.2
 
+# Only these /compute_ik codes mean "this orientation sample is kinematically infeasible" --
+# every other non-SUCCESS code is a service/request-level failure (bad group/link name, frame
+# transform failure, planner internal error, ...) and must surface as an 'error' target, not
+# silently count toward 'unreachable' (docs/INTERFACES.md §7.2).
+_IK_INFEASIBLE_CODES = frozenset({MoveItErrorCodes.NO_IK_SOLUTION, MoveItErrorCodes.TIMED_OUT})
+
+_MOVEIT_ERROR_CODE_NAMES = {
+    getattr(MoveItErrorCodes, name): name
+    for name in dir(MoveItErrorCodes)
+    if name.isupper() and isinstance(getattr(MoveItErrorCodes, name), int)
+}
+
+
+def _ik_error_name(val: int) -> str:
+    return _MOVEIT_ERROR_CODE_NAMES.get(val, str(val))
+
 _SERVICE_SPECS = (
     ("ik", GetPositionIK, "/compute_ik"),
     ("fk", GetPositionFK, "/compute_fk"),
@@ -354,7 +370,15 @@ def _process_target(
                 "error": f"compute_ik service call failed/timed out for target {target.target_id}",
             }
         if resp.error_code.val != MoveItErrorCodes.SUCCESS:
-            continue
+            if resp.error_code.val in _IK_INFEASIBLE_CODES:
+                continue
+            return {
+                "status": "error",
+                "position": nominal_position,
+                "ik_calls": ik_calls,
+                "ik_time_s": ik_time_s,
+                "error": f"compute_ik returned {_ik_error_name(resp.error_code.val)} for target {target.target_id}",
+            }
 
         joints = {
             name: value
