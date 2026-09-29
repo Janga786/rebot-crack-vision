@@ -771,3 +771,170 @@ The gripper's measured pointing axis in `docs/TECHNICAL_APPROACH.md` §2.2–2.3
 local `+X`) is **prior evidence only**, informing but not substituting for GEOM-07's physical
 pivot/boresight calibration. No code may treat it as calibrated fact before GEOM-07 reports measured
 residuals.
+
+---
+
+## 7. Reachability map and specimen placement (MOT-04)
+
+Runs under the system python3 (ROS Humble), invoked via `scripts/ros/env_ros.sh`, not
+`./env.sh` — these are `rclpy`-side tools, distinct from the `crackvision.*` CLIs in §3.
+
+### 7.1 Reachability config
+
+`config/motion/reachability.yaml` (schema `crackvision.reachability_config/1`) is the sweep's
+single source of truth for the grid, orientation sampling, IK tuning, surface-collision geometry
+and placement search parameters. It is loaded and validated by
+`ros2_ws/src/crackvision_motion/crackvision_motion/reachability_core.py::load_config`
+(`ConfigError` on any structural or numeric violation) — see that module's docstring and
+`config/motion/reachability.yaml`'s own comments for the field-by-field definitions; this section
+does not repeat them.
+
+### 7.2 Reachability map JSON
+
+Default path `data/motion/reachability_map.json` (git-ignored — this is generated evidence, not a
+committed input). Built, written and validated by
+`ros2_ws/src/crackvision_motion/crackvision_motion/reachability_map.py`. Frame `base_link`, units
+metres/radians, quaternion order **`(x, y, z, w)`** throughout, matching §6.2.
+
+```json
+{
+  "schema": "crackvision.reachability_map/1",
+  "created_utc": "2026-09-28T12:00:00Z",
+  "git_commit": "d1638163...",
+  "config_path": "config/motion/reachability.yaml",
+  "config_sha256": "<64 hex>",
+  "frame": "base_link",
+  "units": {"length": "m", "angle": "rad"},
+  "quaternion_order": "xyzw",
+  "robot": {
+    "group": "arm",
+    "ik_link": "gripper_tcp",
+    "ik_solver": "trac_ik",
+    "reach_bound_m": 0.9,
+    "limits_file": "config/robot/b601_dm_limits.yaml",
+    "limits_sha256": "<64 hex>"
+  },
+  "boresight": {"axis_local": [1.0, 0.0, 0.0], "provenance": "prior_evidence"},
+  "grid": {
+    "grid": {"x_m": {"min": 0.05, "max": 0.50, "step": 0.025}, "y_m": {"...": "..."},
+             "surface_z_m": [0.0, 0.04], "standoffs_m": [0.01, 0.04]},
+    "orientation": {"roll_samples": 8, "tilt_deg": [0.0], "tilt_azimuth_samples": 4},
+    "ik": {"timeout_s": 0.02, "avoid_collisions": true, "seed": "neighbour", "roll_search": "best"},
+    "surface_collision": {"enabled": true, "thickness_m": 0.02, "margin_m": 0.05,
+                           "allowed_links": ["base_link", "link1"]}
+  },
+  "complete": true,
+  "duration_s": 842.1,
+  "targets": [
+    {
+      "target_id": "z00_x000_y000_s0", "x": 0.05, "y": -0.40, "surface_z": 0.0, "standoff_m": 0.01,
+      "position": [0.05, -0.40, 0.01], "status": "reachable",
+      "ik_calls": 3, "ik_time_s": 0.006, "error": "",
+      "tilt_deg": 0.0, "azimuth_rad": 0.0, "roll_rad": 0.0,
+      "quat_xyzw": [0.0, 0.0, 0.0, 1.0],
+      "joints": {"joint1": 0.1, "joint2": -0.2, "joint3": -0.3, "joint4": 0.0, "joint5": 0.0, "joint6": 0.0},
+      "min_joint_limit_margin_rad": 0.42, "fk_position_error_m": 0.0003, "fk_axis_error_deg": 0.1
+    }
+  ],
+  "summary": {
+    "counts_by_status": {"reachable": 1, "unreachable": 0, "prefiltered": 0, "fk_mismatch": 0, "error": 0},
+    "reachable_fraction_by_surface_z": {"0": 1.0}
+  }
+}
+```
+
+`grid` echoes the *normalised* config `grid`, `orientation`, `ik` and `surface_collision` blocks
+(post-`load_config`, tuples as JSON lists) verbatim, so a consumer never has to re-load and
+re-validate the YAML just to know what was swept. `robot.ik_solver` is a free-text string naming
+the MoveIt IK plugin actually used (e.g. `"trac_ik"` — see `config/robot/b601_dm_limits.yaml`'s
+provenance note on the TRAC-IK switch). `robot.reach_bound_m` is the `reach_bound_from_urdf`
+conservative bound used for prefiltering. `summary.reachable_fraction_by_surface_z` keys are the
+`surface_z` values formatted with Python `format(z, ".6g")` (e.g. `"0"`, `"0.04"`).
+
+`targets` has exactly one entry per `reachability_core.enumerate_targets()` result, in that order.
+Every entry has `target_id, x, y, surface_z, standoff_m, position, status, ik_calls, ik_time_s,
+error` (`error` is `""` unless `status` is `error` or `fk_mismatch`, in which case it names the
+failure). A `reachable` entry additionally has `tilt_deg, azimuth_rad, roll_rad, quat_xyzw` (4
+floats), `joints` (all of `joint1`..`joint6`, radians), `min_joint_limit_margin_rad` (from
+`joint_limit_margin` against `config/robot/b601_dm_limits.yaml`), `fk_position_error_m` and
+`fk_axis_error_deg`.
+
+**Status semantics** (assigned by the MOT-04.4 sweep node, defined here so every consumer agrees):
+
+| Status | Meaning |
+|---|---|
+| `reachable` | IK succeeded with collision checking, and an independent FK re-check agreed with the commanded pose within 1 mm / 0.5°. |
+| `unreachable` | Every orientation sample at this target failed IK. |
+| `prefiltered` | Beyond `robot.reach_bound_m`, provably unreachable by `reachability_core.prefiltered`; IK was never called. |
+| `fk_mismatch` | IK reported success but the FK re-check disagreed by more than 1 mm / 0.5° — `error` names the discrepancy. |
+| `error` | A service call failed (timeout, exception) rather than IK cleanly reporting infeasible. |
+
+`complete: false` means the sweep was interrupted (crash, timeout, operator abort) before every
+target got a final status. **Consumers MUST refuse a map with `complete: false`** — treat it the
+same as a missing file, never as partial ground truth.
+
+### 7.3 Specimen placement YAML
+
+Default path `config/motion/specimen_placement.yaml` (schema `crackvision.specimen_placement/1`),
+written by MOT-04.3's `recommend_placement` from a completed reachability map. **This is a nominal
+recommendation, not a measurement**: the operator physically places the specimen at
+`placement.center_xy_m`/`yaw_rad`, and MOT-10 measures the real, as-placed pose, which then
+supersedes this file for every downstream consumer.
+
+```yaml
+schema: crackvision.specimen_placement/1
+value_status: nominal
+feasible: true
+frame: base_link
+placement:
+  center_xy_m: [0.10, 0.00]
+  surface_z_m: 0.04
+  yaw_rad: 0.0
+  footprint_m: [0.20, 0.20]
+  tolerance_m: 0.02
+  standoffs_m: [0.01, 0.04]
+  score_min_joint_margin_rad: 0.42
+alternatives:
+  - {center_xy_m: [0.10, 0.05], surface_z_m: 0.04, yaw_rad: 0.0, footprint_m: [0.20, 0.20],
+     tolerance_m: 0.02, standoffs_m: [0.01, 0.04], score_min_joint_margin_rad: 0.39}
+max_feasible_square_m: null
+map_sha256: "<64 hex>"
+config_sha256: "<64 hex>"
+boresight_provenance: prior_evidence
+caveats:
+  - "Nominal recommendation only; the operator places the specimen and MOT-10 measures and
+     supersedes this file with the real, as-placed pose."
+source: "recommend_placement (MOT-04.3)"
+```
+
+`placement` is `null` (with `feasible: false`) when no candidate satisfies the scoring rule
+anywhere on the grid; `max_feasible_square_m` is then the side length of the largest fully-feasible
+square found (for operator feedback on how much to shrink the footprint), and is otherwise absent
+or `null`. `alternatives` holds up to `placement.top_k` (from `config/motion/reachability.yaml`)
+further candidates, same shape as `placement`, ranked after the winner. `map_sha256`/
+`config_sha256` pin the exact `reachability_map.json` and `reachability.yaml` this recommendation
+was computed from; `boresight_provenance` copies the map's `boresight.provenance` so a consumer
+can see at a glance that it is not yet GEOM-07-calibrated. `caveats` always includes the
+nominal-recommendation disclaimer above.
+
+**Scoring rule** (stub — MOT-04.3 implements this; recorded here now so the schema and the rule
+that fills it stay in one place):
+
+> A grid node is *feasible for a candidate placement* when every grid node inside the
+> tolerance-dilated footprint is `reachable` at every configured standoff. A candidate's *score* is
+> its minimum joint-limit margin (radians) across all of those reachable targets. Ties break, in
+> order: smaller `|center_xy_m[1]|` (closer to the arm's y=0 centreline), smaller `yaw_rad`,
+> smaller `center_xy_m[0]`, smaller `surface_z_m`.
+
+### 7.4 CLIs
+
+| CLI | Card | Exit codes |
+|---|---|---|
+| `scripts/ros/run_reachability.sh` | MOT-04.4 | 0 ok · 1 runtime/FK-mismatch/require-all failed · 2 config · 3 precondition (MoveIt services absent) |
+| `reachability_sweep` | MOT-04.4 | 0 ok · 1 runtime/FK-mismatch/require-all failed · 2 config · 3 precondition (MoveIt services absent, input config invalid target) |
+| `recommend_placement` | MOT-04.3 | 0 ok · 1 no feasible placement found · 2 config · 3 precondition (map missing or `complete: false`) |
+
+All three are `rclpy`-side tools run via `scripts/ros/env_ros.sh` (never `./env.sh`) and follow the
+§0 conventions (§0.2 exit codes, §0.3 common flags via
+`ros2_ws/src/crackvision_motion/crackvision_motion/cli_common.py::add_common_args`, §0.4 log
+artefacts via `cli_common.py::run_cli`).
