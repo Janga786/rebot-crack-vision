@@ -50,14 +50,27 @@ _ROBOT_INFO = {
 # half-extent window) without touching the hole. The patch exists purely so the CLI-smoke
 # acceptance check (recommend_placement run against the real config/motion/reachability.yaml)
 # finds a feasible placement; its own margin value is not asserted anywhere.
+#
+# All lengths below are the original annulus/patch geometry (grid step 0.025) uniformly scaled
+# by 1.2 = 0.03 / 0.025, to track the real config/motion/reachability.yaml's grid step (MOT-04.5
+# runtime change 0.025 -> 0.03). Uniform scaling preserves every containment/distance relationship
+# the hand-computed tests below rely on (grid-step-relative coverage, tie-breaks, the hole), so
+# the same relative structure holds at the new step.
 # --------------------------------------------------------------------------------------
+
+_SCALE = 1.2  # 0.03 / 0.025 -- see comment above
+
+
+def _s(v: float) -> float:
+    return round(v * _SCALE, 9)
+
 
 _ANNULUS_GRID_CFG = {
     "frame": "base_link",
     "boresight": {"axis_local": (1.0, 0.0, 0.0), "provenance": "prior_evidence"},
     "grid": {
-        "x_m": {"min": 0.05, "max": 0.40, "step": 0.025},
-        "y_m": {"min": -0.125, "max": 0.125, "step": 0.025},
+        "x_m": {"min": _s(0.05), "max": _s(0.40), "step": _s(0.025)},
+        "y_m": {"min": _s(-0.125), "max": _s(0.125), "step": _s(0.025)},
         "surface_z_m": (0.0,),
         "standoffs_m": (0.01,),
     },
@@ -66,17 +79,18 @@ _ANNULUS_GRID_CFG = {
     "surface_collision": {"enabled": True, "thickness_m": 0.02, "margin_m": 0.05, "allowed_links": ("base_link",)},
 }
 
-_ANNULUS_CENTER = (0.15, 0.0)
-_ANNULUS_R_IN = 0.02
-_ANNULUS_R_OUT = 0.08
-_ANNULUS_X = (0.075, 0.225)
-_ANNULUS_Y = (-0.075, 0.075)
+_ANNULUS_CENTER = (_s(0.15), 0.0)
+_ANNULUS_R_IN = _s(0.02)
+_ANNULUS_R_OUT = _s(0.08)
+_ANNULUS_X = (_s(0.075), _s(0.225))
+_ANNULUS_Y = (_s(-0.075), _s(0.075))
 
 # Sized for the real config/motion/reachability.yaml: footprint_m [0.20, 0.20] dilated by
-# tolerance_m 0.02 -> half-extent 0.12; offset > 0.12 from _ANNULUS_CENTER so the dilated
-# footprint never touches the hole, at grid step 0.025.
-_PATCH_X = (0.175, 0.375)
-_PATCH_Y = (-0.10, 0.10)
+# tolerance_m 0.02 -> half-extent 0.12 (unscaled -- footprint/tolerance come from the production
+# config, not the map); offset > 0.12 from _ANNULUS_CENTER so the dilated footprint never touches
+# the hole, at the map's grid step (now 0.03).
+_PATCH_X = (_s(0.175), _s(0.375))
+_PATCH_Y = (_s(-0.10), _s(0.10))
 _PATCH_MARGIN = 0.5
 _BOX_EPS = 1e-9
 
@@ -122,7 +136,7 @@ def build_synthetic_map() -> dict:
     return m
 
 
-def _small_placement_cfg(footprint_m=(0.04, 0.04), tolerance_m=0.005, yaw_candidates_rad=(0.0, math.pi / 2), top_k=5):
+def _small_placement_cfg(footprint_m=(_s(0.04), _s(0.04)), tolerance_m=_s(0.005), yaw_candidates_rad=(0.0, math.pi / 2), top_k=5):
     return {
         "frame": "base_link",
         "placement": {
@@ -162,9 +176,9 @@ def test_recommend_known_unique_optimum():
 
     assert result["feasible"] is True
     winner = result["placement"]
-    assert winner["center_xy_m"] == [0.10, 0.0]
+    assert winner["center_xy_m"] == [_s(0.10), 0.0]
     assert winner["yaw_rad"] == 0.0
-    expected_score = round(1.0 - math.hypot(0.075, 0.025), 6)
+    expected_score = round(1.0 - math.hypot(_s(0.075), _s(0.025)), 6)
     assert winner["score_min_joint_margin_rad"] == pytest.approx(expected_score)
     validate_placement(result)
 
@@ -176,14 +190,16 @@ def test_tie_break_prefers_smaller_abs_y_then_smaller_x():
 
     top_score = candidates[0]["score_min_joint_margin_rad"]
     tied = [c for c in candidates if c["score_min_joint_margin_rad"] == pytest.approx(top_score)]
-    assert [c["center_xy_m"] for c in tied] == [[0.10, 0.0], [0.20, 0.0], [0.15, -0.05], [0.15, 0.05]]
+    assert [c["center_xy_m"] for c in tied] == [
+        [_s(0.10), 0.0], [_s(0.20), 0.0], [_s(0.15), _s(-0.05)], [_s(0.15), _s(0.05)],
+    ]
 
 
 def test_square_footprint_ties_across_yaw_and_smaller_yaw_wins():
     m = build_synthetic_map()
     cfg = _small_placement_cfg(yaw_candidates_rad=(math.pi / 2, 0.0))
     candidates = placement.score_candidates(m, cfg)
-    assert candidates[0]["center_xy_m"] == [0.10, 0.0]
+    assert candidates[0]["center_xy_m"] == [_s(0.10), 0.0]
     assert candidates[0]["yaw_rad"] == 0.0
 
 
@@ -192,9 +208,9 @@ def test_hole_at_annulus_centre_makes_that_candidate_infeasible():
     cfg = _small_placement_cfg(yaw_candidates_rad=(0.0,))
     candidates = placement.score_candidates(m, cfg)
     centers = [c["center_xy_m"] for c in candidates]
-    assert [0.15, 0.0] not in centers  # the hole itself
-    assert [0.125, 0.0] not in centers  # neighbour: footprint still covers the hole
-    assert [0.10, 0.0] in centers  # 2 steps out: footprint clears the hole
+    assert [_s(0.15), 0.0] not in centers  # the hole itself
+    assert [_s(0.125), 0.0] not in centers  # neighbour: footprint still covers the hole
+    assert [_s(0.10), 0.0] in centers  # 2 steps out: footprint clears the hole
 
 
 def test_alternatives_deduplicated_by_grid_step():
@@ -202,9 +218,9 @@ def test_alternatives_deduplicated_by_grid_step():
     cfg = _small_placement_cfg(yaw_candidates_rad=(0.0,), top_k=3)
     result = placement.recommend(m, cfg, "a" * 64, "b" * 64)
     centers = [result["placement"]["center_xy_m"]] + [a["center_xy_m"] for a in result["alternatives"]]
-    assert centers[0] == [0.10, 0.0]
+    assert centers[0] == [_s(0.10), 0.0]
     # (0.20, 0.0) ties on score but is not within one grid step of the winner -> kept as an alt.
-    assert [0.20, 0.0] in centers
+    assert [_s(0.20), 0.0] in centers
     assert len(result["alternatives"]) <= cfg["placement"]["top_k"] - 1
 
 
@@ -308,7 +324,7 @@ def fake_root(tmp_path):
     return tmp_path
 
 
-def _full_config_dict(x_step=0.025, y_step=0.025, footprint_m=(0.04, 0.04), tolerance_m=0.0125,
+def _full_config_dict(x_step=0.03, y_step=0.03, footprint_m=(0.04, 0.04), tolerance_m=0.015,
                        yaw_candidates_rad=(0.0, math.pi / 2), top_k=5):
     return {
         "frame": "base_link",
@@ -384,7 +400,7 @@ def test_cli_grid_step_mismatch_is_config_error(fake_root, tmp_path):
     map_path = tmp_path / "map.json"
     _write_synthetic_map(map_path)
     config_path = tmp_path / "reachability.yaml"
-    _write_yaml(config_path, _full_config_dict(x_step=0.03, y_step=0.03, tolerance_m=0.03))
+    _write_yaml(config_path, _full_config_dict(x_step=0.025, y_step=0.025, tolerance_m=0.03))
 
     code = recommend_placement_main([
         "--root", str(fake_root),
@@ -412,7 +428,7 @@ def test_cli_feasible_run_writes_valid_placement(fake_root, tmp_path):
     written = load_placement(out_path)
     assert written["feasible"] is True
     assert written["value_status"] == "nominal"
-    assert written["placement"]["center_xy_m"] == [0.10, 0.0]
+    assert written["placement"]["center_xy_m"] == [_s(0.10), 0.0]
     assert len(written["map_sha256"]) == 64
     assert len(written["config_sha256"]) == 64
     assert written["boresight_provenance"] == "prior_evidence"
@@ -424,7 +440,7 @@ def test_cli_infeasible_run_exits_1_but_still_writes_file(fake_root, tmp_path):
     map_path = tmp_path / "map.json"
     _write_synthetic_map(map_path)
     config_path = tmp_path / "reachability.yaml"
-    _write_yaml(config_path, _full_config_dict(footprint_m=(5.0, 5.0), tolerance_m=0.0125))
+    _write_yaml(config_path, _full_config_dict(footprint_m=(5.0, 5.0), tolerance_m=0.015))
     out_path = tmp_path / "out.yaml"
 
     code = recommend_placement_main([
@@ -495,5 +511,5 @@ def test_cli_emit_verify_config_is_valid(fake_root, tmp_path):
     ])
     assert code == EXIT_OK
     verify_cfg = load_config(verify_path)
-    assert verify_cfg["grid"]["x_m"]["step"] == pytest.approx(0.0125)
+    assert verify_cfg["grid"]["x_m"]["step"] == pytest.approx(0.015)
     assert verify_cfg["grid"]["surface_z_m"] == (0.0,)
