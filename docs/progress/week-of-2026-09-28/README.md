@@ -1,6 +1,6 @@
 # Progress — week of Mon Sep 28 – Sun Oct 04, 2026
 
-**20 task(s) completed and independently audited this week** · project total **29/74** accepted
+**21 task(s) completed and independently audited this week** · project total **29/74** accepted
 
 ## Notes
 
@@ -48,10 +48,12 @@
 …[303 chars clipped]
 - **MOT-04.3 — Specimen placement scorer + recommend_placement CLI (+ verification-grid emitter)** ([details](MOT-04.3.md)): Finished the specimen-placement scorer and its recommend_placement CLI for the robot motion-planning reachability pipeline: given a completed reachability sweep, it now picks a deterministic best spec
 …[391 chars clipped]
+- **MOT-04.4 — MoveIt reachability sweep node (compute_ik + independent FK re-check) + headless run/test scripts** ([details](MOT-04.4.md)): Built the MoveIt reachability-sweep tool for the robot arm: it queries the real IK/FK solver (via move_group's compute_ik/compute_fk services, never an action client, so it can't move the arm) across 
+…[758 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 28 / 60
+- Implementation/review sessions run: 29 / 61
 - Audits that rejected work with evidence-backed findings: 6 (repairs created: 4)
 - Re-verified after an upstream change: CAM-02, GEOM-01, GEOM-01.R1, MOT-02, MOT-04.1, MOT-04.2, MOT-04.3, PERC-03, PERC-03.R1, TC-001, TC-011
 
