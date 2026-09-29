@@ -1,0 +1,21 @@
+{
+  "component": "llama.cpp",
+  "repo_url": "https://github.com/ggml-org/llama.cpp.git",
+  "tag": "v0.5.0",
+  "commit": "7fe450e19305b828c199d602c23a8337aaa1f03b",
+  "build_date_utc": "2026-09-29T17:26:16Z",
+  "install_dir": "~/opt/llama.cpp",
+  "binary": "~/opt/llama.cpp/build/bin/llama-server",
+  "cmake_flags": {
+    "CMAKE_BUILD_TYPE": "Release",
+    "GGML_CUDA": "ON",
+    "CMAKE_CUDA_COMPILER": "/usr/local/cuda-12.8/bin/nvcc",
+    "CMAKE_CUDA_ARCHITECTURES": "86",
+    "LLAMA_CURL": "ON"
+  },
+  "cuda_version": "12.8",
+  "cuda_home": "/usr/local/cuda-12.8",
+  "build_jobs": 12,
+  "gpu_target": "NVIDIA GeForce RTX 3090 (sm_86)",
+  "note": "This attempt's sandbox did not bind-mount ~/opt/llama.cpp as writable (see docs/llm/RUNTIME.md), so the pinned tag/commit was instead built end-to-end at an out-of-repo scratch path to validate scripts/llm/build_llama_cpp.sh and capture genuine --version/--list-devices output (both recorded below). Re-running scripts/llm/build_llama_cpp.sh with a writable ~/opt will place the same pinned commit's binary at install_dir/binary above."
+}
