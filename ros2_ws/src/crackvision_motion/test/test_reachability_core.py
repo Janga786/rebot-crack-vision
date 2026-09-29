@@ -392,5 +392,7 @@ def test_load_committed_config():
     assert cfg["ik_link"] == "gripper_tcp"
     assert cfg["value_status"] == "nominal"
     assert cfg["boresight"]["provenance"] == "prior_evidence"
-    assert len(axis_values(cfg["grid"]["x_m"])) == 19
-    assert len(axis_values(cfg["grid"]["y_m"])) == 33
+    # grid step 0.03 (MOT-04.5 runtime change, see config/motion/reachability.yaml "Grid change"):
+    # x in [0.05, 0.50] -> 16 samples, y in [-0.39, 0.39] -> 27 samples.
+    assert len(axis_values(cfg["grid"]["x_m"])) == 16
+    assert len(axis_values(cfg["grid"]["y_m"])) == 27
