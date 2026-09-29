@@ -26,6 +26,7 @@ setup(
     entry_points={
         "console_scripts": [
             "plan_joint_goal = crackvision_motion.plan_joint_goal:main",
+            "recommend_placement = crackvision_motion.recommend_placement:main",
         ],
     },
 )
