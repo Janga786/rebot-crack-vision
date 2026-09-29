@@ -1,6 +1,6 @@
 # Progress — week of Mon Sep 28 – Sun Oct 04, 2026
 
-**14 task(s) completed and independently audited this week** · project total **23/74** accepted
+**15 task(s) completed and independently audited this week** · project total **24/74** accepted
 
 ## Notes
 
@@ -36,10 +36,12 @@
 …[495 chars clipped]
 - **CAM-02 — Lossless RGB-D recording + deterministic replay** ([details](CAM-02.md)): Added a lossless recording/replay layer for the D405 RGB-D pipeline: sessions record colour (lossless PNG) and raw depth (lossless 16-bit PNG) frames plus full device/intrinsics/extrinsics metadata, a
 …[233 chars clipped]
+- **TC-014 — Integration + contract + hygiene tests** ([details](TC-014.md)): Added the integration and contract test suite for the crack-vision pipeline (TC-014): it runs the real prepare-inputs to visualize to skeleton chain end-to-end on synthetic images (including a non-squ
+…[510 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 20 / 33
+- Implementation/review sessions run: 21 / 34
 - Audits that rejected work with evidence-backed findings: 5 (repairs created: 3)
 - Re-verified after an upstream change: GEOM-01, GEOM-01.R1, PERC-03, PERC-03.R1, TC-001
 
@@ -57,6 +59,6 @@
 | Perception (L-PERC) | 10 | 16 |
 | Geometry & calibration (L-GEOM) | 2 | 9 |
 | Motion planning (L-MOTION) | 2 | 15 |
-| Integration & commissioning (L-INT) | 0 | 6 |
+| Integration & commissioning (L-INT) | 1 | 6 |
 | Operator workflow & handoff (L-OPS) | 0 | 4 |
 | Imitation learning (later phase) (L-IL) | 0 | 1 |
