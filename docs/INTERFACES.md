@@ -917,14 +917,34 @@ was computed from; `boresight_provenance` copies the map's `boresight.provenance
 can see at a glance that it is not yet GEOM-07-calibrated. `caveats` always includes the
 nominal-recommendation disclaimer above.
 
-**Scoring rule** (stub — MOT-04.3 implements this; recorded here now so the schema and the rule
-that fills it stay in one place):
+**Scoring rule** (normative; implemented in `crackvision_motion/placement.py`). Grid geometry
+(x/y/surface_z/standoffs) always comes from the *map* being scored; only `footprint_m`,
+`tolerance_m`, `yaw_candidates_rad` and `top_k` come from the reachability config's `placement`
+block. For each `surface_z` in the map's grid, each `yaw` in `placement.yaw_candidates_rad`, and
+each candidate centre = every grid `(x, y)` node in the map:
 
-> A grid node is *feasible for a candidate placement* when every grid node inside the
-> tolerance-dilated footprint is `reachable` at every configured standoff. A candidate's *score* is
-> its minimum joint-limit margin (radians) across all of those reachable targets. Ties break, in
-> order: smaller `|center_xy_m[1]|` (closer to the arm's y=0 centreline), smaller `yaw_rad`,
-> smaller `center_xy_m[0]`, smaller `surface_z_m`.
+> 1. The footprint rectangle is `footprint_m` = (w along the specimen's local x, d along its local
+>    y), rotated by `yaw` about the centre, then dilated by `tolerance_m` on every side (this
+>    dilation models operator placement error).
+> 2. The candidate is `out_of_grid`, and therefore infeasible, if any corner of the dilated
+>    rectangle lies outside `[x.min, x.max] x [y.min, y.max]` (the map's grid bounds).
+> 3. Sample nodes are all map grid nodes inside the dilated rectangle, with an inclusive test using
+>    a 1e-9 epsilon.
+> 4. The candidate is feasible iff every (node, standoff) for all of the map's configured
+>    standoffs has `status == reachable`.
+> 5. Score = min over those (node, standoff) of `min_joint_limit_margin_rad`.
+> 6. Ranking: score desc (compared after rounding to 1e-6), then smaller `|center_xy_m[1]|`
+>    (closer to the arm's y=0 centreline), then smaller `yaw_rad`, then smaller `center_xy_m[0]`,
+>    then smaller `surface_z_m`.
+>
+> The winner is rank 1. `alternatives` holds up to `placement.top_k - 1` further candidates, taken
+> in rank order, skipping any candidate whose centre is within one grid step (in both x and y) of a
+> better-ranked candidate already selected (the winner or an earlier alternative).
+>
+> If nothing is feasible: `feasible: false`, `placement: null`, and `max_feasible_square_m` is the
+> largest square side `s` (searched downward from `min(footprint_m)` in steps of the map's grid
+> step, at `yaw = 0` and the same `tolerance_m`) that has at least one feasible placement on the
+> map, or `0` if none does.
 
 ### 7.4 CLIs
 
