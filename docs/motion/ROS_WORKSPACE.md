@@ -100,7 +100,109 @@ After each run, `ps aux` shows no leftover `move_group` / `ros2_control_node` /
 `~/rebot_ws`'s `git status` is unchanged from the baseline recorded in
 `docs/motion/ROBOT_MODEL.md` (the same 2 pre-existing uncommitted files, untouched).
 
-## 5. Known limitation carried over from MOT-01
+## 5. Reachability sweep (MOT-04)
+
+`crackvision_motion/reachability_sweep.py` (console script `reachability_sweep`) queries
+move_group's `/compute_ik` for every `reachability_core.enumerate_targets()` x
+`reachability_core.orientations()` sample of a `crackvision.reachability_config/1` config
+(`docs/INTERFACES.md` §7.1), re-checks every accepted solution with an independent
+`/compute_fk` call (position error ≤ 1 mm, boresight-axis error ≤ 0.5°), and writes a
+`crackvision.reachability_map/1` JSON (`docs/INTERFACES.md` §7.2). It also adds a static
+surface-collision slab per `surface_z` layer via `/get_planning_scene` /
+`/apply_planning_scene` (extending the allowed-collision matrix, then restoring it and removing
+the slab in a `finally` block, even on error) so IK's own collision checking accounts for the
+inspected surface.
+
+**Services/topics used, and nothing else:** `/compute_ik`, `/compute_fk`,
+`/get_planning_scene`, `/apply_planning_scene` (all four services), plus the
+`/robot_description` and `/robot_description_semantic` topics (URDF for
+`reachability_core.reach_bound_from_urdf`'s prefilter bound, SRDF for the `home` group-state IK
+seed fallback). There is no action client anywhere in the module and it never mentions
+`MoveGroup`, `/move_action`, `ExecuteTrajectory` or `FollowJointTrajectory` — IK/FK are pure
+kinematics queries against move_group's own solver, so nothing this node does can move the mock
+(let alone real) arm, exactly like `plan_joint_goal` above but with an even smaller surface
+(queries only, no plan/execute action at all).
+
+### Commands
+
+```bash
+scripts/ros/env_ros.sh ros2 run crackvision_motion reachability_sweep --dry-run   # config only, no ROS needed
+scripts/ros/run_reachability.sh --reachability-config CFG --out OUT [--require-all-reachable] [--max-duration-s N]
+scripts/ros/test_reachability.sh   # smoke test against the fixture below
+```
+
+`run_reachability.sh` sources `env_ros.sh` and the built overlay itself (exit 3 with a hint if
+`ros2_ws/install` doesn't exist yet), starts the same headless mock stack as
+`test_mock_plan.sh` (via the shared `scripts/ros/_mock_stack.sh` helper, factored out of
+`test_mock_plan.sh`'s launch/pgid/cleanup pattern), runs `reachability_sweep`, tears the stack
+down, and exits with the sweep's exit code.
+
+One footgun worth recording: `source env_ros.sh` with **no** explicit arguments inherits the
+*caller's* positional parameters as env_ros.sh's own `"$@"`, which env_ros.sh's own tail
+(`[ "$#" -gt 0 ] && exec "$@"`) then treats as "run this one command in the scrubbed env" and
+tries to `exec` the caller's own `--flags`. `run_reachability.sh` hits this directly (it forwards
+CLI flags to `reachability_sweep`), so it saves `"$@"` to an array, clears the positional
+parameters (`set --`) before sourcing `env_ros.sh`, and restores them after.
+
+### Fixture probe (`reachability_smoke.yaml`)
+
+`ros2_ws/src/crackvision_motion/test/fixtures/reachability_smoke.yaml` is a 6-target config
+(x ∈ {0.20, 0.95} m, y ∈ {−0.02, 0.0, 0.02} m, surface_z = 0.12 m, standoff = 0.06 m,
+surface-collision **on**). The near/far split and the standoff were chosen from a live throwaway
+probe against `/compute_ik` with the surface-collision slab applied and
+`avoid_collisions: true` (matching production):
+
+```
+$ scripts/ros/env_ros.sh python3 <throwaway probe: reachability_core.orientations() @ (0.20,0,0.12)
+  and (0.95,0,0.12), standoffs 0.01/0.04/0.06/0.08/0.10/0.12/0.15, slab added exactly as
+  reachability_sweep.py would (margin_m=0.05, thickness_m=0.02, allowed_links=[base_link,link1])>
+standoff 0.01 -> reachable 0/8   (every roll: NO_IK_SOLUTION)
+standoff 0.04 -> reachable 0/8
+standoff 0.06 -> reachable 7-8/8   <- used in the fixture
+standoff 0.08 -> reachable 7/8
+standoff 0.10 -> reachable 7/8
+standoff 0.12 -> reachable 0/8
+x=0.95, any y, standoff 0.06 -> reachable 0/8   (used as the "far" target)
+```
+
+The 0.01/0.04 m standoffs from the production `config/motion/reachability.yaml` fail on every
+roll *with the slab active*: an FK sweep of every link at a known-good (no-slab) solution showed
+`gripper_link` sitting **below** `gripper_tcp` by the same ~44.3 mm `docs/motion/ROBOT_MODEL.md`
+§4 records for the fixed `gripper_tcp` joint (boresight-down inverts which end is "forward"), so
+the ~4-5 cm gripper body straddles the 2 cm-thick slab for any standoff below ~0.06 m and IK
+correctly reports no collision-free solution. This is a real geometric interaction with the
+canonical model, not a bug — it means a real inspection run needs a standoff clearing the
+gripper's own body, not just the fingertip. `x = 0.95` sits inside
+`reach_bound_from_urdf`'s conservative sphere (≈1.007 m from the mock stack's own
+`/robot_description`), so it reaches a real `/compute_ik` call and comes back genuinely
+`unreachable` (not `prefiltered`) — this exercises the real IK-failure path, not just the
+prefilter shortcut.
+
+### Verified locally
+
+```
+$ bash scripts/ros/build_ws.sh                    # exit 0
+$ bash scripts/ros/test_reachability.sh
+...
+test_reachability.sh: map assertions OK -- counts={'reachable': 3, 'unreachable': 3}
+test_reachability.sh: no stray processes in launch pgid <pgid>
+test_reachability.sh: OK
+(exit 0)
+```
+
+The sweep itself (6 targets x 8 orientations, one surface_z layer) ran `complete: true` in
+about 2.5 s; the whole `test_reachability.sh` run (launch bring-up + sweep + teardown) takes
+about 30-40 s, dominated by move_group's own startup. `bash scripts/ros/test_mock_plan.sh`
+(MOT-02) and the existing `pytest` suite under
+`ros2_ws/src/crackvision_motion/test/` (92 tests) were re-run after this card's changes and
+still pass unchanged. `--require-all-reachable` against the fixture (3/6 unreachable) exits 1;
+`--max-duration-s` set below the sweep's natural runtime produces `complete: false` and a §0.4
+`status: partial` (exit 1); with the mock stack not running, `--service-timeout-s 3` exits 3
+within the timeout and writes no map. After every run, `ps aux` shows no leftover `move_group` /
+`ros2_control_node` / `robot_state_publisher` / spawner process, matching MOT-02's own teardown
+guarantee.
+
+## 6. Known limitation carried over from MOT-01
 
 `trac_ik_kinematics_plugin` (the `arm` group's configured IK solver — see
 `docs/motion/ROBOT_MODEL.md` §0) needs `libnlopt.so.0`, which `env_ros.sh` locates at
