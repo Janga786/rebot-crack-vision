@@ -1,6 +1,6 @@
 # Progress — week of Mon Sep 28 – Sun Oct 04, 2026
 
-**17 task(s) completed and independently audited this week** · project total **26/74** accepted
+**18 task(s) completed and independently audited this week** · project total **22/74** accepted
 
 ## Notes
 
@@ -42,10 +42,12 @@
 …[467 chars clipped]
 - **MOT-04.1 — Reachability config + boresight-down target/pose generator (pure Python)** ([details](MOT-04.1.md)): Built the pure-Python geometry and config layer for the arm's reachability sweep: a validated YAML config describing the sweep grid, boresight-down orientation sampling, and IK/placement parameters, p
 …[383 chars clipped]
+- **MOT-04.2 — Reachability map + placement contract (INTERFACES §7), map I/O, ROS-side CLI common layer** ([details](MOT-04.2.md)): Defined and implemented the reachability-map and specimen-placement data contracts for the robot motion-planning reachability sweep: a new INTERFACES.md section pins down the exact JSON/YAML schemas (
+…[266 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 23 / 37
+- Implementation/review sessions run: 24 / 38
 - Audits that rejected work with evidence-backed findings: 5 (repairs created: 3)
 - Re-verified after an upstream change: GEOM-01, GEOM-01.R1, MOT-02, PERC-03, PERC-03.R1, TC-001
 
@@ -59,10 +61,10 @@
 |---|---|---|
 | Host platform & reproducibility (L-HOST) | 4 | 9 |
 | Local coding model (L-LLM) | 1 | 6 |
-| D405 capture (L-CAM) | 3 | 7 |
-| Perception (L-PERC) | 11 | 16 |
-| Geometry & calibration (L-GEOM) | 2 | 9 |
-| Motion planning (L-MOTION) | 3 | 15 |
+| D405 capture (L-CAM) | 2 | 7 |
+| Perception (L-PERC) | 10 | 16 |
+| Geometry & calibration (L-GEOM) | 1 | 9 |
+| Motion planning (L-MOTION) | 2 | 15 |
 | Integration & commissioning (L-INT) | 1 | 6 |
 | Operator workflow & handoff (L-OPS) | 0 | 4 |
 | Imitation learning (later phase) (L-IL) | 0 | 1 |
