@@ -1,6 +1,6 @@
 # Progress — week of Mon Sep 28 – Sun Oct 04, 2026
 
-**23 task(s) completed and independently audited this week** · project total **29/74** accepted
+**23 task(s) completed and independently audited this week** · project total **30/74** accepted
 
 ## Notes
 
@@ -53,7 +53,7 @@
 
 ## Quality loop
 
-- Implementation/review sessions run: 33 / 68
+- Implementation/review sessions run: 33 / 69
 - Audits that rejected work with evidence-backed findings: 6 (repairs created: 6)
 - Re-verified after an upstream change: CAM-02, GEOM-01, GEOM-01.R1, MOT-02, MOT-04.1, MOT-04.2, MOT-04.3, MOT-04.4, MOT-04.4.R1, PERC-03, PERC-03.R1, TC-001, TC-011
 
@@ -70,7 +70,7 @@
 | D405 capture (L-CAM) | 3 | 7 |
 | Perception (L-PERC) | 11 | 16 |
 | Geometry & calibration (L-GEOM) | 2 | 9 |
-| Motion planning (L-MOTION) | 5 | 15 |
+| Motion planning (L-MOTION) | 6 | 15 |
 | Integration & commissioning (L-INT) | 1 | 6 |
 | Operator workflow & handoff (L-OPS) | 1 | 4 |
 | Imitation learning (later phase) (L-IL) | 0 | 1 |
