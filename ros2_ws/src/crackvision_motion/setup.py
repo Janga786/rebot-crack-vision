@@ -28,6 +28,8 @@ setup(
             "plan_joint_goal = crackvision_motion.plan_joint_goal:main",
             "recommend_placement = crackvision_motion.recommend_placement:main",
             "reachability_sweep = crackvision_motion.reachability_sweep:main",
+            "apply_scene = crackvision_motion.scene_apply:main",
+            "assert_scene_objects = crackvision_motion.assert_scene_objects:main",
         ],
     },
 )

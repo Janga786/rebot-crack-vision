@@ -1,0 +1,26 @@
+# scene_collision_smoke.yaml — test-only fixture for the "a colliding goal is rejected" smoke
+# check (MOT-03). Not a candidate production scene: a single oversized box ("collider") centred
+# on base_link that engulfs the whole robot's reachable volume (the canonical B601-DM's reach is
+# about 1.0 m -- docs/motion/ROS_WORKSPACE.md -- well inside this 4 m cube), allowed to touch only
+# base_link. Applying this on top of any other scene guarantees every other link is in collision
+# for any joint configuration, without needing to compute FK for a specific target pose.
+schema: crackvision.scene_config/1
+frame: base_link
+
+objects:
+  - id: collider
+    shape: box
+    dimensions_m: [4.0, 4.0, 4.0]
+    pose:
+      frame: base_link
+      position_m: [0.0, 0.0, 0.5]
+      rpy_rad: [0.0, 0.0, 0.0]
+    value_status: nominal
+    source: "Test fixture only (MOT-03 scene-test); deliberately oversized to engulf the whole robot regardless of joint state, not a candidate production scene value."
+
+allowed_collisions:
+  - link_a: collider
+    link_b: base_link
+    reason: "test fixture: base_link is the only link allowed to sit inside the collider, so every other link's overlap is a real collision"
+    value_status: nominal
+    source: "Test fixture only (MOT-03 scene-test)."

@@ -1,0 +1,80 @@
+# config/scene/scene.yaml — collision scene for MoveIt planning against the canonical B601-DM
+# model (MOT-03: table, specimen and camera-mount collision objects + an allowed-collision-matrix
+# (ACM) diff, loaded and applied by ros2_ws/src/crackvision_motion/crackvision_motion/scene_apply.py).
+#
+# Schema id: crackvision.scene_config/1 (validated by
+# ros2_ws/src/crackvision_motion/crackvision_motion/scene_core.py:load_config).
+#
+# value_status: EVERY object and allowed_collisions entry below carries its own `value_status`
+# (measured|nominal) and `source`. Everything here is `nominal` today -- an engineering starting
+# guess, not a tape-measure/CAD-verified quantity of the real workcell. MOT-10 measures the real
+# workcell and must flip every entry to `measured` (with a real source) before
+# scene_core.assert_commissioning_ready() will let MOT-05's commissioning-gated executor use this
+# file for a real-hardware run -- see docs/motion/SCENE.md.
+schema: crackvision.scene_config/1
+frame: base_link
+
+objects:
+  # A thin tabletop slab the robot is bolted to. Positioned entirely below base_link's own origin
+  # (top face 2 cm under z=0) so it cannot intersect the arm's own links for any on-workspace
+  # joint configuration, while still being wide enough to plausibly carry the specimen.
+  - id: table
+    shape: box
+    dimensions_m: [1.00, 0.80, 0.05]
+    pose:
+      frame: base_link
+      position_m: [0.40, 0.0, -0.045]
+      rpy_rad: [0.0, 0.0, 0.0]
+    value_status: nominal
+    source: "Nominal bench footprint/position guess (no real workcell measurement exists yet); MOT-10 tape-measures the real table and supersedes this entry."
+
+  # The inspected coupon, resting on the table top (table top at z=-0.02; specimen thickness
+  # 1 cm centred at z=-0.015 so its top face sits at z=-0.01, still below the robot's own origin
+  # plane). x/y and footprint reuse config/motion/specimen_placement.yaml's nominal footprint.
+  - id: specimen
+    shape: box
+    dimensions_m: [0.20, 0.20, 0.01]
+    pose:
+      frame: base_link
+      position_m: [0.30, 0.0, -0.015]
+      rpy_rad: [0.0, 0.0, 0.0]
+    value_status: nominal
+    source: "config/motion/specimen_placement.yaml footprint_m (MOT-04.3, itself nominal); real as-placed pose is measured by MOT-10, which supersedes both files."
+
+  # A small bracket box standing in for a fixed camera mount, placed low and diagonally behind
+  # the shoulder (-x/-y, near the base plate) so it clears link1/link2's swept volume at every
+  # joint-space goal used by this repo's smoke tests (verified live via /compute_fk at the
+  # plan_joint_goal.py default goal: link2 sits at x=0.010 y=0.036 z=0.140, about 0.21 m from
+  # this box's centre), and allowed to touch link1 (the mount attaches near the base of the
+  # kinematic chain). NOTE: ADR-013 ("Camera-to-robot calibration method + camera mounting",
+  # docs/adr/013-calibration-method.md) is still proposed/blocked on operator confirmation and
+  # recommends *eye-in-hand* (wrist-mounted, moving with the arm) over a fixed world mount --
+  # if that is confirmed, this static world CollisionObject no longer models the real camera and
+  # a future card must replace it with an attached collision object on the wrist link instead.
+  # This entry is a conservative placeholder for whichever mounting is eventually confirmed.
+  - id: camera_mount
+    shape: box
+    dimensions_m: [0.05, 0.05, 0.08]
+    pose:
+      frame: base_link
+      position_m: [-0.12, -0.12, 0.05]
+      rpy_rad: [0.0, 0.0, 0.0]
+    value_status: nominal
+    source: "docs/adr/013-calibration-method.md (GEOM-03) is proposed/blocked on operator confirmation of eye-in-hand vs. eye-to-hand mounting; no measured mount pose or confirmed parent link exists yet, this is a placeholder bracket volume near the base pending that decision and a physical measurement (MOT-10)."
+
+allowed_collisions:
+  - link_a: table
+    link_b: base_link
+    reason: "the table is the surface the robot base is bolted to"
+    value_status: nominal
+    source: "Nominal mounting assumption (robot bolted to the table) pending the real workcell survey (MOT-10)."
+  - link_a: specimen
+    link_b: table
+    reason: "the specimen rests directly on the table top"
+    value_status: nominal
+    source: "Nominal placement assumption pending the real workcell survey (MOT-10)."
+  - link_a: camera_mount
+    link_b: link1
+    reason: "the camera mount bracket attaches near the base of the arm chain (docs/motion/GEOM-03)"
+    value_status: nominal
+    source: "docs/motion/GEOM-03 gives the mounting link qualitatively; exact contact geometry is pending measurement."
