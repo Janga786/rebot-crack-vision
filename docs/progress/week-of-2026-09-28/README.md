@@ -1,6 +1,6 @@
 # Progress — week of Mon Sep 28 – Sun Oct 04, 2026
 
-**26 task(s) completed and independently audited this week** · project total **33/74** accepted
+**27 task(s) completed and independently audited this week** · project total **34/74** accepted
 
 ## Notes
 
@@ -56,10 +56,12 @@
 …[194 chars clipped]
 - **GEOM-06 — TCP (pivot) calibration solver + boresight procedure** ([details](GEOM-06.md)): Added the software and procedure for calibrating the robot arm's tool-centre point (the exact 3D offset of the physical tip relative to the wrist). The solver recovers a known test offset to within 0.
 …[248 chars clipped]
+- **HOST-02 — Lock the crackvision environment + verify-lock script** ([details](HOST-02.md)): The crackvision perception environment can now be locked and its drift automatically checked: `verify_lock.py` correctly reports a clean match against the committed lock files, and `rebuild_env.sh --d
+…[416 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 40 / 80
+- Implementation/review sessions run: 43 / 81
 - Audits that rejected work with evidence-backed findings: 6 (repairs created: 6)
 - Re-verified after an upstream change: CAM-02, GEOM-01, GEOM-01.R1, MOT-02, MOT-04.1, MOT-04.1.R1, MOT-04.2, MOT-04.3, MOT-04.3.R1, MOT-04.4, MOT-04.4.R1, PERC-03, PERC-03.R1, TC-001, TC-011
 
@@ -71,7 +73,7 @@
 
 | Work package | Accepted | Total |
 |---|---|---|
-| Host platform & reproducibility (L-HOST) | 4 | 9 |
+| Host platform & reproducibility (L-HOST) | 5 | 9 |
 | Local coding model (L-LLM) | 1 | 6 |
 | D405 capture (L-CAM) | 4 | 7 |
 | Perception (L-PERC) | 12 | 16 |
@@ -86,6 +88,8 @@
 - GEOM-03: operator_decision — Camera mounting (eye-in-hand vs eye-to-hand) for the D405 is not documented anywhere in this repo or ~/rebot_ws — ARCHIT
 …[181 chars clipped]
 - LLM-02: other — This attempt's bwrap sandbox invocation (visible via /proc/1/cmdline) does not include a --bind for ~/opt/llama.cpp, eve
+…[181 chars clipped]
+- LLM-03: privilege — ~/models/llm (the card's declared extra writable path) is not bind-mounted read-write in this bubblewrap sandbox — mkdir
 …[181 chars clipped]
 - MOT-03: other — MOT-03's card scope.write omits scripts/ros/** (unlike MOT-02 and MOT-04.4, which included their respective wrapper scri
 …[181 chars clipped]
