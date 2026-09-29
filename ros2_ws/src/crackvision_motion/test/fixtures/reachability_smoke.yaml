@@ -1,0 +1,76 @@
+# reachability_smoke.yaml — tiny reachability_config/1 fixture for MOT-04.4's smoke test
+# (scripts/ros/test_reachability.sh). 2 x values x 3 y values x 1 surface_z x 1 standoff = 6
+# targets: {x=0.20} is a near region probed live against move_group WITH the surface-collision
+# slab active (see docs/motion/ROS_WORKSPACE.md, "Reachability sweep (MOT-04)" for the exact
+# probe commands and output) and reachable at 7-8/8 roll samples; {x=0.95} is beyond that but
+# still inside reach_bound_from_urdf's conservative sphere (~1.0 m), so it reaches real IK calls
+# and comes back genuinely unreachable (0/8 roll samples) rather than prefiltered -- this
+# exercises the real IK failure path, not just the prefilter shortcut.
+#
+# standoffs_m=[0.06]: the live probe showed the 0.01/0.04 m standoffs from
+# config/motion/reachability.yaml fail IK here even with avoid_collisions off geometry aside --
+# with the surface-collision slab active (top face at surface_z-0.001=0.119) and
+# avoid_collisions=true, an FK sweep of every link showed gripper_link sits ~44.3 mm *below*
+# gripper_tcp when boresight-down (docs/motion/ROBOT_MODEL.md §4's -44.3 mm offset), so the whole
+# gripper body straddles the 0.02 m-thick slab for any standoff below ~0.06 m and every roll
+# fails with NO_IK_SOLUTION; 0.06-0.10 m all probed clear (7-8/8 rolls) -- 0.06 m is used here.
+
+frame: base_link
+group: arm
+ik_link: gripper_tcp
+
+boresight:
+  axis_local: [1.0, 0.0, 0.0]
+  down_world: [0.0, 0.0, -1.0]
+  provenance: prior_evidence
+  source: "docs/INTERFACES.md §6.5 (prior_evidence, not GEOM-07-calibrated); reused as-is from config/motion/reachability.yaml for this fixture."
+
+grid:
+  x_m:
+    min: 0.20
+    max: 0.95
+    step: 0.75
+  y_m:
+    min: -0.02
+    max: 0.02
+    step: 0.02
+  surface_z_m: [0.12]
+  standoffs_m: [0.06]
+
+orientation:
+  roll_samples: 8
+  tilt_deg: [0.0]
+  tilt_azimuth_samples: 4
+
+ik:
+  timeout_s: 0.02
+  avoid_collisions: true
+  seed: neighbour
+  roll_search: best
+
+surface_collision:
+  enabled: true
+  thickness_m: 0.02
+  margin_m: 0.05
+  allowed_links: [base_link, link1]
+
+prefilter:
+  enabled: true
+
+placement:
+  footprint_m: [0.05, 0.05]
+  yaw_candidates_rad: [0.0]
+  tolerance_m: 0.4
+  top_k: 1
+
+value_status: nominal
+
+sources:
+  fixture: "MOT-04.4 smoke-test fixture (scripts/ros/test_reachability.sh), not a sweep input; see docs/motion/ROS_WORKSPACE.md for the live-probe evidence behind the near/far target choice."
+  boresight: "docs/INTERFACES.md §6.5, reused verbatim from config/motion/reachability.yaml."
+  grid: "x={0.20, 0.95} probed live against move_group/compute_ik with the surface-collision slab active: 0.20 m is comfortably reachable (7-8/8 roll samples) at standoff 0.06 m, 0.95 m is inside reach_bound_from_urdf's ~1.0 m conservative sphere so it reaches real IK and comes back genuinely unreachable (0/8), not prefiltered. standoffs_m=[0.06]: see the top-of-file comment -- standoffs below ~0.06 m put the gripper body through the slab (gripper_link sits ~44.3 mm below gripper_tcp when boresight-down) and fail IK on every roll."
+  orientation: "roll_samples=8/tilt_deg=[0.0]/tilt_azimuth_samples=4 reused from config/motion/reachability.yaml so the fixture exercises the same roll-search path as production."
+  ik: "timeout_s=0.02/seed=neighbour/roll_search=best reused verbatim from config/motion/reachability.yaml; verified live at this timeout the near targets still resolve reliably."
+  surface_collision: "enabled=true so the smoke test also exercises the surface-slab collision-object/ACM add-remove path."
+  prefilter: "enabled=true, consistent with production; the far target is deliberately inside the prefilter bound so it still reaches a real IK call (see grid note above)."
+  placement: "not exercised by this fixture's smoke test; values only need to satisfy reachability_config/1 validation (tolerance_m >= max(x.step, y.step)/2)."
