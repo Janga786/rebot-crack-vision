@@ -5,7 +5,8 @@
   "kind": "hardware",
   "depends_on": [
     "GEOM-06",
-    "MOT-09"
+    "MOT-09",
+    "GEOM-11"
   ],
   "requirements": [
     "REQ-GEOM-3"
@@ -28,3 +29,8 @@
 ```
 
 Draft.
+
+## ADR-014 guidance (technical-lead recovery, 2026-09-30)
+- Calibrate the tool that will face the crack (closed gripper tip, or a held probe/pen) with the GEOM-06 solver as
+  corrected by GEOM-11; the prior is end_effector.yaml tool (nominal (0,0,0) = closed-finger tip), not gripper_tcp.
+- Write the measured tool block (value_status measured, residuals, evidence) into config/robot/end_effector.yaml.

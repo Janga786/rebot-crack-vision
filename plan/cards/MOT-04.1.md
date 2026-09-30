@@ -112,3 +112,14 @@ Insert `Path(__file__).resolve().parents[1]` into sys.path so the file runs with
 Run with: `bash scripts/ros/env_ros.sh python3 -m pytest ros2_ws/src/crackvision_motion/test/test_reachability_core.py -q -p no:cacheprovider`.
 
 No robot motion, no ROS graph and no GPU are involved in this card.
+
+## Amendment 2026-09-30 (technical-lead recovery, ADR-014) — sanctioned changes, re-review against these
+- `ik_link` in config/motion/reachability.yaml is the TASK frame whose pose IK targets. It was `gripper_tcp`
+  (the vendor grasp centre, 44.3 mm proximal to the fingertips) and is now `tool_tip` (= gripper_link origin, the
+  closed-finger tip), because standoffs_m were always meant as tool-tip clearances (0.04 m = the presentation's
+  STANDOFF_APPROACH_M, measured from gripper_link). The earlier text of this card ("ik_link: gripper_tcp") is
+  superseded; all criteria above still apply unchanged.
+- MOT-04.6 added optional, backward-compatible config keys (surface_collision.model/floor_z_m/base_keepout_m,
+  top-level environment) and the pure function specimen_proxy_boxes to reachability_core; unknown keys are still
+  rejected and every new numeric value in the committed config is nominal with a source.
+- The committed grid now starts at x = 0.11 (outside the robot-base keep-out); the committed-config test asserts it.

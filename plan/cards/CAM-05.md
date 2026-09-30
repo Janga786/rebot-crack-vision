@@ -22,3 +22,8 @@
 ```
 
 Draft: the core pipeline is pure Python; add realsense2_camera launch only if GEOM-03 or OPS-01 needs ROS topics.
+
+## ADR-014 guidance (technical-lead recovery, 2026-09-30)
+- Eye-in-hand consequence (INTERFACES §8.4): any capture that will be lifted to 3D must record the arm joint state
+  (and end_effector.yaml sha256) at the capture instant. If ROS topics are used, capture /joint_states alongside
+  the aligned images; the camera frames come from realsense2_camera TF (the URDF only places camera_link).

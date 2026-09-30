@@ -23,3 +23,7 @@
 ```
 
 Draft.
+
+## ADR-014 guidance (technical-lead recovery, 2026-09-30)
+- capture = move to a view pose (camera_link target), record RGB-D + joint state; plan = GEOM-08 3D path -> MOT-06
+  view/approach/trace/retract; execute only through the MOT-05 gate (refuses nominal end-effector geometry).

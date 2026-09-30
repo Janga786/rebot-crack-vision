@@ -6,7 +6,8 @@
   "depends_on": [
     "GEOM-02",
     "GEOM-03",
-    "PERC-03"
+    "PERC-03",
+    "GEOM-10"
   ],
   "requirements": [
     "REQ-GEOM-1",
@@ -32,3 +33,10 @@
 ```
 
 Draft: needs the path contract and calibration plan.
+
+## ADR-014 guidance (technical-lead recovery, 2026-09-30)
+- 3D path: p_base = FK(q_capture) · T_gripper_link_camera_link · T_camera_link_optical · p_optical (INTERFACES §8.4):
+  every capture must carry the arm joint state at the capture instant and the end_effector.yaml sha256; refuse
+  captures without them. Uncertainty must include the camera extrinsic's status (nominal => not for execution).
+- Tool waypoints are poses of tool_tip: boresight (+X) along the local surface anti-normal, free roll, positions at
+  the trace clearance (nominal 0.01 m) above the surface; approach/retract at 0.04 m (ADR-014 §2).
