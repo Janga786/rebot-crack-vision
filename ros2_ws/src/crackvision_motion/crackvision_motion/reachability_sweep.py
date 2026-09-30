@@ -9,7 +9,9 @@ This node only ever calls `/compute_ik`, `/compute_fk`, `/get_planning_scene` an
 `/apply_planning_scene`, and only ever subscribes to `/robot_description` and
 `/robot_description_semantic`. There is no action client anywhere in this file and nothing here
 can command a trajectory -- IK/FK are pure kinematics queries, and the planning-scene calls only
-add/remove a static collision slab used for IK's own collision checking.
+add/remove static collision objects used for IK's own collision checking: the per-layer specimen proxy
+(`reachability_core.specimen_proxy_boxes`) and, when the config has an `environment` block, the named
+static workcell objects (e.g. the table) from a crackvision.scene_config/1 file (ADR-014).
 """
 
 from __future__ import annotations
@@ -45,8 +47,10 @@ from shape_msgs.msg import SolidPrimitive
 from std_msgs.msg import String
 
 from .cli_common import PreconditionError, RunSummary, add_common_args, find_root, run_cli, setup_logging
-from .reachability_core import ConfigError, config_sha256, enumerate_targets, load_config, orientations, prefiltered, reach_bound_from_urdf, target_position
+from .reachability_core import ConfigError, config_sha256, enumerate_targets, load_config, orientations, prefiltered, reach_bound_from_urdf, specimen_proxy_boxes, target_position
 from .reachability_map import add_target, finalize, joint_limit_margin, limits_from_yaml, new_map, write_map
+from .scene_apply import build_collision_objects, extend_acm
+from .scene_core import SceneError, load_config as load_scene_config
 
 TOOL = "reachability_sweep"
 
@@ -251,26 +255,22 @@ def _build_fk_request(cfg: dict, solution: RobotState) -> GetPositionFK.Request:
 # --------------------------------------------------------------------------------------
 
 def _surface_object(cfg: dict, surface_z: float, operation: int) -> CollisionObject:
+    """The specimen proxy for one surface_z layer: one CollisionObject, one BOX primitive per
+    `specimen_proxy_boxes` entry (a single slab, or the keep-out-aware specimen block)."""
     obj = CollisionObject()
     obj.header.frame_id = cfg["frame"]
     obj.id = _SURFACE_OBJECT_ID
     obj.operation = operation
     if operation == CollisionObject.ADD:
-        sc = cfg["surface_collision"]
-        x_axis, y_axis = cfg["grid"]["x_m"], cfg["grid"]["y_m"]
-        x_extent = (x_axis["max"] - x_axis["min"]) + 2.0 * sc["margin_m"]
-        y_extent = (y_axis["max"] - y_axis["min"]) + 2.0 * sc["margin_m"]
-        thickness = sc["thickness_m"]
-        prim = SolidPrimitive()
-        prim.type = SolidPrimitive.BOX
-        prim.dimensions = [x_extent, y_extent, thickness]
-        pose = Pose()
-        pose.position.x = (x_axis["min"] + x_axis["max"]) / 2.0
-        pose.position.y = (y_axis["min"] + y_axis["max"]) / 2.0
-        pose.position.z = surface_z - 0.001 - thickness / 2.0
-        pose.orientation.w = 1.0
-        obj.primitives = [prim]
-        obj.primitive_poses = [pose]
+        for centre, size in specimen_proxy_boxes(cfg, surface_z):
+            prim = SolidPrimitive()
+            prim.type = SolidPrimitive.BOX
+            prim.dimensions = [float(v) for v in size]
+            pose = Pose()
+            pose.position.x, pose.position.y, pose.position.z = (float(v) for v in centre)
+            pose.orientation.w = 1.0
+            obj.primitives.append(prim)
+            obj.primitive_poses.append(pose)
     return obj
 
 
@@ -318,6 +318,10 @@ def _surface_collision_layer(node: Node, clients: Dict[str, Any], cfg: dict, sur
     if not sc["enabled"]:
         yield
         return
+    if not specimen_proxy_boxes(cfg, surface_z):
+        log.info("surface_z=%.4f is the floor: no specimen proxy for this layer (the table is the surface)", surface_z)
+        yield
+        return
     orig_acm = _get_acm(node, clients)
     new_acm = _extend_acm(orig_acm, sc["allowed_links"])
     _apply_scene_diff(node, clients, [_surface_object(cfg, surface_z, CollisionObject.ADD)], new_acm)
@@ -327,6 +331,44 @@ def _surface_collision_layer(node: Node, clients: Dict[str, Any], cfg: dict, sur
     finally:
         _apply_scene_diff(node, clients, [_surface_object(cfg, surface_z, CollisionObject.REMOVE)], orig_acm)
         log.info("removed surface-collision slab '%s'", _SURFACE_OBJECT_ID)
+
+
+def _environment_scene(cfg: dict, root: Path) -> Optional[Dict[str, Any]]:
+    """The static workcell objects named by cfg['environment'] as a filtered scene config, or None."""
+    env = cfg.get("environment")
+    if not env:
+        return None
+    path = (root / env["scene_config"]).resolve()
+    try:
+        scene = load_scene_config(path)
+    except (OSError, SceneError) as exc:
+        raise ConfigError(f"environment.scene_config {path}: {exc}") from exc
+    by_id = {o["id"]: o for o in scene["objects"]}
+    missing = [o for o in env["objects"] if o not in by_id]
+    if missing:
+        raise ConfigError(f"environment.objects {missing} not found in {path} (has {sorted(by_id)})")
+    chosen = set(env["objects"])
+    return {
+        "frame": scene["frame"],
+        "path": path,
+        "objects": [by_id[o] for o in env["objects"]],
+        "allowed_collisions": [a for a in scene["allowed_collisions"] if a["link_a"] in chosen or a["link_b"] in chosen],
+    }
+
+
+@contextlib.contextmanager
+def _environment_layer(node: Node, clients: Dict[str, Any], scene: Optional[Dict[str, Any]], log):
+    if scene is None:
+        yield
+        return
+    orig_acm = _get_acm(node, clients)
+    _apply_scene_diff(node, clients, build_collision_objects(scene, CollisionObject.ADD), extend_acm(orig_acm, scene))
+    log.info("applied environment objects %s from %s", [o["id"] for o in scene["objects"]], scene["path"])
+    try:
+        yield
+    finally:
+        _apply_scene_diff(node, clients, build_collision_objects(scene, CollisionObject.REMOVE), orig_acm)
+        log.info("removed environment objects")
 
 
 # --------------------------------------------------------------------------------------
@@ -614,11 +656,19 @@ def _run(args: argparse.Namespace, log, summary: RunSummary) -> Dict[str, str]:
             "limits_sha256": limits_sha,
         }
         map_dict = new_map(cfg, _relpath(config_path, root), cfg_sha, robot_info, git_commit)
+        scene = _environment_scene(cfg, root)
+        if scene is not None:
+            map_dict["grid"]["environment"] = {
+                "scene_config": _relpath(scene["path"], root),
+                "scene_config_sha256": hashlib.sha256(scene["path"].read_bytes()).hexdigest(),
+                "objects": [o["id"] for o in scene["objects"]],
+            }
 
-        return _sweep(
-            node, clients, cfg, limits, reach_bound_m, home_positions, map_dict,
-            args.max_duration_s, args.require_all_reachable, log, summary,
-        )
+        with _environment_layer(node, clients, scene, log):
+            return _sweep(
+                node, clients, cfg, limits, reach_bound_m, home_positions, map_dict,
+                args.max_duration_s, args.require_all_reachable, log, summary,
+            )
     finally:
         if map_dict is not None:
             try:

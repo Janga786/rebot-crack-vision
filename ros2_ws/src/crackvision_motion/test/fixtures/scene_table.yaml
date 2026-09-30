@@ -1,0 +1,21 @@
+# scene_table.yaml — test fixture (ADR-014 task-frame smoke test): only the workcell table, top face at
+# the base_link z=0 plane (bottom face of base_link.STL), so the smoke test does not depend on the
+# evolving MOT-03 scene in config/scene/scene.yaml.
+schema: crackvision.scene_config/1
+frame: base_link
+objects:
+  - id: table
+    shape: box
+    dimensions_m: [1.20, 1.20, 0.05]
+    pose:
+      frame: base_link
+      position_m: [0.30, 0.0, -0.025]
+      rpy_rad: [0.0, 0.0, 0.0]
+    value_status: nominal
+    source: "test fixture: table top = base_link z=0 plane"
+allowed_collisions:
+  - link_a: table
+    link_b: base_link
+    reason: "the robot base stands on the table"
+    value_status: nominal
+    source: "test fixture"

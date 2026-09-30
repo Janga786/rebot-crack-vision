@@ -1,0 +1,33 @@
+# reachability_view_smoke.yaml — ADR-014 wrist-camera view smoke fixture: camera_link (+x = D405 optical
+# axis) 0.25 m above (0.29, 0, 0.04), looking down or tilted up to 15 deg, specimen block + table present.
+frame: base_link
+group: arm
+ik_link: camera_link
+boresight:
+  axis_local: [1.0, 0.0, 0.0]
+  down_world: [0.0, 0.0, -1.0]
+  provenance: cad_prior
+  source: "camera_link +x is the D405 optical axis (realsense-ros); pose prior config/robot/end_effector.yaml (ADR-014)"
+grid:
+  x_m: {min: 0.29, max: 0.29, step: 0.03}
+  y_m: {min: 0.0, max: 0.0, step: 0.03}
+  surface_z_m: [0.04]
+  standoffs_m: [0.25]
+orientation: {roll_samples: 8, tilt_deg: [0.0, 15.0], tilt_azimuth_samples: 4}
+ik: {timeout_s: 0.02, avoid_collisions: true, seed: neighbour, roll_search: first}
+surface_collision:
+  enabled: true
+  model: specimen_block
+  thickness_m: 0.02
+  margin_m: 0.12
+  floor_z_m: 0.0
+  base_keepout_m: [-0.09, 0.09, -0.12, 0.12]
+  allowed_links: []
+environment:
+  scene_config: ros2_ws/src/crackvision_motion/test/fixtures/scene_table.yaml
+  objects: [table]
+prefilter: {enabled: true}
+placement: {footprint_m: [0.20, 0.20], yaw_candidates_rad: [0.0], tolerance_m: 0.02, top_k: 1}
+value_status: nominal
+sources:
+  fixture: "ADR-014 camera-view smoke fixture (scripts/ros/test_reachability_task_frames.sh)."
