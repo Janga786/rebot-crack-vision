@@ -1035,3 +1035,295 @@ A capture whose pixels are lifted to `base_link` must carry, taken at the captur
 with the last factor taken from the driver's TF (§6.2) or the device record. A capture without these
 fields is valid for 2D perception only. Any card that records or consumes robot-mounted captures
 (CAM-05, GEOM-08, INT-02, OPS-01) must implement this contract.
+
+---
+
+## 9. Eye-in-hand capture record (`crackvision.capture_3d/1`)
+
+**Normative source:** implements §8.4. **File:** `data/captures/{case}_capture.json`, keyed by the
+§1 `case_id`. Never committed (contains a live device/robot snapshot, not a build artefact).
+
+### 9.1 Fields
+
+| Field | Type | Meaning |
+|---|---|---|
+| `schema` | str | `"crackvision.capture_3d/1"` |
+| `case_id` | str | §1 case id |
+| `synthetic` | bool | mandatory; `true` for any generated/fake scene, never omitted |
+| `image.height`, `image.width` | int | must equal the colour image, the aligned depth PNG, the mask and `paths.json`'s `image_height`/`image_width` (§0.5) |
+| `color_intrinsics` | object | `{width, height, fx, fy, ppx, ppy, model, coeffs[5]}` — the §3.10 colour intrinsics, consumed via `geometry.Intrinsics` |
+| `depth.file` | str | repo-relative path to the `uint16` z16 PNG, aligned to colour (§3.10 item 6) |
+| `depth.depth_scale_m_per_unit` | float | from the device metadata (§3.10 item 7); never defaulted |
+| `depth.aligned_to` | str | `"color"` |
+| `source.kind` | str | `d405_metadata` \| `recording` \| `synthetic` |
+| `source.ref` | str | repo-relative path to the originating file |
+| `source.frame_index` | int \| null | frame index within `source.ref`, if applicable |
+| `capture_stamp_ns` | int | image capture time |
+| `clock` | str | `"utc_epoch_ns"` — the only clock defined in v1 |
+| `robot.joint_names` | list[str] | exactly `["joint1", ..., "joint6"]`, in that order |
+| `robot.positions_rad` | list[float] | 6 values, radians, same order as `joint_names` |
+| `robot.stamp_ns` | int | joint-state timestamp, same `clock` |
+| `robot.stamp_source` | str | where the stamp came from (e.g. `/joint_states`, `moveit_planning_scene`) |
+| `robot.kinematic_model.path` | str | repo-relative URDF used for FK |
+| `robot.kinematic_model.sha256` | str | sha256 of that URDF's bytes |
+| `end_effector.path` | str | `"config/robot/end_effector.yaml"` |
+| `end_effector.sha256` | str | sha256 of that file's bytes at capture time |
+| `end_effector.wrist_camera_value_status` | str | `nominal` \| `measured`, copied from the file at capture time |
+| `end_effector.tool_value_status` | str | `nominal` \| `measured`, copied from the file at capture time |
+| `camera_optical.T_camera_link_camera_color_optical_frame` | object | `{xyz_m[3], quat_xyzw[4]}` |
+| `camera_optical.source` | str | `driver_tf` \| `nominal_d405` |
+
+`nominal_d405` (used when no live driver TF is available, e.g. `--synthetic` or offline replay) is
+zero translation, rpy `(−π/2, 0, −π/2)`: optical `+z` = `camera_link` `+x`, optical `+x` = `−y`,
+optical `+y` = `−z`. This is the realsense-ros nominal for the D405, whose colour stream is the left
+imager.
+
+### 9.2 Chain
+
+```
+p_base_link = FK(q) · T_gripper_link_camera_link · T_camera_link_camera_color_optical_frame · p_optical
+```
+
+(exactly as §8.4 / ADR-014 §4, in ADR-012 `T_a_b` notation, all quaternions `(x, y, z, w)`).
+
+- `FK` uses the canonical gripper model (`docs/motion/ROBOT_MODEL.md`). The committed copy
+  `presentation/sim/reBot_B601_DM_with_gripper.urdf` has kinematics identical to the vendor model.
+- `T_gripper_link_camera_link` comes from `end_effector.yaml`'s `wrist_camera` block (§8.1).
+- `T_camera_link_camera_color_optical_frame` is taken from the driver's published static TF (§6.2)
+  when `camera_optical.source == "driver_tf"`, or from `nominal_d405` above otherwise. It is never
+  hand-built from `color_intrinsics` or from `depth_scale_m_per_unit`.
+- **Caveat (open item for MOT-09 / GEOM-09):** the real driver's `robot_description`
+  (`reBot-DevArm_fixend.urdf`) places joint6's origin 4.3 mm differently from the canonical gripper
+  model above. Joint *values* (`robot.positions_rad`) are shared between the two models; FK for this
+  contract always follows the canonical/MoveIt gripper model, not the driver's URDF, so a consumer
+  must not silently substitute the driver's kinematic tree here.
+
+### 9.3 Example
+
+```json
+{"schema":"crackvision.capture_3d/1","case_id":"Deck_Crack_01","synthetic":false,
+ "image":{"height":480,"width":848},
+ "color_intrinsics":{"width":848,"height":480,"fx":425.3,"fy":425.3,"ppx":424.1,"ppy":239.6,
+   "model":"Brown Conrady","coeffs":[0.0,0.0,0.0,0.0,0.0]},
+ "depth":{"file":"data/d405/depth/20260930T101500Z_000012_depth.png",
+   "depth_scale_m_per_unit":0.0001,"aligned_to":"color"},
+ "source":{"kind":"d405_metadata","ref":"data/d405/metadata/20260930T101500Z_000012.json","frame_index":12},
+ "capture_stamp_ns":1780300500000000000,"clock":"utc_epoch_ns",
+ "robot":{"joint_names":["joint1","joint2","joint3","joint4","joint5","joint6"],
+   "positions_rad":[0.12,-0.44,1.02,0.0,0.77,0.0],
+   "stamp_ns":1780300500031000000,"stamp_source":"/joint_states",
+   "kinematic_model":{"path":"presentation/sim/reBot_B601_DM_with_gripper.urdf",
+     "sha256":"…64 hex…"}},
+ "end_effector":{"path":"config/robot/end_effector.yaml","sha256":"…64 hex…",
+   "wrist_camera_value_status":"nominal","tool_value_status":"nominal"},
+ "camera_optical":{"T_camera_link_camera_color_optical_frame":
+   {"xyz_m":[0.0,0.0,0.0],"quat_xyzw":[-0.5,0.5,-0.5,0.5]},"source":"nominal_d405"}}
+```
+
+### 9.4 Refusal rules
+
+Consumers raise, and CLIs built on this contract exit **3**, for any of:
+
+- the `robot` block is missing or incomplete, or a joint value is outside the URDF limits by more
+  than `1e-3` rad;
+- `end_effector.sha256` is missing;
+- `|capture_stamp_ns − robot.stamp_ns| >` the max skew (default **0.1 s** — the arm must be
+  stationary at capture);
+- `image.height`/`image.width` do not match the colour image, aligned depth PNG, mask, or
+  `paths.json`'s `image_height`/`image_width` (§0.5);
+- the case's `case_map.json` entry has `downscaled: true` (a downscaled case is refused outright —
+  §0.5's pixel-index guarantee no longer holds);
+- `end_effector.sha256` differs from the current `config/robot/end_effector.yaml` file, **unless**
+  the consumer is given an explicit override. With the override, the output records both hashes
+  (`sources.end_effector.sha256_at_capture` and `sha256_now`, §10.1) and the resulting product is
+  ineligible for execution (§10.6, `end_effector_changed_since_capture`).
+
+A capture record without a `robot` block is valid for 2D perception only (§8.4) and must not be fed
+into §10's lifting pipeline.
+
+---
+
+## 10. Robot-frame 3D crack paths and tool waypoints (`crackvision.paths3d/1`)
+
+**File:** `data/paths3d/{case}_paths3d.json`. Consumes a §9 capture record plus the §3.13
+`{case}_paths.json` for the same case.
+
+### 10.1 Top-level fields
+
+| Field | Type | Meaning |
+|---|---|---|
+| `schema` | str | `"crackvision.paths3d/1"` |
+| `case_id` | str | §1 case id |
+| `frame` | str | `"base_link"` |
+| `image_height`, `image_width` | int | copied from the §9 capture record |
+| `sources.paths_json` | str | repo-relative path |
+| `sources.paths_json_sha256` | str | sha256 of that file |
+| `sources.capture_record` | str | repo-relative path to the §9 capture used |
+| `sources.capture_record_sha256` | str | sha256 of that file |
+| `sources.mask` | str | repo-relative path to the crack mask used for surface sampling |
+| `sources.mask_sha256` | str | sha256 of that file |
+| `sources.end_effector.sha256_at_capture` | str | from the §9 record |
+| `sources.end_effector.sha256_now` | str | sha256 of the current `config/robot/end_effector.yaml` at generation time |
+| `sources.urdf_sha256` | str | sha256 of `robot.kinematic_model.path` (§9) |
+| `parameters` | object | every tunable in §10.2–§10.4, see below |
+| `calibration.wrist_camera` | object | `{value_status, position_sigma_m, rotation_sigma_rad, source}` |
+| `calibration.tool` | object | `{value_status, position_sigma_m, source}` |
+| `uncertainty_model.terms` | list[str] | modelled error terms (§10.4) |
+| `uncertainty_model.unmodelled` | list[str] | named, explicitly not modelled (§10.4) |
+| `execution_eligible` | bool | §10.6 |
+| `ineligible_reasons` | list[str] | every §10.6 reason that applies; `[]` iff `execution_eligible` |
+| `counts.points` | int | total dense points across all polylines |
+| `counts.valid` | int | points with non-null geometry (includes `interpolated: true`) |
+| `counts.interpolated` | int | points filled by the gap policy (§10.3) |
+| `counts.invalid_by_reason` | object | `{reason: count}` for every point left invalid |
+
+`parameters` must contain every value named in §10.2–§10.4 that is not already a `calibration.*`
+field: `annulus_inner_px`, `annulus_outer_px`, `annulus_min_fraction_valid`, `valid_depth_range_m`,
+`max_gap_px`, `sigma_px`, `waypoint_spacing_m`, `approach_retract_offset_m`, `trace_clearance_m`,
+`roll_free` (bool), `max_clock_skew_s`.
+
+### 10.2 `components[]`
+
+Mirrors `paths.json` (§3.13): `order_index`, `component_id`, `polylines[]` with `kind: main|branch`
+and `branch_index` (`null` for `main`, `0`-based index within the component's branch list for a
+branch — matching the sorted-by-length order §3.13 already fixes).
+
+Each polyline:
+
+| Field | Type | Meaning |
+|---|---|---|
+| `points[]` | list | one entry per **dense** pixel of the source polyline, in `paths.json` order |
+| `segments[]` | list | `{start_index, end_index}` (inclusive, into `points`) `+ waypoints[]` |
+
+Each `points[]` entry:
+
+| Field | Type | Meaning |
+|---|---|---|
+| `row`, `col`, `u`, `v` | int | copied from the source `paths.json` point (§3.13) |
+| `valid` | bool | whether this point carries geometry |
+| `reason` | str \| null | invalid reason (`depth_invalid`, `annulus_insufficient`, `normal_fit_failed`, …), `null` when valid |
+| `interpolated` | bool | filled by the §10.3 gap policy rather than measured |
+| `depth_m` | float \| null | sampled surface depth (annulus method, §10.3) |
+| `fraction_valid` | float \| null | fraction of valid annulus samples backing `depth_m` (`geometry.AnnulusSample`) |
+| `p_optical_m` | [float,float,float] \| null | 3D point in `camera_color_optical_frame` |
+| `p_base_m` | [float,float,float] \| null | 3D point in `base_link` |
+| `n_base` | [float,float,float] \| null | outward surface normal, unit vector, in `base_link` |
+| `normal_rms_m` | float \| null | RMS plane-fit residual (`geometry.PlaneFit`) |
+| `sigma_normal_rad` | float \| null | normal-direction uncertainty, §10.4 |
+| `cov_base_m2` | [9 floats] \| null | row-major 3×3 `Σ_base`, m² |
+| `sigma_base_m` | [float,float,float] \| null | `sqrt(diag(Σ_base))` per axis, m |
+
+**Invalid points carry null geometry fields** (`depth_m`, `p_optical_m`, `p_base_m`, `n_base`,
+`normal_rms_m`, `sigma_normal_rad`, `cov_base_m2`, `sigma_base_m` all `null`) — never a point placed
+at the camera origin or any other sentinel coordinate.
+
+Each `segments[]` waypoint:
+
+| Field | Type | Meaning |
+|---|---|---|
+| `phase` | str | `approach` \| `trace` \| `retract` |
+| `position_m` | [float,float,float] | `tool_tip` position in `base_link` |
+| `quat_xyzw` | [4 floats] | `tool_tip` orientation in `base_link` |
+| `surface_point_m` | [float,float,float] | the crack-surface point this waypoint stands off from |
+| `normal_base` | [float,float,float] | outward normal at `surface_point_m`, unit vector, `base_link` |
+| `clearance_m` | float | standoff distance actually used (`trace_clearance_m` or `approach_retract_offset_m`) |
+| `sigma_along_normal_m` | float | §10.4 |
+| `sigma_max_m` | float | `max(sigma_base_m)` of the nearest source point |
+| `interpolated` | bool | waypoint's surface point came from an interpolated point |
+| `within_budget` | bool | `3·sigma_along_normal_m ≤ clearance_m` |
+
+### 10.3 Lifting policy
+
+1. **Surface depth**, per dense pixel: `geometry.sample_surface_depth_annulus` on the crack mask
+   (R-08 — cracks are cavities, so the reliable depth is the surrounding intact surface, not the
+   crack pixel itself). Defaults: inner radius **3 px**, outer radius **8 px**, `min_fraction_valid`
+   **0.3**; valid band from `geometry.DEFAULT_VALID_DEPTH_RANGE_M` (0.07–0.50 m). Below
+   `min_fraction_valid` → `reason: annulus_insufficient`.
+2. **Surface point**: the crack pixel `(u, v)` deprojected at that surface depth
+   (`geometry.deproject_pixels`) — the pixel's ray, not the annulus samples' rays.
+3. **Normal**: a plane fit (`geometry.fit_plane`) over the deprojected, valid, non-mask annulus
+   pixels; fewer than 6 such points → `reason: normal_fit_failed`. The **outward** normal is chosen
+   explicitly by `n · (−p_optical) > 0`.
+   > **Pitfall:** `geometry.fit_plane` canonicalises its returned normal to optical `n_z ≥ 0`, which
+   > points *away from* the camera despite what its own comment says. Callers must never rely on
+   > `fit_plane`'s sign convention directly — always re-orient with the `n · (−p_optical) > 0` test
+   > above before use.
+4. **Gaps**: a run of at most `max_gap_px` (default **5**) invalid points strictly between two valid
+   points is filled by linear interpolation in `base_link` (`p_base_m` lerped by pixel-run position;
+   `n_base` filled by a normalised lerp of the neighbouring normals). Interpolated points get
+   `interpolated: true` and inherit `cov_base_m2`/`sigma_base_m` from whichever of the two bounding
+   neighbours has the larger trace (the more conservative of the two). A run longer than
+   `max_gap_px` is **not** bridged — it splits the polyline into separate `segments[]`. Leading and
+   trailing invalid runs (no valid point on one side) are trimmed, never extrapolated. A segment
+   left with fewer than 3 valid points after trimming/splitting is dropped entirely, and the drop is
+   reflected in `counts.invalid_by_reason` (its points keep their original `reason`, or
+   `segment_too_short` if they had none).
+
+### 10.4 Uncertainty (first order; GEOM-09 owns the full budget)
+
+- `σ_px` default **1.0 px** (skeleton-centreline prior). `σ_z = geometry.depth_uncertainty_m(z, fx)`.
+- `Σ_opt = J · diag(σ_px², σ_px², σ_z²) · Jᵀ`, with the pinhole-linearisation Jacobian
+  `J = [[z/fx, 0, x/z], [0, z/fy, y/z], [0, 0, 1]]` (distortion Jacobian neglected — listed under
+  `unmodelled`).
+- `Σ_base = R · Σ_opt · Rᵀ + (σ_cam_pos² + (‖p_opt‖ · σ_cam_rot)²) · I₃`, where `R` is the rotation of
+  `T_base_link_camera_color_optical_frame` (the §9.2 chain composed through `FK(q)`), and
+  `σ_cam_pos`/`σ_cam_rot` are `calibration.wrist_camera.position_sigma_m`/`rotation_sigma_rad`.
+- `σ_normal_rad = normal_rms_m / (outer_radius_px · z / fx)`.
+- Per waypoint: `σ_along_normal = sqrt(nᵀ · Σ_base · n + σ_tool_pos²)`, where `n` is `normal_base` and
+  `σ_tool_pos` is `calibration.tool.position_sigma_m`; `within_budget ⇔ 3 · σ_along_normal ≤ clearance_m`.
+- **Calibration sigmas:** for a `measured` block, read `position_sigma_m`/`rotation_sigma_rad` (or,
+  for `tool`, just `position_sigma_m`) from that block's own `uncertainty: {position_sigma_m,
+  rotation_sigma_rad, source}` object in `end_effector.yaml` — sourced from the `docs/calibration/PLAN.md`
+  §4 layer-3 held-out residual standard deviations, never a placeholder. **A `measured` block that
+  lacks `uncertainty` is refused** (exit 3), because a measured value without a residual estimate is
+  indistinguishable from an unverified guess. **GEOM-05 and GEOM-07 must write this `uncertainty`
+  object** on the `wrist_camera` and `tool` blocks respectively when they promote them to
+  `value_status: measured` — this is a requirement on those cards, not optional metadata.
+  Nominal priors (used while `value_status: nominal`): `wrist_camera` **0.010 m / 5°** (ADR-014 §5's
+  own prior-disagreement flag thresholds — anything a real calibration would flag as wrong is exactly
+  the uncertainty the nominal prior should already carry); `tool` **0.005 m** (`end_effector.yaml`'s
+  own documented "a few mm" seating-error caveat on the CAD prior).
+- `uncertainty_model.unmodelled` (always all five, verbatim): `joint_encoder_and_fk`, `depth_bias`,
+  `distortion_jacobian`, `capture_time_skew_motion`, `thermal_drift`.
+
+### 10.5 Waypoint policy (ADR-014 §2)
+
+1. Resample each segment by 3D arc length at `waypoint_spacing_m` (default **0.002 m**), both
+   segment endpoints included. Normals at resampled positions are the normalised lerp of the
+   bracketing source points' `n_base`.
+2. `tool_tip`'s `+X` axis is set to `−n_out` (the boresight points into the surface, opposite the
+   outward normal). `position_m = surface_point_m + clearance_m · n_out`, with `clearance_m =
+   trace_clearance_m` (default **0.01 m**) for `trace` waypoints.
+3. **Roll is free** (`parameters.roll_free: true` — MOT-06 may re-roll at execution time). The
+   deterministic default fill here is parallel transport of a reference `+Z`: the first waypoint's
+   `+Z` is the capture-pose `tool_tip` `Z` axis (`FK(q) · T_gripper_link_tool_tip`, `q` from the §9
+   capture record) projected onto the plane ⟂ the waypoint's `+X` and renormalised; if that
+   projection's norm is `< 1e-6` (capture pose nearly parallel to this waypoint's boresight), fall
+   back to projecting `base_link` `+Z`, and if that also degenerates, `base_link` `+X`. Each
+   subsequent waypoint's `+Z` is the previous waypoint's (already-transported) `+Z` projected onto
+   its own `+X`-orthogonal plane and renormalised — i.e. propagated along the path, not recomputed
+   from the capture pose each time. `+Y = +Z × +X`, right-handed, gives `quat_xyzw`.
+4. One `approach` waypoint immediately before and one `retract` waypoint immediately after each
+   segment's resampled `trace` waypoints, each at `approach_retract_offset_m` (default **0.04 m**)
+   along that end's `n_out` from that end's surface point, with that end's orientation.
+
+### 10.6 Execution eligibility
+
+`execution_eligible = false`, with every applicable reason listed in `ineligible_reasons`, when any
+of the following hold:
+
+| Reason | Condition |
+|---|---|
+| `wrist_camera_nominal` | `calibration.wrist_camera.value_status != "measured"` |
+| `tool_nominal` | `calibration.tool.value_status != "measured"` |
+| `optical_frames_nominal` | the §9 capture's `camera_optical.source == "nominal_d405"` |
+| `synthetic_capture` | the §9 capture's `synthetic == true` |
+| `end_effector_changed_since_capture` | `sources.end_effector.sha256_at_capture != sha256_now` |
+| `uncertainty_exceeds_clearance` | any waypoint has `within_budget == false` |
+| `no_valid_points` | `counts.valid == 0` |
+
+The file is **always** written, including when `execution_eligible` is `false` — it remains valid
+input for mock/sim planning and visualization. `MOT-05` must refuse real execution of any path whose
+file reports `execution_eligible: false`.
+
+---
