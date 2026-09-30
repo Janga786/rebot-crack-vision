@@ -1,6 +1,7 @@
 # ADR-013: Camera-to-robot calibration method + camera mounting
 
-**Status:** proposed, blocked on operator confirmation · **Date:** 2026-09-29 · **Supersedes:** — · **Superseded by:** —
+**Status:** accepted · **Date:** 2026-09-29, mounting confirmed by operator 2026-09-30 (see ADR-014)
+· **Supersedes:** — · **Superseded by:** —
 
 ## Context
 REQ-GEOM-2 (camera-to-robot calibration with explicit transform conventions and residuals) and
@@ -17,30 +18,32 @@ choice for the second:
    eye-to-hand formulation, `AX = XB`) or `cv2.calibrateRobotWorldHandEye` (robot-world formulation,
    needed when the target — not the camera — is the thing rigidly attached to the robot).
 
-**No answer to question 1 exists anywhere in this repository or in `~/rebot_ws` today.**
-Checked and confirmed empty of any camera-mount reference:
-`~/rebot_ws/src/rebotarm_bringup/description/urdf/*.urdf` (no `camera_link`, no `d405`, no
-`camera_mount` — `grep` returns nothing), the MoveIt xacro/SRDF, and every doc in this repo
-(`ARCHITECTURE.md`, `TECHNICAL_APPROACH.md`, `docs/motion/*.md`, all `plan/cards/GEOM-*.md`,
-`plan/cards/CAM-*.md`). `ARCHITECTURE.md` §"Environment" states plainly: **"No D405 is attached
-to this machine right now."** `TECHNICAL_APPROACH.md` §2.1 states: "there is no camera mounted on
-this arm yet." GEOM-05's card lists `d405_mounted` as a hardware precondition it still needs, not
-a fact already established. No CAD, bracket part number, or operator note records an intended
-mounting point or orientation.
+**Operator decision (authoritative, 2026-09-30, recorded in ADR-014 and
+`config/robot/end_effector.yaml`): the D405 is eye-in-hand**, wrist-mounted on the reBot B601-DM
+gripper with Seeed's stock `D405_305_Mount.step`
+(`Seeed-Projects/reBot-DevArm@590ff16c`, `hardware/reBot_B601_DM/3D_Printed_Parts/`), at an
+approximate 15° downward pitch (measured on the physically identical B601-RS gripper by
+`github.com/bowenszhu/rebot-b601-rs-d405-wrist-mount`). This confirms the recommendation this ADR
+already argued for below (kept as the record of *why* eye-in-hand, not merely *that* it was
+picked). Two things this decision does **not** settle, both tracked in ADR-014 and outside this
+ADR's scope:
 
-Per this card's acceptance criteria, that absence is itself the answer this ADR must give: **this
-decision is blocked on the operator**, not resolved by this document. Sections below give a
-technical recommendation and a fully specified method *conditioned on* that recommendation, so
-that once the operator confirms (or overrides) the mounting, GEOM-04/05 have nothing left to
-design — only to implement/execute. Nothing in this ADR may be read as "the camera is mounted
-eye-in-hand"; it is a proposal awaiting sign-off (see `docs/calibration/PLAN.md` §0).
+- The installed camera-to-robot extrinsic is a **CAD prior only** (`config/robot/end_effector.yaml`,
+  `wrist_camera`, `value_status: nominal`), not a measurement — hand-eye calibration (GEOM-04/05,
+  this ADR's method) supersedes it once run.
+- One placement fact — which gripper face the camera sits on — is still an open assumption the
+  operator must confirm before GEOM-05 executes on hardware; see `docs/calibration/PLAN.md` §0 and
+  ADR-014 §"Decision 1".
+
+Because the mounting is eye-in-hand, the **eye-to-hand / robot-world branch below is not
+applicable** to this rig and is kept only as a documented fallback in case a future mount change
+(ADR-014 "Revisit when") reopens the question — it must not be read as active guidance today.
 
 ## Decision
 
-### Mounting: recommend eye-in-hand (wrist-mounted), pending operator confirmation
-Recommended: D405 rigidly bolted to the arm near the tool (a fixed child frame of `gripper_link`
-or another arm-side link, per ADR-012's frame table — the exact parent link is itself part of what
-the operator confirms, since it depends on the physical bracket used).
+### Mounting: eye-in-hand (wrist-mounted), confirmed by operator
+Confirmed: D405 rigidly bolted to the gripper via Seeed's stock mount, a fixed child frame of
+`gripper_link` (ADR-014's `camera_link`, CAD-prior pose pending GEOM-05 measurement).
 
 Reasoning, all grounded in facts already recorded elsewhere in this repo:
 
@@ -71,11 +74,13 @@ Reasoning, all grounded in facts already recorded elsewhere in this repo:
   frames, not a live feed during motion). This is a real integration cost, not a reason to prefer
   eye-to-hand, which has no camera/stand of its own defined anywhere to absorb that cost instead.
 
-**If the operator instead confirms eye-to-hand** (e.g. an existing camera stand/gantry not yet
-documented here), the frame graph, target-motion convention and the robot-world solve in the
-Algorithms section below apply unchanged — only the extrinsic parent frame moves from an arm link
-to a `base_link`- or world-fixed one, and the pose-diversity source moves from "move the arm, hold
-the target still" to "hold the camera still, move the target with the gripper" (§ Poses below).
+**Not applicable to this rig (kept for a future mount-change fallback only):** if a future revision
+ever moved the D405 to a fixed external stand/gantry (eye-to-hand), the frame graph, target-motion
+convention and the robot-world solve in the Algorithms section below would apply — the extrinsic
+parent frame would move from an arm link to a `base_link`- or world-fixed one, and the
+pose-diversity source would move from "move the arm, hold the target still" to "hold the camera
+still, move the target with the gripper" (§ Poses below). This does not describe the confirmed
+mount and must not be executed against it.
 
 ### Target: ChArUco board
 ChArUco (chessboard + ArUco corners) over a plain chessboard or a plain ArUco grid, because it gives
@@ -132,8 +137,8 @@ even with hundreds of poses, a well-known degeneracy of Tsai/Park-style solvers.
   a minimum interior-corner count (recommend ≥ 12 of the 24 interior corners) rather than silently
   keeping a weak detection in the solve.
 
-### Algorithms: ≥2 cross-checked `calibrateHandEye` methods (+ robot-world variant if eye-to-hand)
-For the eye-in-hand case (recommended mounting): for each retained pose, compute
+### Algorithms: ≥2 cross-checked `calibrateHandEye` methods
+For each retained pose, compute
 `R_gripper2base, t_gripper2base` from the robot's own forward kinematics/TF at capture time (the
 `T_base_link_gripper_link` this ADR's parent, ADR-012, already names), and
 `R_target2cam, t_target2cam` from `estimatePoseCharucoBoard`. Solve with `cv2.calibrateHandEye`
@@ -152,14 +157,11 @@ plausible-looking but wrong answer:
    pose count is comfortably above the 15-pose floor (its dual-quaternion SVD wants more
    well-conditioned data to be reliable at exactly 15).
 
-If the operator instead confirms **eye-to-hand** mounting, the board must instead be rigidly held by
-the gripper (camera fixed, target moves) and the solve is the **robot-world** formulation,
-`cv2.calibrateRobotWorldHandEye`, which simultaneously recovers `T_base_world` (here, effectively
-the fixed camera's pose relative to the robot base — the extrinsic this ADR actually wants) and
-`T_gripper2cam`-analogue (the target's fixed pose relative to the gripper), because in this
-configuration neither is known ahead of time the way `T_gripper2cam` is assumed fixed in the
-eye-in-hand case. Cross-check its two available methods, `CALIBRATE_ROBOT_WORLD_HAND_EYE_SHAH` and
-`CALIBRATE_ROBOT_WORLD_HAND_EYE_LI`, the same way as above.
+**Not applicable to this rig:** the robot-world formulation, `cv2.calibrateRobotWorldHandEye`
+(cross-checking `CALIBRATE_ROBOT_WORLD_HAND_EYE_SHAH` against `CALIBRATE_ROBOT_WORLD_HAND_EYE_LI`),
+is the eye-to-hand-only equivalent of the above — it would apply if the board were rigidly held by
+the gripper and the camera fixed in the world. Kept only as a documented fallback per the note at
+the top of this ADR's Decision section.
 
 ### Residual thresholds and uncertainty propagation
 Three residual layers, each with its own threshold, because a small error at one layer can still
@@ -206,21 +208,25 @@ with the depth model's.
   involved.
 + GEOM-05 (operator execution) has a concrete target spec (with a mandatory print-scale check) and
   a residual report format to fill in, rather than inventing thresholds during a hardware session.
-+ Cross-checking ≥2 (eye-in-hand) or both (robot-world) methods turns "the solver produced a number"
-  into "the solver produced a number *and* a second independent method agrees with it," catching the
++ Cross-checking ≥2 `calibrateHandEye` methods turns "the solver produced a number" into "the
+  solver produced a number *and* a second independent method agrees with it," catching the
   silent-wrong-answer failure mode a single method solve cannot self-diagnose.
-- This ADR does not itself decide the mounting — it recommends eye-in-hand and gives the full method
-  for it, but `docs/calibration/PLAN.md` §0 formally blocks GEOM-04/05 until the operator confirms
-  (or overrides) that recommendation in writing. No downstream card may treat "eye-in-hand" as
-  decided until that confirmation exists.
+- The camera-to-robot extrinsic this method solves for still starts from a CAD prior only
+  (`config/robot/end_effector.yaml`, `wrist_camera`, `value_status: nominal`, per ADR-014); GEOM-04/05
+  must run and flag any disagreement with that prior above ADR-014's 10 mm / 5° thresholds before
+  anything downstream treats the extrinsic as measured.
+- `docs/calibration/PLAN.md` §0 still records one remaining operator check (which gripper face the
+  camera sits on, ADR-014's `gripper_link` −Z assumption) that must be confirmed before GEOM-05 runs
+  on hardware — the mounting *identity* (eye-in-hand) is decided, but that one placement detail is
+  not yet.
 - The 7×5/30 mm ChArUco spec and the residual thresholds are sized for the D405's 7–50 cm range and
   this project's 10–40 cm working distance; a different camera or working distance would need this
   ADR revisited, not silently reused.
 
 ## Revisit when
-The operator confirms (or overrides) the camera mounting — at which point
-`docs/calibration/PLAN.md` §0's block is lifted and, if the confirmed mounting is eye-to-hand
-instead of the eye-in-hand recommended here, this ADR is revised (not superseded) to make the
-robot-world branch primary. Also revisit if GEOM-05's measured residuals repeatedly fail the
-thresholds above with a properly diverse, print-verified pose set — that would mean the thresholds
-themselves, not the capture procedure, were miscalibrated to this rig.
+The operator reports the camera on a different gripper face than ADR-014's −Z assumption, a
+different mount is fitted (e.g. ADR-014's mentioned 30° redesign), or the camera/working distance
+changes — any of these would need this ADR revised, not silently reused. Also revisit if GEOM-05's
+measured residuals repeatedly fail the thresholds above with a properly diverse, print-verified pose
+set — that would mean the thresholds themselves, not the capture procedure, were miscalibrated to
+this rig.
