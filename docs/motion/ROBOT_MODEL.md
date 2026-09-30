@@ -110,6 +110,12 @@ From `rebotarm_moveit_config/config/rebotarm.urdf.xacro` (which includes the can
 - `gripper_tcp` — the MoveIt end-effector/TCP frame, `-44.3 mm` along `gripper_link`'s local x
   from `gripper_link`'s origin (fixed joint, no rotation). This is the frame planning groups
   should target, not `link6` or `gripper_link` directly.
+  **Amended 2026-09-30 (ADR-014):** that holds for *grasping*. `gripper_tcp` sits at the finger
+  mid-length. `gripper_link`'s origin is the closed-finger **tip**: the finger meshes placed by
+  `gripper_joint1/2` at q=0 reach x = 0.0000 at y = 0. Surface-facing tasks (approach, trace, retract)
+  target the new `tool_tip` frame. Camera view poses target `camera_link`. Both come from
+  `config/robot/end_effector.yaml` via the `crackvision_description` overlay; the vendor files are
+  unchanged.
 - `gripper_left` / `gripper_right` — the two finger links, driven by `gripper_joint1` /
   `gripper_joint2` (prismatic, `[0, 0.0715] m` each) for open/close.
 

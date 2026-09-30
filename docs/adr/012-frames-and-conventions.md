@@ -1,6 +1,13 @@
 # ADR-012: One frame graph, one transform notation, one pixel convention
 
-**Status:** accepted · **Date:** 2026-09-28 · **Supersedes:** — · **Superseded by:** —
+**Status:** accepted, amended · **Date:** 2026-09-28 · **Supersedes:** — · **Superseded by:** ADR-014 (in part: the `TCP` frame row and "Boresight / TCP — status of prior evidence")
+
+> **Amendment 2026-09-30 (ADR-014).** `gripper_tcp` is the vendor *grasp centre*, 44.3 mm proximal to the
+> fingertips. The physical crack-facing tool point is `gripper_link`'s origin (the closed-finger tip,
+> from the canonical URDF's finger meshes), published as the new frame `tool_tip`. The wrist D405 is
+> `camera_link`, eye-in-hand, on Seeed's stock mount. The `-0.0443 m` offset below is therefore the prior for
+> the grasp centre only, **not** for the tip a pivot calibration measures. Surface tasks and TCP
+> calibration use `tool_tip` (ADR-014 §1, §5). Everything else in this ADR stands.
 
 ## Context
 Geometry now lifts (ADR-011, stage 2): depth→3D backprojection of the ordered crack path and
@@ -137,6 +144,8 @@ cases identically — mark the point invalid/absent, never silently project dept
 the camera origin.
 
 ### Boresight / TCP — status of prior evidence
+> Superseded for surface-facing tools by ADR-014: see the amendment at the top of this ADR.
+
 `docs/TECHNICAL_APPROACH.md` §2.2–2.3 already measured the reBot B601-DM gripper's physical pointing
 axis in simulation (Isaac Sim URDF probe: local **+X**, not +Z, corroborated by the arm's own solved
 IK behaviour and by `~/rebot_ws/src/rebotarm_moveit_config`). The MoveIt config's own fixed URDF

@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>crackvision_description</name>
+  <version>0.1.0</version>
+  <description>B601-DM end-of-arm overlay (tool tip, wrist D405 + mount collision proxies) on the vendor model, driven by config/robot/end_effector.yaml (ADR-014).</description>
+  <maintainer email="jangarabliss@gmail.com">crackvision maintainers</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <exec_depend>rebotarm_bringup</exec_depend>
+  <exec_depend>rebotarm_moveit_config</exec_depend>
+  <exec_depend>xacro</exec_depend>
+
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

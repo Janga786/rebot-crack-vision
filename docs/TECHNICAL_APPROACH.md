@@ -204,6 +204,12 @@ Two independent facts corroborate that local +X is the right choice, found after
   X as the reach axis too, with no rotation applied — strong corroboration from a source that
   had nothing to do with this investigation.
 
+> **Correction (2026-09-30, ADR-014).** The probe above measured finger *bounding-box centres*
+> (x ≈ −0.0443), which is where `gripper_tcp` sits: the grasp centre. The distal fingertips are 44.3 mm
+> further out, at `gripper_link`'s origin (x = 0), which is the point this demo's IK actually drove.
+> The pointing axis (+X) conclusion stands. The "same coordinate as the fingertips" reading does not.
+> A tool-tip clearance must be measured from `tool_tip` (= `gripper_link` origin), not `gripper_tcp`.
+
 ### 2.4 Velocity along the path (`compute_velocities.py`)
 
 Given the solved joint trajectory `q(t)` at 20 keyframes, three quantities are derived as

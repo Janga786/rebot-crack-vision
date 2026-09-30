@@ -2,6 +2,19 @@
 
 **Zero-shot crack segmentation for a reBot B601-DM concrete-inspection arm.**
 
+> **Current status (Phase 2, 2026-09-30).**
+> - Phase 1 below is complete.
+> - Phase 2 ([ADR-011](docs/adr/011-phase2-full-pipeline-scope.md)) extends it to ordered crack paths,
+>   depth → 3D, eye-in-hand hand-eye calibration, MoveIt planning and gated commissioning. The work is
+>   tracked as cards under [`plan/`](plan) and weekly write-ups in [`docs/progress/`](docs/progress).
+> - The end-of-arm model is in [ADR-014](docs/adr/014-end-effector-frames-and-task-phases.md): a wrist D405
+>   on Seeed's stock mount, a `tool_tip` distinct from the grasp-centre `gripper_tcp`, and separate
+>   view and trace phases.
+> - Everything robot-side is simulation/mock only. The camera extrinsic, tool tip and workcell are
+>   nominal priors until measured.
+> - Physical steps wait for the operator: D405 and arm adapter connection, calibration, and powered
+>   commissioning.
+
 This repository builds the Phase-1 perception pipeline that turns an RGB image of a concrete/masonry
 surface into a binary crack mask and a one-pixel crack skeleton, using publicly released weights
 with no training of our own, and answers one honest question: *can a zero-shot, publicly released
