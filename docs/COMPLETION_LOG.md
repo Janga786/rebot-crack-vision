@@ -1615,3 +1615,65 @@ ISSUES:
     run, and no deviation from `docs/INTERFACES.md` §3.3 or the card body was needed.
 NEXT CARD: TC-010
 ```
+
+---
+
+## GEOM-08.1 — Contracts: eye-in-hand capture record (§9) + robot-frame 3D path / tool-waypoint
+file with uncertainty and execution-eligibility policy (§10)
+
+```
+TASK: GEOM-08.1
+STATUS: COMPLETE
+CHANGES:
+  - docs/INTERFACES.md — appended two normative sections after §8.4, in the §3.13/§8 style (tables,
+    a JSON example, then bullet rules). §0–§8 untouched (pure append; verified with
+    `git diff --unified=0 HEAD~1 -- docs/INTERFACES.md | grep -E '^-[^-]'`, no output).
+    - §9 `crackvision.capture_3d/1` — the `data/captures/{case}_capture.json` eye-in-hand capture
+      record that implements §8.4: every field (`schema`, `case_id`, `synthetic`, `image`,
+      `color_intrinsics`, `depth`, `source`, `capture_stamp_ns`/`clock`, `robot.*`, `end_effector.*`,
+      `camera_optical.*`) named, typed and, where relevant, framed; the `nominal_d405` optical-frame
+      convention spelled out; the exact §8.4/ADR-014 §4 chain
+      (`p_base_link = FK(q) · T_gripper_link_camera_link · T_camera_link_camera_color_optical_frame
+      · p_optical`) restated with the joint6 driver-vs-canonical-gripper-model caveat (ADR-009/
+      MOT-09/GEOM-09 open item: the real driver's `reBot-DevArm_fixend.urdf` places joint6's origin
+      4.3 mm differently from the canonical gripper model FK always uses here); and the full refusal
+      rule set (missing/incomplete robot block or out-of-limits joint, missing `end_effector.sha256`,
+      >0.1 s clock skew, image-shape mismatch against colour/depth/mask/paths.json, `downscaled:
+      true` case, `end_effector.sha256` mismatch with/without override).
+    - §10 `crackvision.paths3d/1` — the `data/paths3d/{case}_paths3d.json` robot-frame path/waypoint
+      file: every top-level and per-point/per-waypoint field named, typed and framed; the annulus
+      surface-depth + plane-fit lifting policy (`geometry.sample_surface_depth_annulus`,
+      `geometry.deproject_pixels`, `geometry.fit_plane`) with the `fit_plane` optical-`n_z≥0`
+      sign pitfall documented as a named caveat (callers must always re-derive the outward sign via
+      `n·(−p_optical) > 0`, never trust `fit_plane`'s own sign); the gap/interpolation and
+      segment-splitting policy; the first-order covariance propagation
+      (`Σ_opt` pinhole Jacobian → `Σ_base` via the capture-chain rotation plus calibration-sigma
+      terms → per-waypoint `σ_along_normal`/`within_budget`); the nominal calibration priors
+      (`wrist_camera` 0.010 m / 5°, citing ADR-014 §5's own prior-disagreement flag thresholds;
+      `tool` 0.005 m, citing `end_effector.yaml`'s "a few mm" seating-error caveat) with rationale;
+      the requirement, stated explicitly, that GEOM-05 and GEOM-07 write
+      `uncertainty: {position_sigma_m, rotation_sigma_rad, source}` on any block they promote to
+      `value_status: measured`, and that a `measured` block lacking it is refused; the tool-waypoint
+      policy (arc-length resampling, `tool_tip +X = −n_out`, parallel-transported roll with the
+      capture-pose-Z → base-Z → base-X fallback chain, approach/retract offsets); and the seven
+      named `execution_eligible`/`ineligible_reasons` rules.
+  - docs/COMPLETION_LOG.md — this entry.
+VERIFICATION:
+  - `grep -q '^## 9\. ' docs/INTERFACES.md && grep -q '^## 10\. ' docs/INTERFACES.md && grep -q
+    'crackvision.capture_3d/1' docs/INTERFACES.md && grep -q 'crackvision.paths3d/1'
+    docs/INTERFACES.md && grep -q 'execution_eligible' docs/INTERFACES.md && echo SECTIONS_OK` ->
+    `SECTIONS_OK`, exit 0.
+  - `git diff --unified=0 HEAD~1 -- docs/INTERFACES.md | grep -E '^-[^-]' ; test $? -eq 1` -> grep
+    found no removed-line hunks (exit 1 from grep, meaning no match), so the `test $? -eq 1` passed;
+    combined command exit 0. `git diff docs/INTERFACES.md` (working tree vs the pre-session commit)
+    confirms independently: exactly one line-count-context `-` (the diff header's own `---`/`+++`
+    convention aside) and 295 added lines, all after the pre-existing §8.4 close — §0–§8 byte-
+    identical.
+  - `./env.sh pytest tests/test_contracts.py -q -p no:cacheprovider` -> `5 passed in 0.50s`, exit 0.
+ISSUES:
+  - None. This is a documentation-only decision card: it specifies the §9/§10 contracts that later
+    GEOM-08.x implementation cards (which write `crackvision.capture_3d`, `crackvision.paths3d`, and
+    the `uncertainty` fields on GEOM-05/GEOM-07) build against. No code was written or could be
+    exercised beyond the prose/schema itself.
+NEXT CARD: GEOM-08.2 (or whichever GEOM-08.x decomposition card implements §9/§10 next)
+```
