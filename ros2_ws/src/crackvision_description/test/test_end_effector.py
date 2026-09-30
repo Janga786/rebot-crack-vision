@@ -96,6 +96,10 @@ def test_documented_derived_numbers_match_the_transform():
     (lambda r: r["collision"][0].update(frame="link6"), "must be one of"),
     (lambda r: r["allowed_self_collisions"].append(["link5", "link6", "vendor pair"]), "overlay collision link"),
     (lambda r: r["allowed_self_collisions"].append(list(r["allowed_self_collisions"][0])), "duplicate pair"),
+    # review 00132: an exemption against an arm link would silently stop checking the camera against the arm
+    (lambda r: r["allowed_self_collisions"].append(["camera_mount_link", "link6", "x"]), "may not be exempted"),
+    (lambda r: r["allowed_self_collisions"].append(["camera_housing_link", "base_link", "x"]), "may not be exempted"),
+    (lambda r: r["allowed_self_collisions"].append(["link3", "camera_mount_link", "x"]), "may not be exempted"),
 ])
 def test_invalid_configs_are_refused(tmp_path, mutate, message):
     raw = copy.deepcopy(_raw())
