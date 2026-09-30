@@ -2,7 +2,7 @@
 
 ```json card
 {
-  "kind": "impl",
+  "kind": "branch",
   "depends_on": [
     "GEOM-02",
     "GEOM-03",
@@ -13,7 +13,6 @@
     "REQ-GEOM-1",
     "REQ-GEOM-2"
   ],
-  "spec_state": "draft",
   "refine_after": [
     "GEOM-03",
     "PERC-03"
@@ -40,3 +39,6 @@ Draft: needs the path contract and calibration plan.
   captures without them. Uncertainty must include the camera extrinsic's status (nominal => not for execution).
 - Tool waypoints are poses of tool_tip: boresight (+X) along the local surface anti-normal, free roll, positions at
   the trace clearance (nominal 0.01 m) above the surface; approach/retract at 0.04 m (ADR-014 §2).
+
+## Decomposed 2026-09-30T09:28:16Z by L-GEOM (claude-opus-5-5, high)
+Children: GEOM-08.1, GEOM-08.2, GEOM-08.3, GEOM-08.4, GEOM-08.5, GEOM-08.6, GEOM-08.7, GEOM-08.8
