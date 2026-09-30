@@ -1,6 +1,6 @@
 # Progress — week of Mon Sep 28 – Sun Oct 04, 2026
 
-**32 task(s) completed and independently audited this week** · project total **39/77** accepted
+**33 task(s) completed and independently audited this week** · project total **32/92** accepted
 
 ## Notes
 
@@ -68,16 +68,21 @@
 …[439 chars clipped]
 - **GEOM-03 — Calibration method + camera mounting decision** ([details](GEOM-03.md)): Finalized the written calibration plan for the wrist camera: ADR-013 now formally records the operator's decision that the D405 is wrist-mounted (eye-in-hand) on the gripper, with a fully specified Ch
 …[385 chars clipped]
+- **GEOM-08.1 — Contracts: eye-in-hand capture record (§9) + robot-frame 3D path / tool-waypoint file with uncertainty and execution-eligibility policy (§10)** ([details](GEOM-08.1.md)): Wrote the full normative spec for two new pipeline contracts into docs/INTERFACES.md: the eye-in-hand capture record format (§9) that pairs a colour/depth image with the robot's joint state and calibr
+…[379 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 49 / 107
+- Implementation/review sessions run: 50 / 108
 - Audits that rejected work with evidence-backed findings: 6 (repairs created: 6)
 - Re-verified after an upstream change: CAM-02, GEOM-01, GEOM-01.R1, GEOM-02, GEOM-02.R1, GEOM-06, GEOM-10, MOT-01, MOT-02, MOT-04.1, MOT-04.1.R1, MOT-04.2, MOT-04.3, MOT-04.3.R1, MOT-04.4, MOT-04.4.R1, PERC-03, PERC-03.R1, TC-001, TC-011, TC-016
 
 ## Planning changes
 
 - decomposed: MOT-04 → MOT-04.1, MOT-04.2, MOT-04.3, MOT-04.4, MOT-04.5
+- decomposed: GEOM-08 → GEOM-08.1, GEOM-08.2, GEOM-08.3, GEOM-08.4, GEOM-08.5, GEOM-08.6, GEOM-08.7, GEOM-08.8
+- decomposed: GEOM-04 → GEOM-04.1, GEOM-04.2, GEOM-04.3, GEOM-04.4, GEOM-04.5
+- decomposed: CAM-05 → CAM-05.1, CAM-05.2
 
 ## Progress by work package
 
@@ -85,10 +90,10 @@
 |---|---|---|
 | Host platform & reproducibility (L-HOST) | 5 | 9 |
 | Local coding model (L-LLM) | 1 | 6 |
-| D405 capture (L-CAM) | 4 | 7 |
-| Perception (L-PERC) | 13 | 16 |
-| Geometry & calibration (L-GEOM) | 6 | 11 |
-| Motion planning (L-MOTION) | 7 | 16 |
+| D405 capture (L-CAM) | 3 | 9 |
+| Perception (L-PERC) | 12 | 16 |
+| Geometry & calibration (L-GEOM) | 4 | 24 |
+| Motion planning (L-MOTION) | 4 | 16 |
 | Integration & commissioning (L-INT) | 1 | 6 |
 | Operator workflow & handoff (L-OPS) | 1 | 4 |
 | Imitation learning (later phase) (L-IL) | 0 | 1 |
