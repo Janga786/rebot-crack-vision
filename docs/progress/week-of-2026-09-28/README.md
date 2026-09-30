@@ -1,6 +1,6 @@
 # Progress — week of Mon Sep 28 – Sun Oct 04, 2026
 
-**33 task(s) completed and independently audited this week** · project total **40/92** accepted
+**34 task(s) completed and independently audited this week** · project total **41/92** accepted
 
 ## Notes
 
@@ -70,11 +70,13 @@
 …[385 chars clipped]
 - **GEOM-08.1 — Contracts: eye-in-hand capture record (§9) + robot-frame 3D path / tool-waypoint file with uncertainty and execution-eligibility policy (§10)** ([details](GEOM-08.1.md)): Wrote the full normative spec for two new pipeline contracts into docs/INTERFACES.md: the eye-in-hand capture record format (§9) that pairs a colour/depth image with the robot's joint state and calibr
 …[379 chars clipped]
+- **GEOM-08.2 — Pure-numpy B601-DM forward kinematics + end-effector transforms (crackvision.kinematics)** ([details](GEOM-08.2.md)): Added a pure-Python (no ROS) forward-kinematics module for the B601-DM arm that computes the base-to-gripper transform straight from the committed URDF, plus a loader for the wrist camera and tool-tip
+…[302 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 50 / 119
-- Audits that rejected work with evidence-backed findings: 6 (repairs created: 6)
+- Implementation/review sessions run: 52 / 121
+- Audits that rejected work with evidence-backed findings: 7 (repairs created: 7)
 - Re-verified after an upstream change: CAM-02, GEOM-01, GEOM-01.R1, GEOM-02, GEOM-02.R1, GEOM-06, GEOM-10, GEOM-11, MOT-01, MOT-02, MOT-04.1, MOT-04.1.R1, MOT-04.2, MOT-04.3, MOT-04.3.R1, MOT-04.4, MOT-04.4.R1, MOT-04.6, PERC-03, PERC-03.R1, TC-001, TC-011, TC-016
 
 ## Planning changes
@@ -92,7 +94,7 @@
 | Local coding model (L-LLM) | 1 | 6 |
 | D405 capture (L-CAM) | 4 | 9 |
 | Perception (L-PERC) | 13 | 16 |
-| Geometry & calibration (L-GEOM) | 7 | 24 |
+| Geometry & calibration (L-GEOM) | 8 | 24 |
 | Motion planning (L-MOTION) | 7 | 16 |
 | Integration & commissioning (L-INT) | 1 | 6 |
 | Operator workflow & handoff (L-OPS) | 1 | 4 |
