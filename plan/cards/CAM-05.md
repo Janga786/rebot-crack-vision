@@ -2,14 +2,13 @@
 
 ```json card
 {
-  "kind": "decision",
+  "kind": "branch",
   "depends_on": [
     "GEOM-03"
   ],
   "requirements": [
     "REQ-CAM-2"
   ],
-  "spec_state": "draft",
   "refine_after": [
     "GEOM-03"
   ],
@@ -27,3 +26,6 @@ Draft: the core pipeline is pure Python; add realsense2_camera launch only if GE
 - Eye-in-hand consequence (INTERFACES §8.4): any capture that will be lifted to 3D must record the arm joint state
   (and end_effector.yaml sha256) at the capture instant. If ROS topics are used, capture /joint_states alongside
   the aligned images; the camera frames come from realsense2_camera TF (the URDF only places camera_link).
+
+## Decomposed 2026-09-30T14:00:11Z by L-CAM (claude-sonnet-5, high)
+Children: CAM-05.1, CAM-05.2
