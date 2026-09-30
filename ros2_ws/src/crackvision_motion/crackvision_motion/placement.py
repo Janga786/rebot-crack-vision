@@ -22,13 +22,32 @@ _SCORE_DECIMALS = 6
 SCHEMA = "crackvision.specimen_placement/1"
 SOURCE = "recommend_placement (MOT-04.3)"
 
+NOMINAL_DISCLAIMER = (
+    "Nominal recommendation only; the operator places the specimen and MOT-10 measures and "
+    "supersedes this file with the real, as-placed pose."
+)
 CAVEATS = [
+    NOMINAL_DISCLAIMER,
     "The boresight is prior evidence until GEOM-07.",
-    "The TCP is gripper_tcp from the MoveIt config, not yet calibrated.",
-    "The camera mount is undecided (GEOM-03); re-run if the inspection frame changes.",
-    "The collision scene is only self-collision plus a surface slab, not the MOT-03 scene.",
+    "End-of-arm geometry (tool_tip, wrist D405 camera_link and mount collision proxies) is the nominal "
+    "CAD/URDF prior in config/robot/end_effector.yaml (ADR-014); re-run after GEOM-07 (tool tip) and "
+    "GEOM-05 (hand-eye) replace it.",
     "The values are nominal until MOT-10.",
 ]
+
+
+def caveats_for(map_dict: Mapping[str, Any]) -> List[str]:
+    """CAVEATS plus the map-specific task frame and collision model the recommendation rests on."""
+    ik_link = map_dict.get("robot", {}).get("ik_link", "?")
+    grid = map_dict.get("grid", {})
+    model = grid.get("surface_collision", {}).get("model", "slab")
+    env = grid.get("environment")
+    scene = (f"; environment objects {list(env['objects'])} from {env['scene_config']}" if env
+             else "; no workcell objects (table) in the scene")
+    return list(CAVEATS) + [
+        f"Targets are poses of '{ik_link}' at the map's standoffs along its boresight.",
+        f"Collision model: self-collision (incl. the camera proxies) + specimen proxy '{model}'{scene}.",
+    ]
 
 
 def _round_key(v: float) -> float:
@@ -206,7 +225,7 @@ def recommend(
         "map_sha256": map_sha256,
         "config_sha256": config_sha256,
         "boresight_provenance": map_dict["boresight"]["provenance"],
-        "caveats": list(CAVEATS),
+        "caveats": caveats_for(map_dict),
         "source": SOURCE,
     }
 
@@ -268,7 +287,7 @@ def verification_config(placement: Mapping[str, Any], cfg: Mapping[str, Any]) ->
         "never sampled."
     )
 
-    return {
+    out = {
         "frame": cfg["frame"],
         "group": cfg["group"],
         "ik_link": cfg["ik_link"],
@@ -287,3 +306,64 @@ def verification_config(placement: Mapping[str, Any], cfg: Mapping[str, Any]) ->
         "value_status": "nominal",
         "sources": sources,
     }
+    if cfg.get("environment"):
+        out["environment"] = _jsonify(cfg["environment"])
+    return out
+
+
+VIEW_DISTANCE_M = 0.25
+VIEW_TILT_DEG = (0.0, 15.0)
+
+
+def view_verification_config(
+    placement: Mapping[str, Any],
+    cfg: Mapping[str, Any],
+    distance_m: float = VIEW_DISTANCE_M,
+    tilt_deg: Sequence[float] = VIEW_TILT_DEG,
+) -> Dict[str, Any]:
+    """A crackvision.reachability_config/1 dict checking that the wrist D405 can look at the placement
+    (ADR-014 view phase): `camera_link` (+x = optical axis) at `distance_m` above the footprint centre,
+    optical axis along the surface anti-normal or tilted up to max(tilt_deg), any roll. The specimen
+    proxy margin is widened to cover the whole dilated footprint."""
+    cx, cy = placement["center_xy_m"]
+    fw, fd = placement["footprint_m"]
+    sc = _jsonify(cfg["surface_collision"])
+    sc["margin_m"] = max(fw, fd) / 2.0 + placement["tolerance_m"]
+    sources = dict(cfg["sources"])
+    sources["view_verification"] = (
+        f"Emitted by recommend_placement: wrist-camera view check (ADR-014 view phase) at the placement "
+        f"centre, viewing distance {distance_m} m (nominal: inside the D405 0.07-0.50 m ideal band, and "
+        f"far enough for a {max(fw, fd)} m specimen to fit the 58 deg vertical FOV), tilt <= {max(tilt_deg)} deg."
+    )
+    out = {
+        "frame": cfg["frame"],
+        "group": cfg["group"],
+        "ik_link": "camera_link",
+        "boresight": {
+            "axis_local": [1.0, 0.0, 0.0],
+            "down_world": [0.0, 0.0, -1.0],
+            "provenance": "cad_prior",
+            "source": "camera_link +x is the D405 optical axis (realsense-ros); its pose on the gripper is the "
+                      "nominal CAD prior in config/robot/end_effector.yaml until GEOM-05 (ADR-014)",
+        },
+        "grid": {
+            "x_m": {"min": cx, "max": cx, "step": cfg["grid"]["x_m"]["step"]},
+            "y_m": {"min": cy, "max": cy, "step": cfg["grid"]["y_m"]["step"]},
+            "surface_z_m": [placement["surface_z_m"]],
+            "standoffs_m": [float(distance_m)],
+        },
+        "orientation": {
+            "roll_samples": cfg["orientation"]["roll_samples"],
+            "tilt_deg": [float(t) for t in tilt_deg],
+            "tilt_azimuth_samples": 4,
+        },
+        "ik": dict(_jsonify(cfg["ik"]), roll_search="first"),
+        "surface_collision": sc,
+        "prefilter": {"enabled": True},
+        "placement": _jsonify(cfg["placement"]),
+        "value_status": "nominal",
+        "sources": sources,
+    }
+    if cfg.get("environment"):
+        out["environment"] = _jsonify(cfg["environment"])
+    return out

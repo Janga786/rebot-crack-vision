@@ -5,7 +5,14 @@ standalone under the system python3 (ROS Humble, py3.10) without a colcon build.
 (MOT-04.2+) import these names from the actual ROS sweep node; the public names below
 (`ConfigError`, `Orientation`, `Target`, `load_config`, `config_sha256`, `axis_values`,
 `orientations`, `target_position`, `enumerate_targets`, `reach_bound_from_urdf`,
-`prefiltered`) are normative.
+`prefiltered`, `specimen_proxy_boxes`) are normative.
+
+ADR-014 additions (all optional, backward compatible): `ik_link` may be any frame rigidly attached to
+the planning chain tip (e.g. `tool_tip`, `camera_link` from crackvision_description) -- MoveIt's
+/compute_ik resolves it; `surface_collision.model: specimen_block` replaces the thin grid-wide slab by
+a block from the table (`floor_z_m`) up to the surface that excludes the robot base footprint
+(`base_keepout_m`); `environment` names static workcell objects (e.g. the table) taken from a
+crackvision.scene_config/1 file (MOT-03) and applied for the whole sweep.
 """
 
 from __future__ import annotations
@@ -21,14 +28,19 @@ import yaml
 
 _TOP_LEVEL_KEYS = frozenset({
     "frame", "group", "ik_link", "boresight", "grid", "orientation",
-    "ik", "surface_collision", "prefilter", "placement", "value_status", "sources",
+    "ik", "surface_collision", "prefilter", "placement", "value_status", "sources", "environment",
 })
 _BORESIGHT_KEYS = frozenset({"axis_local", "down_world", "provenance", "source"})
 _AXIS_KEYS = frozenset({"min", "max", "step"})
 _GRID_KEYS = frozenset({"x_m", "y_m", "surface_z_m", "standoffs_m"})
 _ORIENTATION_KEYS = frozenset({"roll_samples", "tilt_deg", "tilt_azimuth_samples"})
 _IK_KEYS = frozenset({"timeout_s", "avoid_collisions", "seed", "roll_search"})
-_SURFACE_COLLISION_KEYS = frozenset({"enabled", "thickness_m", "margin_m", "allowed_links"})
+_SURFACE_COLLISION_KEYS = frozenset({
+    "enabled", "thickness_m", "margin_m", "allowed_links", "model", "floor_z_m", "base_keepout_m",
+})
+_SURFACE_MODELS = frozenset({"slab", "specimen_block"})
+_ENVIRONMENT_KEYS = frozenset({"scene_config", "objects"})
+_SURFACE_GAP_M = 0.001  # proxy top face sits this far below the inspected surface
 _PREFILTER_KEYS = frozenset({"enabled"})
 _PLACEMENT_KEYS = frozenset({"footprint_m", "yaw_candidates_rad", "tolerance_m", "top_k"})
 
@@ -249,12 +261,38 @@ def load_config(path: Union[str, Path]) -> dict:
     if not isinstance(allowed_links_raw, list):
         raise ConfigError("'surface_collision.allowed_links' must be a list")
     allowed_links = tuple(str(v) for v in allowed_links_raw)
+    model = sc_raw.get("model", "slab")
+    if model not in _SURFACE_MODELS:
+        raise ConfigError(f"'surface_collision.model' must be one of {sorted(_SURFACE_MODELS)}, got {model!r}")
     surface_collision = {
         "enabled": sc_enabled,
         "thickness_m": thickness_m,
         "margin_m": margin_m,
         "allowed_links": allowed_links,
+        "model": model,
     }
+    if model == "specimen_block":
+        floor_z_m = _as_float(_require(sc_raw, "floor_z_m", "surface_collision"), "surface_collision.floor_z_m")
+        keepout_raw = _require(sc_raw, "base_keepout_m", "surface_collision")
+        if not isinstance(keepout_raw, list) or len(keepout_raw) != 4:
+            raise ConfigError("'surface_collision.base_keepout_m' must be [x_min, x_max, y_min, y_max]")
+        keepout = tuple(_as_float(v, "surface_collision.base_keepout_m") for v in keepout_raw)
+        if not (keepout[0] < keepout[1] and keepout[2] < keepout[3]):
+            raise ConfigError(f"'surface_collision.base_keepout_m' must have min < max, got {keepout}")
+        for z in surface_z_m:
+            if z < floor_z_m:
+                raise ConfigError(f"'grid.surface_z_m' entry {z} lies below surface_collision.floor_z_m {floor_z_m}")
+        for x in axis_values(x_axis):
+            for y in axis_values(y_axis):
+                if keepout[0] < x < keepout[1] and keepout[2] < y < keepout[3]:
+                    raise ConfigError(
+                        f"grid node ({x:.4f}, {y:.4f}) lies inside surface_collision.base_keepout_m {keepout}: "
+                        "a specimen cannot be placed on the robot base"
+                    )
+        surface_collision["floor_z_m"] = floor_z_m
+        surface_collision["base_keepout_m"] = keepout
+    elif "floor_z_m" in sc_raw or "base_keepout_m" in sc_raw:
+        raise ConfigError("'surface_collision.floor_z_m'/'base_keepout_m' only apply to model 'specimen_block'")
 
     prefilter_raw = _require(raw, "prefilter", "<root>")
     _check_keys(prefilter_raw, _PREFILTER_KEYS, "prefilter")
@@ -303,7 +341,7 @@ def load_config(path: Union[str, Path]) -> dict:
         if not isinstance(v, str) or not v:
             raise ConfigError(f"'sources.{k}' must be a non-empty string")
 
-    return {
+    result = {
         "frame": raw["frame"],
         "group": raw["group"],
         "ik_link": raw["ik_link"],
@@ -317,6 +355,18 @@ def load_config(path: Union[str, Path]) -> dict:
         "value_status": value_status,
         "sources": dict(sources),
     }
+    if "environment" in raw:
+        env_raw = raw["environment"]
+        _check_keys(env_raw, _ENVIRONMENT_KEYS, "environment")
+        scene_config = _require(env_raw, "scene_config", "environment")
+        if not isinstance(scene_config, str) or not scene_config:
+            raise ConfigError("'environment.scene_config' must be a non-empty (repo-relative) path")
+        objects = _require(env_raw, "objects", "environment")
+        if (not isinstance(objects, list) or not objects
+                or not all(isinstance(o, str) and o for o in objects) or len(set(objects)) != len(objects)):
+            raise ConfigError("'environment.objects' must be a non-empty list of unique object ids")
+        result["environment"] = {"scene_config": scene_config, "objects": tuple(objects)}
+    return result
 
 
 def config_sha256(path: Union[str, Path]) -> str:
@@ -447,6 +497,45 @@ def orientations(cfg: dict) -> List[Orientation]:
 
 def target_position(surface_xyz: Sequence[float], standoff_m: float, d_world: Sequence[float]) -> np.ndarray:
     return np.array(surface_xyz, dtype=float) - standoff_m * np.array(d_world, dtype=float)
+
+
+Box = Tuple[Tuple[float, float, float], Tuple[float, float, float]]  # (centre, size), axis-aligned, cfg frame
+
+
+def specimen_proxy_boxes(cfg: dict, surface_z: float) -> List[Box]:
+    """Axis-aligned boxes standing in for the inspected specimen at one surface height.
+
+    Region = grid x/y extent dilated by margin_m. The top face is _SURFACE_GAP_M below `surface_z`.
+    - model `slab` (MOT-04.4 behaviour): one box of thickness_m over the whole region.
+    - model `specimen_block` (ADR-014): the region minus base_keepout_m (a specimen cannot overlap the
+      robot base), as up to four boxes reaching down to floor_z_m (the table top the specimen stands
+      on). Returns [] when the surface is at the floor (the table itself is the surface).
+    """
+    sc = cfg["surface_collision"]
+    x_axis, y_axis = cfg["grid"]["x_m"], cfg["grid"]["y_m"]
+    m = sc["margin_m"]
+    x0, x1 = x_axis["min"] - m, x_axis["max"] + m
+    y0, y1 = y_axis["min"] - m, y_axis["max"] + m
+    top = surface_z - _SURFACE_GAP_M
+    if sc.get("model", "slab") == "slab":
+        t = sc["thickness_m"]
+        return [(((x0 + x1) / 2.0, (y0 + y1) / 2.0, top - t / 2.0), (x1 - x0, y1 - y0, t))]
+    bottom = sc["floor_z_m"]
+    if top - bottom <= 1e-6:
+        return []
+    kx0, kx1, ky0, ky1 = sc["base_keepout_m"]
+    rects = [
+        (max(x0, kx1), x1, y0, y1),                               # in front of the base
+        (x0, min(x1, kx0), y0, y1),                               # behind the base
+        (max(x0, kx0), min(x1, kx1), max(y0, ky1), y1),           # beside the base, +y
+        (max(x0, kx0), min(x1, kx1), y0, min(y1, ky0)),           # beside the base, -y
+    ]
+    boxes: List[Box] = []
+    for rx0, rx1, ry0, ry1 in rects:
+        if rx1 - rx0 > 1e-9 and ry1 - ry0 > 1e-9:
+            boxes.append((((rx0 + rx1) / 2.0, (ry0 + ry1) / 2.0, (top + bottom) / 2.0),
+                          (rx1 - rx0, ry1 - ry0, top - bottom)))
+    return boxes
 
 
 # --------------------------------------------------------------------------------------

@@ -1,0 +1,36 @@
+# reachability_task_frames_smoke.yaml — ADR-014 smoke fixture for scripts/ros/test_reachability_task_frames.sh.
+# Tool tip at 0.01/0.04 m clearance above a raised surface (z=0.04) with the specimen_block proxy, the
+# base keep-out and the table environment: x=0.23 is inside the comfortable region measured in the ADR-014
+# feasibility probe (both clearances reachable there, joint margin ~0.25 rad at z=0.04); x=0.95 is beyond
+# reach. The same 0.01 m clearance applied to gripper_tcp was infeasible everywhere (MOT-04.5 attempt 2).
+frame: base_link
+group: arm
+ik_link: tool_tip
+boresight:
+  axis_local: [1.0, 0.0, 0.0]
+  down_world: [0.0, 0.0, -1.0]
+  provenance: prior_evidence
+  source: "docs/INTERFACES.md §6.5; tool_tip per config/robot/end_effector.yaml (ADR-014)"
+grid:
+  x_m: {min: 0.23, max: 0.95, step: 0.72}
+  y_m: {min: -0.03, max: 0.03, step: 0.03}
+  surface_z_m: [0.04]
+  standoffs_m: [0.01, 0.04]
+orientation: {roll_samples: 8, tilt_deg: [0.0], tilt_azimuth_samples: 4}
+ik: {timeout_s: 0.02, avoid_collisions: true, seed: neighbour, roll_search: best}
+surface_collision:
+  enabled: true
+  model: specimen_block
+  thickness_m: 0.02
+  margin_m: 0.05
+  floor_z_m: 0.0
+  base_keepout_m: [-0.09, 0.09, -0.12, 0.12]
+  allowed_links: []
+environment:
+  scene_config: ros2_ws/src/crackvision_motion/test/fixtures/scene_table.yaml
+  objects: [table]
+prefilter: {enabled: true}
+placement: {footprint_m: [0.05, 0.05], yaw_candidates_rad: [0.0], tolerance_m: 0.36, top_k: 1}
+value_status: nominal
+sources:
+  fixture: "ADR-014 smoke-test fixture (scripts/ros/test_reachability_task_frames.sh), not a sweep input."

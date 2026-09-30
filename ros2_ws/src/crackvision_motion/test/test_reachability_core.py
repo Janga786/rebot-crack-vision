@@ -22,6 +22,7 @@ from crackvision_motion.reachability_core import (  # noqa: E402
     orientations,
     prefiltered,
     reach_bound_from_urdf,
+    specimen_proxy_boxes,
     target_position,
 )
 
@@ -389,10 +390,97 @@ def test_load_committed_config():
     cfg = load_config(REPO_ROOT / "config" / "motion" / "reachability.yaml")
     assert cfg["frame"] == "base_link"
     assert cfg["group"] == "arm"
-    assert cfg["ik_link"] == "gripper_tcp"
+    # ADR-014: standoffs are tool-tip clearances, so the task frame is tool_tip, not the grasp-centre
+    # gripper_tcp (44.3 mm proximal to the fingertips).
+    assert cfg["ik_link"] == "tool_tip"
+    assert cfg["grid"]["standoffs_m"] == (0.01, 0.04)
     assert cfg["value_status"] == "nominal"
     assert cfg["boresight"]["provenance"] == "prior_evidence"
-    # grid step 0.03 (MOT-04.5 runtime change, see config/motion/reachability.yaml "Grid change"):
-    # x in [0.05, 0.50] -> 16 samples, y in [-0.39, 0.39] -> 27 samples.
-    assert len(axis_values(cfg["grid"]["x_m"])) == 16
+    assert cfg["surface_collision"]["model"] == "specimen_block"
+    assert cfg["environment"]["objects"] == ("table",)
+    # grid step 0.03 (MOT-04.5 runtime choice); x starts outside the base keep-out:
+    # x in [0.11, 0.50] -> 14 samples, y in [-0.39, 0.39] -> 27 samples.
+    assert len(axis_values(cfg["grid"]["x_m"])) == 14
     assert len(axis_values(cfg["grid"]["y_m"])) == 27
+
+
+# --------------------------------------------------------------------------------------
+# ADR-014: task frames, specimen_block proxy with base keep-out, environment objects
+# --------------------------------------------------------------------------------------
+
+def _block_config() -> dict:
+    cfg = _base_config()
+    cfg["ik_link"] = "tool_tip"
+    cfg["grid"]["x_m"] = {"min": 0.11, "max": 0.50, "step": 0.03}
+    cfg["grid"]["y_m"] = {"min": -0.39, "max": 0.39, "step": 0.03}
+    cfg["grid"]["surface_z_m"] = [0.0, 0.04, 0.12]
+    cfg["surface_collision"] = {
+        "enabled": True, "model": "specimen_block", "thickness_m": 0.02, "margin_m": 0.05,
+        "floor_z_m": 0.0, "base_keepout_m": [-0.09, 0.09, -0.12, 0.12], "allowed_links": [],
+    }
+    cfg["environment"] = {"scene_config": "config/scene/scene.yaml", "objects": ["table"]}
+    return cfg
+
+
+def _inside(box, p) -> bool:
+    (cx, cy, cz), (sx, sy, sz) = box
+    return abs(p[0] - cx) < sx / 2 and abs(p[1] - cy) < sy / 2 and abs(p[2] - cz) < sz / 2
+
+
+def test_specimen_block_config_loads_and_defaults_legacy_slab(tmp_path):
+    cfg = load_config(_write_yaml(tmp_path, _block_config()))
+    assert cfg["surface_collision"]["model"] == "specimen_block"
+    assert cfg["surface_collision"]["base_keepout_m"] == (-0.09, 0.09, -0.12, 0.12)
+    assert cfg["environment"] == {"scene_config": "config/scene/scene.yaml", "objects": ("table",)}
+    legacy = load_config(_write_yaml(tmp_path, _base_config()))
+    assert legacy["surface_collision"]["model"] == "slab" and "environment" not in legacy
+
+
+def test_legacy_slab_geometry_is_unchanged():
+    cfg = load_config_from_dict(_base_config())
+    [(centre, size)] = specimen_proxy_boxes(cfg, 0.04)
+    assert np.allclose(centre, (0.275, 0.0, 0.04 - 0.001 - 0.01))
+    assert np.allclose(size, (0.45 + 0.10, 0.80 + 0.10, 0.02))
+
+
+def test_specimen_block_reaches_the_floor_and_avoids_the_base():
+    cfg = load_config_from_dict(_block_config())
+    boxes = specimen_proxy_boxes(cfg, 0.12)
+    assert boxes, "a raised surface needs a proxy"
+    for (_, (_, _, sz)), (cz) in ((b, b[0][2]) for b in boxes):
+        assert cz - sz / 2 == pytest.approx(0.0) and cz + sz / 2 == pytest.approx(0.119)
+    # nothing inside the base keep-out, everything else under the grid is covered
+    assert not any(_inside(b, (0.0, 0.0, 0.06)) for b in boxes)
+    assert not any(_inside(b, (0.08, 0.11, 0.06)) for b in boxes)
+    for p in ((0.30, 0.0, 0.06), (0.10, 0.0, 0.06), (0.07, 0.30, 0.06), (0.07, -0.30, 0.06), (0.52, 0.42, 0.06)):
+        assert any(_inside(b, p) for b in boxes), p
+    assert specimen_proxy_boxes(cfg, 0.0) == []  # the table itself is the surface
+
+
+@pytest.mark.parametrize("mutate, message", [
+    (lambda c: c["surface_collision"].update(model="cloud"), "model"),
+    (lambda c: c["surface_collision"].pop("floor_z_m"), "floor_z_m"),
+    (lambda c: c["surface_collision"].update(base_keepout_m=[0.09, -0.09, -0.12, 0.12]), "min < max"),
+    (lambda c: c["grid"].update(x_m={"min": 0.05, "max": 0.50, "step": 0.03}), "inside surface_collision.base_keepout_m"),
+    (lambda c: c["grid"].update(surface_z_m=[-0.02]), "below"),
+    (lambda c: c["environment"].update(objects=[]), "environment.objects"),
+    (lambda c: c["environment"].update(extra=1), "unknown key"),
+])
+def test_specimen_block_config_errors(tmp_path, mutate, message):
+    cfg = _block_config()
+    mutate(cfg)
+    with pytest.raises(ConfigError, match=message):
+        load_config(_write_yaml(tmp_path, cfg))
+
+
+def test_keepout_keys_rejected_for_slab(tmp_path):
+    cfg = _base_config()
+    cfg["surface_collision"]["floor_z_m"] = 0.0
+    with pytest.raises(ConfigError, match="only apply"):
+        load_config(_write_yaml(tmp_path, cfg))
+
+
+def load_config_from_dict(d: dict) -> dict:
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        return load_config(_write_yaml(Path(tmp), d))

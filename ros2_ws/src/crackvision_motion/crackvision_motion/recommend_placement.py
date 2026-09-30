@@ -15,7 +15,7 @@ from typing import Any, Dict, Optional
 import yaml
 
 from .cli_common import PreconditionError, find_root, run_cli
-from .placement import recommend, verification_config
+from .placement import recommend, verification_config, view_verification_config
 from .reachability_core import ConfigError, config_sha256, load_config
 from .reachability_map import PlacementError, load_map, load_placement, validate_placement
 
@@ -78,6 +78,7 @@ def _extra_args(parser) -> None:
     parser.add_argument("--reachability-config", type=Path, default=None, help="reachability config YAML (default: config/motion/reachability.yaml)")
     parser.add_argument("--out", type=Path, default=None, help="specimen placement YAML to write (default: config/motion/specimen_placement.yaml)")
     parser.add_argument("--emit-verify-config", type=Path, default=None, help="also write a half-step verification-grid reachability config here")
+    parser.add_argument("--emit-view-config", type=Path, default=None, help="also write a wrist-camera view check config (camera_link above the placement centre, ADR-014) here")
     parser.add_argument("--validate-placement", type=Path, default=None, help="validate-only: check PATH against the schema and exit (0 valid, 2 invalid)")
 
 
@@ -133,6 +134,18 @@ def _run(args, log, summary) -> Dict[str, Any]:
             load_config(verify_path)  # self-check: must itself be a valid reachability_config/1
             log.info("wrote verification-grid config to %s", verify_path)
             summary.increment("verify_config_written")
+
+    if args.emit_view_config is not None:
+        if not placement_dict["feasible"]:
+            log.warning("no feasible placement: skipping --emit-view-config")
+        else:
+            view_path = Path(args.emit_view_config).expanduser().resolve()
+            view_cfg = view_verification_config(placement_dict["placement"], cfg)
+            view_path.parent.mkdir(parents=True, exist_ok=True)
+            view_path.write_text(yaml.safe_dump(view_cfg, sort_keys=False, default_flow_style=False), encoding="utf-8")
+            load_config(view_path)  # self-check
+            log.info("wrote camera view-check config to %s", view_path)
+            summary.increment("view_config_written")
 
     if not placement_dict["feasible"]:
         return {"status": "failed"}
