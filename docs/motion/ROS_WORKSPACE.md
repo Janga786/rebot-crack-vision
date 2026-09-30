@@ -210,3 +210,28 @@ guarantee.
 joint-space goals, which do not require IK, so this does not block MOT-02; a Cartesian
 goal for the `arm` group would need that library on the loader path (or a rebuilt/repackaged
 `trac_ik_kinematics_plugin`) to succeed.
+
+## 7. End-of-arm overlay and task-frame reachability (ADR-014)
+
+The mock stack now plans against the vendor model **plus** `crackvision_description`: `tool_tip`,
+the wrist D405 `camera_link`, and padded camera/mount collision proxies, all placed from
+`config/robot/end_effector.yaml` (every value nominal until GEOM-05/07). `~/rebot_ws` is still only
+read. `mock_planning.launch.py` validates that file first and refuses to start on an invalid one.
+It also adds realsense's nominal optical frames, because no camera driver runs in the mock.
+
+```
+$ bash scripts/ros/test_end_effector.sh              # 21 offline tests + live check_end_effector
+  PASS: URDF joint origin of 'tool_tip' / 'camera_link' / proxies equal the config
+  PASS: FK T_gripper_link_tool_tip / T_gripper_link_camera_link match (|dp| < 1e-16 m)
+  PASS: all-zero (SRDF home) state is collision-free with the camera proxies
+  PASS: camera_link is above gripper_link at the zero pose (dz=+0.0640 m)
+  PASS: compute_ik with ik_link_name='tool_tip' / 'camera_link' ... FK agrees (0.000 mm, 0.000 deg)
+$ bash scripts/ros/test_reachability_task_frames.sh  # tool_tip @0.01/0.04 m + camera view @0.25 m
+  test_reachability_task_frames.sh: tool counts={'reachable': 6, 'unreachable': 6}; camera view reachable (tilt 0.0 deg)
+```
+
+MoveIt's `/compute_ik` accepts any frame rigidly attached to the SRDF chain tip as `ik_link_name`, so
+the `arm` chain stays `base_link → gripper_tcp`. The sweep's `specimen_block` proxy and `environment`
+table (INTERFACES §8.3) replace the old grid-wide thin slab. That slab ran under the base and
+collided with link2 at surface_z ≥ ≈0.10 m. The legacy `slab` model is still the default, so
+`test_reachability.sh` above is unchanged and still passes.

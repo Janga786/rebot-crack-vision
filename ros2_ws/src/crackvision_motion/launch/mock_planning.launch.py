@@ -6,12 +6,21 @@ rebotarm_controller + gripper_controller spawners, move_group) but with no RViz 
 GUI, so it can run on a headless CI/test box. Exiting move_group (e.g. via SIGINT to the
 whole process group) cascades to ros2_control_node and then to a full LaunchService
 shutdown, so nothing is left running.
+
+Robot model (ADR-014): the vendor URDF/SRDF plus this repo's end-of-arm overlay
+(crackvision_description: tool_tip, wrist D405 camera_link and padded camera/mount collision
+proxies), placed from config/robot/end_effector.yaml. The config is validated before
+MoveItConfigsBuilder runs, because the builder only *warns* when a description file is
+missing and would otherwise start move_group without the camera geometry. Nominal
+realsense optical frames are included because no camera driver runs in this mock stack.
 """
 
 import os
 import signal
+from pathlib import Path
 
 from ament_index_python.packages import get_package_share_directory
+from crackvision_description.end_effector import load_config as load_end_effector_config
 from launch import LaunchDescription
 from launch.actions import EmitEvent, RegisterEventHandler
 from launch.event_handlers import OnProcessExit
@@ -21,11 +30,39 @@ from launch_ros.actions import Node
 from moveit_configs_utils import MoveItConfigsBuilder
 
 
+def _end_effector_config() -> Path:
+    override = os.environ.get("CRACKVISION_END_EFFECTOR_CONFIG")
+    if override:
+        path = Path(override)
+    else:
+        root = os.environ.get("CRACKVISION_ROOT")
+        if not root:
+            raise RuntimeError(
+                "CRACKVISION_ROOT is not set: run through scripts/ros/env_ros.sh (it exports the repo "
+                "root) or set CRACKVISION_END_EFFECTOR_CONFIG to config/robot/end_effector.yaml"
+            )
+        path = Path(root) / "config" / "robot" / "end_effector.yaml"
+    path = path.resolve()
+    load_end_effector_config(path)  # raises EndEffectorError on a missing or invalid file
+    return path
+
+
 def generate_launch_description():
+    end_effector_config = _end_effector_config()
+    description_share = Path(get_package_share_directory("crackvision_description"))
     moveit_config = (
         MoveItConfigsBuilder("rebotarm", package_name="rebotarm_moveit_config")
-        .robot_description(file_path="config/rebotarm.urdf.xacro")
-        .robot_description_semantic(file_path="config/rebotarm.srdf")
+        .robot_description(
+            file_path=str(description_share / "urdf" / "b601_dm_end_effector.urdf.xacro"),
+            mappings={
+                "end_effector_config": str(end_effector_config),
+                "nominal_camera_frames": "true",
+            },
+        )
+        .robot_description_semantic(
+            file_path=str(description_share / "srdf" / "b601_dm_end_effector.srdf.xacro"),
+            mappings={"end_effector_config": str(end_effector_config)},
+        )
         .robot_description_kinematics(file_path="config/kinematics.yaml")
         .joint_limits(file_path="config/joint_limits.yaml")
         .trajectory_execution(file_path="config/moveit_controllers.yaml")

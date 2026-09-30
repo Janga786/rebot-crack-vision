@@ -1,0 +1,104 @@
+<?xml version="1.0"?>
+<!--
+  b601_dm_end_effector.urdf.xacro — the planning model used by this repo (ADR-014).
+
+  = the vendor model exactly as MoveIt loads it (~/rebot_ws rebotarm_moveit_config/config/rebotarm.urdf.xacro:
+    reBot_B601_DM_with_gripper.urdf + gripper_tcp + ros2_control mock, read-only underlay, not modified)
+  + tool_tip, camera_link and conservative collision proxies for the wrist D405 and its mount, all placed
+    from config/robot/end_effector.yaml (arg end_effector_config, absolute path). No number is hard-coded
+    here: calibration updates the YAML (value_status nominal -> measured), never this file.
+
+  nominal_camera_frames:=true adds realsense-ros's nominal camera_link -> camera_{depth,color}{,_optical}_frame
+  chain (identity translation for the D405, whose colour stream IS the left imager). Use it ONLY when no
+  realsense2_camera driver runs (mock/sim); with the real camera the driver publishes those frames from
+  factory calibration and a second publisher would fight it.
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="reBot_B601_DM_with_gripper">
+  <xacro:arg name="end_effector_config" default=""/>
+  <xacro:arg name="nominal_camera_frames" default="false"/>
+  <xacro:arg name="initial_positions_file" default="$(find rebotarm_moveit_config)/config/initial_positions.yaml"/>
+
+  <xacro:include filename="$(find rebotarm_moveit_config)/config/rebotarm.urdf.xacro"/>
+
+  <xacro:property name="ee" value="${xacro.load_yaml('$(arg end_effector_config)')}"/>
+  <xacro:property name="pad" value="${float(ee.collision_padding_m)}"/>
+  <xacro:property name="M_PI" value="3.141592653589793"/>
+
+  <material name="crackvision_proxy">
+    <color rgba="0.95 0.55 0.10 0.45"/>
+  </material>
+
+  <!-- Crack-facing tool reference (approach / trace / retract). Not gripper_tcp (grasp centre). -->
+  <link name="${ee.tool.frame}"/>
+  <joint name="${ee.tool.frame}_joint" type="fixed">
+    <parent link="${ee.parent_link}"/>
+    <child link="${ee.tool.frame}"/>
+    <origin xyz="${ee.tool.xyz_m[0]} ${ee.tool.xyz_m[1]} ${ee.tool.xyz_m[2]}"
+            rpy="${ee.tool.rpy_rad[0]} ${ee.tool.rpy_rad[1]} ${ee.tool.rpy_rad[2]}"/>
+  </joint>
+
+  <!-- Wrist D405 (eye-in-hand). camera_link = realsense-ros depth/left-imager origin, x forward. -->
+  <link name="${ee.wrist_camera.frame}"/>
+  <joint name="wrist_camera_joint" type="fixed">
+    <parent link="${ee.parent_link}"/>
+    <child link="${ee.wrist_camera.frame}"/>
+    <origin xyz="${ee.wrist_camera.xyz_m[0]} ${ee.wrist_camera.xyz_m[1]} ${ee.wrist_camera.xyz_m[2]}"
+            rpy="${ee.wrist_camera.rpy_rad[0]} ${ee.wrist_camera.rpy_rad[1]} ${ee.wrist_camera.rpy_rad[2]}"/>
+  </joint>
+
+  <!-- One fixed link per collision proxy: a padded box centred on the link origin. -->
+  <xacro:macro name="crackvision_collision_boxes" params="items">
+    <xacro:if value="${len(items) > 0}">
+      <link name="${items[0].id}">
+        <visual>
+          <origin xyz="0 0 0" rpy="0 0 0"/>
+          <geometry>
+            <box size="${items[0].box_size_m[0]} ${items[0].box_size_m[1]} ${items[0].box_size_m[2]}"/>
+          </geometry>
+          <material name="crackvision_proxy"/>
+        </visual>
+        <collision>
+          <origin xyz="0 0 0" rpy="0 0 0"/>
+          <geometry>
+            <box size="${items[0].box_size_m[0] + 2 * pad} ${items[0].box_size_m[1] + 2 * pad} ${items[0].box_size_m[2] + 2 * pad}"/>
+          </geometry>
+        </collision>
+      </link>
+      <joint name="${items[0].id}_joint" type="fixed">
+        <parent link="${items[0].frame}"/>
+        <child link="${items[0].id}"/>
+        <origin xyz="${items[0].xyz_m[0]} ${items[0].xyz_m[1]} ${items[0].xyz_m[2]}"
+                rpy="${items[0].rpy_rad[0]} ${items[0].rpy_rad[1]} ${items[0].rpy_rad[2]}"/>
+      </joint>
+      <xacro:crackvision_collision_boxes items="${items[1:]}"/>
+    </xacro:if>
+  </xacro:macro>
+  <xacro:crackvision_collision_boxes items="${ee.collision}"/>
+
+  <xacro:if value="$(arg nominal_camera_frames)">
+    <link name="camera_depth_frame"/>
+    <joint name="camera_depth_joint" type="fixed">
+      <parent link="camera_link"/>
+      <child link="camera_depth_frame"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+    <link name="camera_depth_optical_frame"/>
+    <joint name="camera_depth_optical_joint" type="fixed">
+      <parent link="camera_depth_frame"/>
+      <child link="camera_depth_optical_frame"/>
+      <origin xyz="0 0 0" rpy="${-M_PI / 2} 0 ${-M_PI / 2}"/>
+    </joint>
+    <link name="camera_color_frame"/>
+    <joint name="camera_color_joint" type="fixed">
+      <parent link="camera_link"/>
+      <child link="camera_color_frame"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+    <link name="camera_color_optical_frame"/>
+    <joint name="camera_color_optical_joint" type="fixed">
+      <parent link="camera_color_frame"/>
+      <child link="camera_color_optical_frame"/>
+      <origin xyz="0 0 0" rpy="${-M_PI / 2} 0 ${-M_PI / 2}"/>
+    </joint>
+  </xacro:if>
+</robot>

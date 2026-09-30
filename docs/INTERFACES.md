@@ -958,3 +958,80 @@ All three are `rclpy`-side tools run via `scripts/ros/env_ros.sh` (never `./env.
 §0 conventions (§0.2 exit codes, §0.3 common flags via
 `ros2_ws/src/crackvision_motion/crackvision_motion/cli_common.py::add_common_args`, §0.4 log
 artefacts via `cli_common.py::run_cli`).
+
+---
+
+## 8. End-of-arm frames, task frames and the eye-in-hand capture contract (ADR-014)
+
+**Normative source:** `docs/adr/014-end-effector-frames-and-task-phases.md`. This section amends §6.1
+(`TCP` row) and §6.5 for everything that faces a surface, and extends §7. Earlier sections are not edited.
+
+### 8.1 `config/robot/end_effector.yaml` (schema `crackvision.end_effector/1`)
+
+This file is the single source of truth for everything rigidly attached to `gripper_link`. It is validated
+by `ros2_ws/src/crackvision_description/crackvision_description/end_effector.py::load_config`
+(`EndEffectorError`). All transforms are `T_gripper_link_<child>`, in metres, with URDF fixed-axis rpy.
+
+| Block | Frame(s) | Meaning |
+|---|---|---|
+| `tool` | `tool_tip` | crack-facing tool reference; `pointing_axis` is its boresight (+X) |
+| `wrist_camera` | `camera_link` | D405 depth/left-imager origin, realsense-ros convention (+x optical axis, +y left, +z up); frame name fixed to `camera_link` |
+| `collision[]` | one link per `id` | padded boxes (`collision_padding_m`) for the mount and the housing |
+| `allowed_self_collisions` | — | rigid pairs only; every pair names at least one overlay link |
+
+Every block carries `value_status: nominal|measured`, `provenance` and `source`. `assert_commissioning_ready(cfg)`
+raises `EndEffectorNotCalibratedError` while any block is nominal. MOT-05 must call it before real motion.
+Calibration cards (GEOM-05 camera, GEOM-07 tool) replace blocks with measured values. They never edit
+the xacro.
+
+### 8.2 Planning model
+
+`crackvision_description/urdf/b601_dm_end_effector.urdf.xacro` (args `end_effector_config` = absolute
+path, `nominal_camera_frames` default `false`) = the vendor `rebotarm.urdf.xacro`, unchanged, plus the
+§8.1 frames and proxies. `srdf/b601_dm_end_effector.srdf.xacro` = the vendor SRDF plus the
+`allowed_self_collisions` pairs.
+
+`crackvision_motion/launch/mock_planning.launch.py` loads both, from `$CRACKVISION_ROOT/config/robot/end_effector.yaml`
+(override: `$CRACKVISION_END_EFFECTOR_CONFIG`). It refuses to start on an invalid file. The SRDF `arm`
+chain tip stays `gripper_tcp` (grasping).
+
+Surface tasks target the task frame directly: `ik_link_name: tool_tip` or `camera_link`. MoveIt resolves
+frames rigidly attached to the chain tip. `ros2 run crackvision_motion check_end_effector` verifies the
+live model against the file; it is read-only and follows the §0 exit codes.
+
+| Task | Task frame | Distance along the frame's +X to the surface point |
+|---|---|---|
+| view (capture) | `camera_link` | viewing distance, nominal 0.25 m (0.20–0.30) |
+| approach / retract | `tool_tip` | tool clearance, nominal 0.04 m |
+| no-contact trace | `tool_tip` | tool clearance, nominal 0.01 m |
+
+### 8.3 Reachability additions to §7 (backward compatible)
+
+- `ik_link` may be any task frame from §8.2. §7's `standoffs_m` / map `standoff_m` are distances of
+  *that frame* from the surface point along its boresight.
+- `surface_collision.model`: `slab` (default; §7 behaviour) or `specimen_block`. The latter adds
+  `floor_z_m` and `base_keepout_m: [x_min, x_max, y_min, y_max]`. The proxy is a block from `floor_z_m` up
+  to 1 mm under each `surface_z`, over grid + `margin_m`, minus the keep-out. Every grid node must lie
+  outside the keep-out, and no `surface_z` may lie below `floor_z_m` (`ConfigError`). Geometry:
+  `reachability_core.specimen_proxy_boxes`.
+- Optional top-level `environment: {scene_config: <repo-relative crackvision.scene_config/1>, objects: [ids]}`.
+  These static workcell objects, plus the scene's allowed-collision entries that touch them, are applied
+  for the whole sweep. The map records them as
+  `grid.environment = {scene_config, scene_config_sha256, objects}`.
+- `recommend_placement --emit-view-config PATH` writes a camera view check: `camera_link` at 0.25 m above
+  the placement centre, tilt ∈ {0°, 15°}, specimen proxy widened to the whole dilated footprint. A
+  placement counts as usable only if its half-step verification **and** this view check pass with
+  `--require-all-reachable`.
+- `caveats` always starts with the §7.3 nominal disclaimer (verbatim). It then names the task frame and
+  the collision model the recommendation rests on.
+
+### 8.4 Eye-in-hand capture contract
+
+A capture whose pixels are lifted to `base_link` must carry, taken at the capture instant:
+- the arm joint state (`joint1..joint6`, rad) and its timestamp;
+- the `end_effector.yaml` sha256 and its `wrist_camera.value_status`.
+
+`p_base_link = FK(q) · T_gripper_link_camera_link · T_camera_link_camera_color_optical_frame · p_optical`,
+with the last factor taken from the driver's TF (§6.2) or the device record. A capture without these
+fields is valid for 2D perception only. Any card that records or consumes robot-mounted captures
+(CAM-05, GEOM-08, INT-02, OPS-01) must implement this contract.

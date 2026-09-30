@@ -1,0 +1,94 @@
+# config/robot/end_effector.yaml — end-of-arm geometry of the B601-DM for planning (ADR-014).
+#
+# Schema: crackvision.end_effector/1 (validated by
+# ros2_ws/src/crackvision_description/crackvision_description/end_effector.py:load_config).
+# Consumed by ros2_ws/src/crackvision_description/urdf/b601_dm_end_effector.urdf.xacro, which adds
+# these frames/collision proxies to the canonical vendor model for MoveIt (~/rebot_ws stays untouched).
+#
+# EVERY transform below is T_gripper_link_<child> (ADR-012 notation), metres/radians, URDF fixed-axis
+# rpy. NOTHING in this file is measured yet: each block carries value_status `nominal` plus its
+# provenance. Calibration cards replace a block with `value_status: measured` and a real source:
+#   tool          <- GEOM-07 pivot calibration of the physical tool tip (GEOM-06 solver)
+#   wrist_camera  <- GEOM-05 eye-in-hand hand-eye calibration (GEOM-04 solver)
+# The commissioning gate (MOT-05) must refuse real motion while any block is still `nominal`.
+schema: crackvision.end_effector/1
+parent_link: gripper_link
+
+# The physical point that faces the crack during approach/trace/retract (ADR-014 §2). Not the MoveIt
+# grasp centre: `gripper_tcp` (vendor xacro, xyz -0.0443 0 0) sits 44.3 mm PROXIMAL to the fingertips.
+tool:
+  frame: tool_tip
+  xyz_m: [0.0, 0.0, 0.0]
+  rpy_rad: [0.0, 0.0, 0.0]
+  pointing_axis: [1.0, 0.0, 0.0]
+  value_status: nominal
+  provenance: urdf_mesh_prior
+  source: >-
+    Closed-finger distal tip of the canonical URDF (~/rebot_ws @2ebc4b8c,
+    reBot_B601_DM_with_gripper.urdf): gripper_left/right.STL placed by gripper_joint1/2 at q=0 reach
+    max x = 0.0000 m in gripper_link, at y = 0.0000, z = +/-0.0013 (a point), i.e. the gripper_link
+    origin. Pointing axis +X per docs/TECHNICAL_APPROACH.md §2.3 (prior evidence). If a probe or pen
+    is held in the gripper, GEOM-07 measures its real tip and replaces this block.
+
+# Intel RealSense D405 on Seeed's stock wrist mount (operator decision 2026-09-30, ADR-014 §1).
+# `camera_link` follows realsense-ros (_d405.urdf.xacro, 4.57.7): origin = depth/left-imager origin,
+# 3.7 mm behind the front glass; +x forward (optical axis), +y left, +z up. The driver publishes
+# camera_link -> camera_*_optical_frame from factory calibration at runtime; this file only places
+# camera_link on the gripper.
+wrist_camera:
+  model: intel_realsense_d405
+  frame: camera_link
+  xyz_m: [-0.0783, -0.0090, -0.0640]
+  rpy_rad: [3.141592653589793, -0.2617993877991494, 0.0]
+  value_status: nominal
+  provenance: cad_prior
+  mount: "Seeed D405_305_Mount.step, stock ~15 deg downward pitch (Seeed-Projects/reBot-DevArm @590ff16c51099a15a34abb339c6364355fde9235, hardware/reBot_B601_DM/3D_Printed_Parts/, sha256 99df53e11fcdd192830ef205d080db310448cc39b891b62a8f64316f6565c28d)"
+  source: >-
+    CAD prior, not a measurement. Seeed STEP camera datum (housing rear centre (0.00146, 68.972,
+    -10.612) mm, optical axis pitched 15 deg, left imager +9 mm across the gripper) placed on the
+    gripper exactly as github.com/bowenszhu/rebot-b601-rs-d405-wrist-mount@ca379b9a
+    simulation/simulate_fov.py does (mount base on the rail-bracket rear face x=-0.103209 m, upper
+    screw pair at +0.030 m), then mapped into this model's gripper_link by Rx(pi) (Seeed states the
+    RS and DM grippers are physically identical; its RS gripper_end and new DM end_link frames are
+    Rx(pi) of ~/rebot_ws's gripper_link). Cross-check: with this pose the 42x42x23 mm housing clears
+    the gripper_link mesh by 9.2 mm, matching that study's independently computed 9.17 mm stock
+    clearance, and the mount mesh seats on the gripper body (0.1 mm).
+  assumptions:
+    - "Mount side: the camera sits on the gripper face that points UP (away from the table) at the all-zero joint pose, i.e. gripper_link -Z. Inferred from the upstream RS/DM models, not observed on this robot; the operator confirms it visually before GEOM-05 (a wrong side flips z and the 15 deg tilt direction)."
+    - "Stock Seeed part printed and seated as designed; print/screw/seating error (a few mm, a few deg) is not modelled."
+    - "The bowenszhu 30 deg redesign is NOT what is installed; it is validated on B601-RS only. If it is ever fitted, regenerate this block from its release geometry JSON and re-run MOT-04."
+  derived:
+    optical_axis_in_parent: [0.9659, 0.0, 0.2588]
+    optical_centre_to_tool_tip_m: 0.1015
+    optical_centre_to_gripper_tcp_m: 0.0730
+    note: "Optical axis is 15 deg off the tool boresight, tilted toward the gripper axis; it crosses the boresight line ~0.25 m from the optical centre (0.16 m beyond the tool tip)."
+
+# Conservative collision proxies (never used for calibration or projection). Each becomes its own fixed
+# link `id`, a child of `frame` at xyz/rpy, carrying one box centred on its origin, expanded by
+# collision_padding_m on every side to absorb the unmeasured pose error above.
+collision_padding_m: 0.005
+collision:
+  - id: camera_mount_link
+    frame: gripper_link
+    box_size_m: [0.0332, 0.0460, 0.0709]
+    xyz_m: [-0.0931, 0.0, -0.0576]
+    rpy_rad: [0.0, 0.0, 0.0]
+    value_status: nominal
+    source: "Axis-aligned bounds, in gripper_link, of the stock mount mesh (bowenszhu simulation/assets/seeed_original_d405_15deg.stl, sha256 65e89c83...) placed as for wrist_camera: x [-0.1096,-0.0765], y [-0.023,0.023], z [-0.0930,-0.0221]."
+  - id: camera_housing_link
+    frame: camera_link
+    box_size_m: [0.023, 0.042, 0.042]
+    xyz_m: [-0.0078, -0.009, 0.0]
+    rpy_rad: [0.0, 0.0, 0.0]
+    value_status: nominal
+    source: "D405 aluminium housing collision box from realsense-ros 4.57.7 realsense2_description/urdf/_d405.urdf.xacro (Apache-2.0): 23x42x42 mm, centred (3.7 mm - 11.5 mm, -9 mm, 0) in camera_link."
+
+# Link pairs that can never move relative to each other (all rigid on gripper_link; fingers only slide
+# along gripper_link Y). Disabled for SELF-collision only — the table, the specimen and every arm link
+# (link1..link6) are still checked against these proxies.
+allowed_self_collisions:
+  - [camera_housing_link, gripper_link, "rigidly mounted; CAD clearance 9.2 mm is below the padded proxy"]
+  - [camera_mount_link, gripper_link, "screwed to the gripper rail bracket"]
+  - [camera_housing_link, camera_mount_link, "camera is clamped in the mount cradle"]
+  - [camera_mount_link, gripper_left, "fingers slide along Y only; CAD clearance >= 4.8 mm at full open"]
+  - [camera_mount_link, gripper_right, "fingers slide along Y only; CAD clearance >= 4.8 mm at full open"]
