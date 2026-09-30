@@ -1,7 +1,7 @@
 """crackvision.calibration.tcp — pivot calibration solver for the tool-centre point (GEOM-06).
 
 Implements the classic "pivot calibration" algorithm: the operator holds the physical tool tip
-(the point `docs/adr/012-frames-and-conventions.md` calls `TCP`, i.e. `gripper_tcp`) fixed against
+(`config/robot/end_effector.yaml`'s `tool` block, frame `tool_tip`, per ADR-014 §8.1) fixed against
 a stationary reference point (e.g. a divot/cone fixture) while sweeping the arm through a set of
 orientations. At every pose the physical tip touches the *same* fixed point in the world, but its
 offset from `tool0` (`gripper_link`, per ADR-012) is *also* fixed and unknown — the two constant
@@ -11,24 +11,61 @@ the recorded `T_base_link_tool0` pose at each orientation:
     p_pivot = R_i @ p_tcp + t_i   for every pose i
 
 Only `p_tcp`'s *translation* is observable this way — pivoting a point about itself carries no
-information about the TCP frame's orientation, so this solver (and GEOM-06/07 generally) treats
-`T_tool0_TCP` as translation-only, consistent with ADR-012's `TCP`/`gripper_tcp` definition (a
-point, not an independently-oriented frame).
+information about orientation, so this solver (and GEOM-06/07 generally) treats `T_tool0_tool_tip`
+as translation-only. `p_tcp` here names the calibrated physical tool tip (`tool_tip`), not the
+vendor MoveIt grasp centre (`gripper_tcp`, `GRASP_CENTRE_OFFSET_M` below) — see ADR-014 §5.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Sequence
+from pathlib import Path
+from typing import Optional, Sequence
 
 import numpy as np
+import yaml
 from scipy.spatial.transform import Rotation
 
-# rebotarm.urdf.xacro:8-12's fixed `gripper_tcp` offset relative to `gripper_link` (== `tool0`,
-# ADR-012): xyz="-0.0443 0 0", i.e. -0.0443 m along `gripper_link`'s local +X. This is CAD/URDF
-# *prior evidence*, not a calibrated fact (ADR-012, "Boresight / TCP — status of prior evidence")
-# — GEOM-07 is the only card allowed to report it as measured.
-PRIOR_TCP_OFFSET_M = (-0.0443, 0.0, 0.0)
+# `rebotarm.urdf.xacro:8-12`'s fixed `gripper_tcp` offset relative to `gripper_link` (== `tool0`,
+# ADR-012): xyz="-0.0443 0 0". This is the vendor MoveIt *grasp centre*, 44.3 mm proximal to the
+# fingertips — it is documented here only for reference/regression purposes (ADR-014 §5) and is
+# NEVER the default prior for `check_boresight`. The pivot calibration measures the physical tool
+# tip (`config/robot/end_effector.yaml`'s `tool` block, `tool_tip`), which for a closed gripper is
+# the canonical URDF finger meshes' distal reach, i.e. `gripper_link`'s own origin (0, 0, 0).
+GRASP_CENTRE_OFFSET_M = (-0.0443, 0.0, 0.0)
+
+_DEFAULT_END_EFFECTOR_CONFIG = (
+    Path(__file__).resolve().parents[3] / "config" / "robot" / "end_effector.yaml"
+)
+
+
+@dataclass(frozen=True)
+class ToolTipPrior:
+    """The `tool` block's `xyz_m` prior read from `config/robot/end_effector.yaml`, plus provenance."""
+
+    xyz_m: tuple[float, float, float]
+    value_status: str
+    provenance: str
+
+
+def load_tool_tip_prior(config_path: Optional[Path] = None) -> ToolTipPrior:
+    """Read the tool-tip prior (`tool.xyz_m`) from `config/robot/end_effector.yaml`.
+
+    This is a light read of the single `tool` block used by the boresight comparison — it does not
+    perform the full schema validation `crackvision_description.end_effector.load_config` does
+    (that module lives in `ros2_ws/`, outside this package's dependency footprint); it only pulls
+    the three fields (`xyz_m`, `value_status`, `provenance`) needed to know what the pivot solve is
+    being compared against, per ADR-014 §8.1.
+    """
+    path = config_path if config_path is not None else _DEFAULT_END_EFFECTOR_CONFIG
+    with open(path, "r", encoding="utf-8") as f:
+        raw = yaml.safe_load(f)
+    tool = raw["tool"]
+    return ToolTipPrior(
+        xyz_m=tuple(float(v) for v in tool["xyz_m"]),
+        value_status=str(tool["value_status"]),
+        provenance=str(tool["provenance"]),
+    )
 
 # Below 4 poses the 6-unknown system (p_tcp, p_pivot) has no more equations than unknowns, so a
 # solve "succeeds" numerically but reports zero residual regardless of how wrong the poses'
@@ -108,47 +145,64 @@ def pivot_calibrate(poses: Sequence[PoseSample]) -> PivotCalibrationResult:
     )
 
 
+# Below this vector length (m), a direction is not meaningfully defined (noise dominates), so
+# `angle_from_prior_deg` is withheld rather than computed from an ~arbitrary direction. This also
+# keeps the nominal tool-tip prior (0, 0, 0) from ever driving a spurious "opposite direction" flag
+# — the thresholds and pass/fail interpretation live in the procedure document, not here.
+MIN_VECTOR_LENGTH_FOR_ANGLE_M = 0.005
+
+
 @dataclass(frozen=True)
 class BoresightCheck:
-    """Comparison of a measured TCP offset against the CAD/URDF prior (ADR-012)."""
+    """Point comparison of a measured tool-tip position against the `end_effector.yaml` prior."""
 
-    measured_offset_m: np.ndarray  # (3,)
-    measured_magnitude_m: float
-    prior_offset_m: np.ndarray  # (3,)
-    prior_magnitude_m: float
-    angle_from_prior_deg: float  # angle between the two offset directions
-    magnitude_delta_m: float  # measured_magnitude_m - prior_magnitude_m (signed)
+    measured_point_m: np.ndarray  # (3,) solved tool-tip position, tool0 frame
+    prior_point_m: np.ndarray  # (3,) prior tool-tip position (tool.xyz_m), tool0 frame
+    position_delta_m: np.ndarray  # (3,) measured_point_m - prior_point_m
+    position_delta_norm_m: float  # |measured - prior|, the primary comparison number
+    angle_from_prior_deg: Optional[float]  # angle between the two point vectors, or None if either
+    # vector is shorter than MIN_VECTOR_LENGTH_FOR_ANGLE_M (direction undefined near the origin)
 
 
 def check_boresight(
-    tcp_offset_m: np.ndarray, prior_offset_m: tuple[float, float, float] = PRIOR_TCP_OFFSET_M
+    tcp_offset_m: np.ndarray, prior_offset_m: Optional[tuple[float, float, float]] = None
 ) -> BoresightCheck:
-    """Compare a solved `tcp_offset_m` against `prior_offset_m` (default: the URDF CAD prior).
+    """Compare a solved tool-tip point `tcp_offset_m` against `prior_offset_m`.
 
-    Reports the angle between the two offset directions and the magnitude difference so GEOM-07
-    can record how far the measured boresight axis and TCP distance are from the simulation-derived
-    prior, per ADR-012's "prior evidence, not calibrated fact" caveat — this function never decides
-    pass/fail on its own; the thresholds belong in the procedure document.
+    `prior_offset_m` defaults to `load_tool_tip_prior().xyz_m`, i.e. `end_effector.yaml`'s `tool`
+    block — the physical tool tip, not `GRASP_CENTRE_OFFSET_M`/`gripper_tcp`'s grasp centre.
+
+    This is a point comparison, not a vector/angle one: `position_delta_norm_m` (the Euclidean
+    distance between the measured and prior tool-tip points) is the primary, always-defined number.
+    `angle_from_prior_deg` is reported only when both points are farther than
+    `MIN_VECTOR_LENGTH_FOR_ANGLE_M` from `tool0`'s origin — for a prior near (0, 0, 0) (the nominal
+    closed-gripper tip) a direction is not meaningful, and this avoids ever reporting a NaN or an
+    "opposite direction" artifact for a small, valid offset. Pass/fail thresholds on either number
+    belong in `docs/calibration/TCP_BORESIGHT_PROCEDURE.md`, not in this function.
     """
+    if prior_offset_m is None:
+        prior_offset_m = load_tool_tip_prior().xyz_m
+
     measured = np.asarray(tcp_offset_m, dtype=np.float64)
     prior = np.asarray(prior_offset_m, dtype=np.float64)
 
-    measured_magnitude = float(np.linalg.norm(measured))
-    prior_magnitude = float(np.linalg.norm(prior))
+    position_delta = measured - prior
+    position_delta_norm = float(np.linalg.norm(position_delta))
 
-    if measured_magnitude == 0.0 or prior_magnitude == 0.0:
-        angle_deg = float("nan")
+    measured_length = float(np.linalg.norm(measured))
+    prior_length = float(np.linalg.norm(prior))
+
+    angle_deg: Optional[float]
+    if measured_length < MIN_VECTOR_LENGTH_FOR_ANGLE_M or prior_length < MIN_VECTOR_LENGTH_FOR_ANGLE_M:
+        angle_deg = None
     else:
-        cos_angle = np.clip(
-            np.dot(measured, prior) / (measured_magnitude * prior_magnitude), -1.0, 1.0
-        )
+        cos_angle = np.clip(np.dot(measured, prior) / (measured_length * prior_length), -1.0, 1.0)
         angle_deg = float(np.degrees(np.arccos(cos_angle)))
 
     return BoresightCheck(
-        measured_offset_m=measured,
-        measured_magnitude_m=measured_magnitude,
-        prior_offset_m=prior,
-        prior_magnitude_m=prior_magnitude,
+        measured_point_m=measured,
+        prior_point_m=prior,
+        position_delta_m=position_delta,
+        position_delta_norm_m=position_delta_norm,
         angle_from_prior_deg=angle_deg,
-        magnitude_delta_m=measured_magnitude - prior_magnitude,
     )

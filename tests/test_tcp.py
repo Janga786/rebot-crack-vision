@@ -7,10 +7,11 @@ import pytest
 from scipy.spatial.transform import Rotation
 
 from crackvision.calibration.tcp import (
+    GRASP_CENTRE_OFFSET_M,
     MIN_POSES,
-    PRIOR_TCP_OFFSET_M,
     PoseSample,
     check_boresight,
+    load_tool_tip_prior,
     pivot_calibrate,
 )
 
@@ -126,26 +127,60 @@ def test_pivot_calibrate_degenerate_single_orientation_does_not_recover_tcp():
     assert not np.allclose(result.tcp_offset_m, TRUE_TCP_OFFSET_M, atol=1e-4)  # ... but wrong
 
 
-def test_check_boresight_matches_prior_exactly():
-    check = check_boresight(np.array(PRIOR_TCP_OFFSET_M))
+def test_load_tool_tip_prior_reads_nominal_zero_from_config():
+    prior = load_tool_tip_prior()
 
-    assert check.angle_from_prior_deg == pytest.approx(0.0, abs=1e-6)
-    assert check.magnitude_delta_m == pytest.approx(0.0, abs=1e-9)
-    assert check.measured_magnitude_m == pytest.approx(0.0443, abs=1e-9)
-
-
-def test_check_boresight_reports_angle_and_magnitude_delta():
-    # Same magnitude as the prior, but rotated 90 degrees onto +Y: maximal angular deviation.
-    measured_offset_m = np.array([0.0, -0.0443, 0.0])
-
-    check = check_boresight(measured_offset_m)
-
-    assert check.angle_from_prior_deg == pytest.approx(90.0, abs=1e-6)
-    assert check.magnitude_delta_m == pytest.approx(0.0, abs=1e-9)
+    assert np.allclose(prior.xyz_m, (0.0, 0.0, 0.0))
+    assert prior.value_status == "nominal"
+    assert prior.provenance == "urdf_mesh_prior"
 
 
-def test_check_boresight_zero_offset_reports_nan_angle():
+def test_check_boresight_defaults_to_config_tool_tip_prior():
     check = check_boresight(np.zeros(3))
 
-    assert np.isnan(check.angle_from_prior_deg)
-    assert check.measured_magnitude_m == 0.0
+    assert np.allclose(check.prior_point_m, (0.0, 0.0, 0.0))
+
+
+def test_check_boresight_closed_gripper_calibration_near_zero_is_consistent():
+    """A correct closed-gripper pivot calibration lands near the nominal (0, 0, 0) tool-tip prior."""
+    measured_tip_m = np.array([0.0006, -0.0002, 0.0004])
+
+    check = check_boresight(measured_tip_m)
+
+    assert check.position_delta_norm_m < 0.001  # sub-millimetre delta from the prior
+    # Both vectors are near the origin: direction is undefined, not reported.
+    assert check.angle_from_prior_deg is None
+
+
+def test_check_boresight_held_probe_reports_positive_delta_not_opposite_direction():
+    """A probe held +40 mm along +X is a positive delta from the tool-tip prior, not an error."""
+    measured_tip_m = np.array([0.04, 0.0, 0.0])
+
+    check = check_boresight(measured_tip_m)
+
+    assert check.position_delta_norm_m == pytest.approx(0.04, abs=1e-9)
+    assert check.position_delta_m[0] == pytest.approx(0.04, abs=1e-9)
+    # Prior (0,0,0) is below the minimum length for a direction: no spurious 180 deg flag.
+    assert check.angle_from_prior_deg is None
+
+
+def test_check_boresight_old_grasp_centre_prior_would_have_flagged_44mm():
+    """Regression: GEOM-06's old default prior (gripper_tcp, -44.3 mm) is NOT today's default, and
+    using it explicitly against a correct closed-gripper calibration shows why — it disagrees by
+    ~44 mm, which would have masked a real 44 mm tool-tip defect as "matches the prior"."""
+    measured_tip_m = np.array([0.0, 0.0, 0.0])  # a correct closed-gripper calibration
+
+    check_against_grasp_centre = check_boresight(measured_tip_m, prior_offset_m=GRASP_CENTRE_OFFSET_M)
+    check_against_tool_tip = check_boresight(measured_tip_m)
+
+    assert check_against_grasp_centre.position_delta_norm_m == pytest.approx(0.0443, abs=1e-9)
+    assert check_against_tool_tip.position_delta_norm_m == pytest.approx(0.0, abs=1e-9)
+
+
+def test_check_boresight_reports_angle_when_both_vectors_long_enough():
+    prior_m = np.array([0.04, 0.0, 0.0])
+    measured_tip_m = np.array([0.0, 0.04, 0.0])  # same length, rotated 90 deg onto +Y
+
+    check = check_boresight(measured_tip_m, prior_offset_m=tuple(prior_m))
+
+    assert check.angle_from_prior_deg == pytest.approx(90.0, abs=1e-6)
