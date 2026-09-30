@@ -1,6 +1,6 @@
 # Progress — week of Mon Sep 28 – Sun Oct 04, 2026
 
-**30 task(s) completed and independently audited this week** · project total **37/77** accepted
+**31 task(s) completed and independently audited this week** · project total **37/77** accepted
 
 ## Notes
 
@@ -64,10 +64,12 @@
 …[135 chars clipped]
 - **MOT-04.6 — Reachability on task frames (tool_tip / camera_link) with a workcell-faithful specimen proxy + camera view check** ([details](MOT-04.6.md)): Implemented interactively by the technical-lead recovery session (Claude Opus 5.5, operator-authorised, 2026-09-30); commit 54e522e. Fixes MOT-04.5's frame error (standoffs meant as tool-tip clearance
 …[217 chars clipped]
+- **GEOM-11 — TCP/pivot calibration uses the tool_tip prior (ADR-014), not the grasp-centre gripper_tcp** ([details](GEOM-11.md)): Fixed a calibration bug where the TCP/boresight check was comparing measured tool-tip calibrations against the wrong reference point (the gripper's internal grasp-centre, 44mm off from the actual tool
+…[439 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 47 / 103
+- Implementation/review sessions run: 48 / 104
 - Audits that rejected work with evidence-backed findings: 6 (repairs created: 6)
 - Re-verified after an upstream change: CAM-02, GEOM-01, GEOM-01.R1, GEOM-02, GEOM-02.R1, GEOM-10, MOT-01, MOT-02, MOT-04.1, MOT-04.1.R1, MOT-04.2, MOT-04.3, MOT-04.3.R1, MOT-04.4, MOT-04.4.R1, PERC-03, PERC-03.R1, TC-001, TC-011, TC-016
 
