@@ -1,6 +1,6 @@
 # Progress — week of Mon Sep 28 – Sun Oct 04, 2026
 
-**31 task(s) completed and independently audited this week** · project total **38/77** accepted
+**32 task(s) completed and independently audited this week** · project total **38/77** accepted
 
 ## Notes
 
@@ -66,10 +66,12 @@
 …[217 chars clipped]
 - **GEOM-11 — TCP/pivot calibration uses the tool_tip prior (ADR-014), not the grasp-centre gripper_tcp** ([details](GEOM-11.md)): Fixed a calibration bug where the TCP/boresight check was comparing measured tool-tip calibrations against the wrong reference point (the gripper's internal grasp-centre, 44mm off from the actual tool
 …[439 chars clipped]
+- **GEOM-03 — Calibration method + camera mounting decision** ([details](GEOM-03.md)): Finalized the written calibration plan for the wrist camera: ADR-013 now formally records the operator's decision that the D405 is wrist-mounted (eye-in-hand) on the gripper, with a fully specified Ch
+…[385 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 48 / 105
+- Implementation/review sessions run: 49 / 106
 - Audits that rejected work with evidence-backed findings: 6 (repairs created: 6)
 - Re-verified after an upstream change: CAM-02, GEOM-01, GEOM-01.R1, GEOM-02, GEOM-02.R1, GEOM-06, GEOM-10, MOT-01, MOT-02, MOT-04.1, MOT-04.1.R1, MOT-04.2, MOT-04.3, MOT-04.3.R1, MOT-04.4, MOT-04.4.R1, PERC-03, PERC-03.R1, TC-001, TC-011, TC-016
 
