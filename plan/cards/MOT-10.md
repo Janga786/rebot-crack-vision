@@ -26,3 +26,8 @@
 ```
 
 Draft.
+
+## ADR-014 guidance (technical-lead recovery, 2026-09-30)
+- Measure the table (top face should be the base_link z=0 plane), the specimen pose/height and the workcell
+  clearances; the camera pose is measured by hand-eye calibration (GEOM-05), not by tape. Replace the nominal
+  specimen/table entries in config/scene/scene.yaml with measured values and re-run MOT-04.5's checks.

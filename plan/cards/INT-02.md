@@ -24,3 +24,7 @@
 ```
 
 Draft.
+
+## ADR-014 guidance (technical-lead recovery, 2026-09-30)
+- Recorded-data replay needs the joint state per capture (INTERFACES §8.4); recordings without it can only be used
+  for 2D perception checks.

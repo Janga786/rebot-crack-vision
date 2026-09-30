@@ -132,3 +132,10 @@ Replace only the 'Scoring rule' stub that MOT-04.2 appended to the reachability 
 
 ### setup.py
 Add `recommend_placement = crackvision_motion.recommend_placement:main`. MOT-03 may have edited this file concurrently, so merge and never overwrite.
+
+## Amendment 2026-09-30 (technical-lead recovery, ADR-014) — sanctioned changes, re-review against these
+- The fixed caveats list now starts with the INTERFACES §7.3 nominal disclaimer verbatim (it was only in the
+  file header, which the §7.3 text does not allow) and no longer claims 'the camera mount is undecided' or that
+  the TCP is gripper_tcp; recommend() appends the map's task frame and collision model (placement.caveats_for).
+- verification_config() also copies an optional `environment` block; view_verification_config() and the
+  `--emit-view-config` flag (MOT-04.6) emit the wrist-camera view check. The scoring rule is unchanged.

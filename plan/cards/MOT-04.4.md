@@ -147,3 +147,12 @@ Append to docs/motion/ROS_WORKSPACE.md a new section, 'Reachability sweep (MOT-0
 
 ### setup.py
 Add the `reachability_sweep` console script. Keep the change additive; the file is shared with MOT-03 and MOT-04.3.
+
+## Amendment 2026-09-30 (technical-lead recovery, ADR-014) — sanctioned changes, re-review against these
+- The text above says the presentation's gripper_link is '44.3 mm behind gripper_tcp'. That was backwards:
+  gripper_link's origin is the closed-finger tip, 44.3 mm DISTAL to gripper_tcp (the grasp centre).
+- MOT-04.6 made the surface object a keep-out-aware specimen block when surface_collision.model is
+  `specimen_block` (one CollisionObject, possibly several box primitives) and added optional environment objects
+  from a scene config; the default `slab` geometry, the smoke fixture and this card's checks are unchanged.
+- The mock stack (mock_planning.launch.py) now loads the GEOM-10 end-of-arm overlay (tool_tip, camera_link,
+  camera proxies); the no-execution guarantee is unchanged.

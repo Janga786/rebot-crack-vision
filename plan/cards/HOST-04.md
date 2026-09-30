@@ -34,6 +34,9 @@
     "context": 2,
     "consequence": 4
   },
+  "hardware": [
+    "arm_usb_connected"
+  ],
   "track": "physical",
   "priority": 30,
   "id": "HOST-04",
@@ -43,7 +46,15 @@
 }
 ```
 
-Read ~/rebot_ws (deploy/preflight.sh, rebotarm_bringup, vendor SDK in third_party/) and ~/rebot_lerobot docs to establish the
-adapter's VID:PID and device node. If no source states it, return status "blocked" with blocker type "hardware" asking the
-operator to connect the adapter (prerequisite `arm_usb_connected`) so `lsusb` can be read. Then stage host/udev/99-rebot-arm.rules
-and request the install + reload + trigger exactly as HOST-03 does.
+## Re-specified 2026-09-30 (technical-lead recovery)
+Now gated on the operator prerequisite `arm_usb_connected` (declare with `claude-auto hw declare arm_usb_connected`
+once the B601-DM USB/CAN adapter is plugged in). The adapter is NOT connected; its VID:PID must never be guessed
+(attempt 00130 found only XXXX/YYYY placeholders in ~/rebot_ws docs and no cited value elsewhere).
+
+When dispatched: read the adapter's idVendor/idProduct read-only from sysfs (e.g. /sys/bus/usb/devices/*/idVendor,
+idProduct, product, serial) or the udev database (`udevadm info -q property -p /sys/class/tty/<node>`); the sandbox
+never exposes arm serial/CAN device nodes, by design. Cite the exact output (or operator evidence added with
+`claude-auto evidence add HOST-04 <lsusb-output>`). Stage host/udev/99-rebot-arm.rules (ATTRS idVendor/idProduct,
+MODE 0660, GROUP plugdev, a stable SYMLINK such as rebot_arm), then request the install and the reload exactly as
+HOST-03 does (install with a cmp verify_argv, then `udevadm control --reload-rules`; no blanket trigger, replug
+instead). No usermod/dialout change.
