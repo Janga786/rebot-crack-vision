@@ -33,6 +33,10 @@ _CAMERA_KEYS = frozenset({"model", "frame", "xyz_m", "rpy_rad", "value_status", 
 _COLLISION_KEYS = frozenset({"id", "frame", "box_size_m", "xyz_m", "rpy_rad", "value_status", "source"})
 _VALUE_STATUSES = frozenset({"nominal", "measured"})
 _MAX_PADDING_M = 0.05
+# Vendor finger links on gripper_link (prismatic along its Y only). Together with parent_link and the overlay
+# links they are the ONLY partners a self-collision exemption may name: an exemption against base_link or
+# link1..link6 would silently stop checking the camera against the arm.
+_GRIPPER_FINGER_LINKS = frozenset({"gripper_left", "gripper_right"})
 
 
 class EndEffectorError(ValueError):
@@ -177,6 +181,12 @@ def load_config(path: Union[str, Path]) -> Dict[str, Any]:
         if a not in ids and b not in ids:
             raise EndEffectorError(f"'{ctx}': at least one side must be an overlay collision link {sorted(ids)}; "
                                    "vendor link pairs belong to the vendor SRDF")
+        allowed_partners = ids | _GRIPPER_FINGER_LINKS | {parent}
+        for side in (a, b):
+            if side not in allowed_partners:
+                raise EndEffectorError(
+                    f"'{ctx}': {side!r} may not be exempted from collision with the camera proxies; only "
+                    f"{sorted(allowed_partners)} are rigid with (or slide on) {parent}")
         key = frozenset((a, b))
         if key in seen:
             raise EndEffectorError(f"'{ctx}': duplicate pair {sorted(key)}")
