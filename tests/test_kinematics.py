@@ -182,6 +182,50 @@ def test_load_end_effector_measured_requires_uncertainty(tmp_path):
     assert ee.camera_sigma_rot_rad == pytest.approx(0.01)
 
 
+def test_load_end_effector_measured_requires_uncertainty_source(tmp_path):
+    base = {
+        "schema": "crackvision.end_effector/1",
+        "parent_link": "gripper_link",
+        "tool": {
+            "frame": "tool_tip",
+            "xyz_m": [0.0, 0.0, 0.0],
+            "rpy_rad": [0.0, 0.0, 0.0],
+            "value_status": "measured",
+            "uncertainty": {"position_sigma_m": 0.001},
+        },
+        "wrist_camera": {
+            "frame": "camera_link",
+            "xyz_m": [0.0, 0.0, 0.0],
+            "rpy_rad": [0.0, 0.0, 0.0],
+            "value_status": "nominal",
+        },
+    }
+    p = tmp_path / "ee.yaml"
+    p.write_text(yaml.safe_dump(base))
+    with pytest.raises(kin.KinematicsError):
+        kin.load_end_effector(p)
+
+    base["tool"]["uncertainty"]["source"] = ""
+    p.write_text(yaml.safe_dump(base))
+    with pytest.raises(kin.KinematicsError):
+        kin.load_end_effector(p)
+
+    base["tool"]["uncertainty"]["source"] = "test"
+    base["wrist_camera"]["value_status"] = "measured"
+    base["wrist_camera"]["uncertainty"] = {
+        "position_sigma_m": 0.002,
+        "rotation_sigma_rad": 0.01,
+    }
+    p.write_text(yaml.safe_dump(base))
+    with pytest.raises(kin.KinematicsError):
+        kin.load_end_effector(p)
+
+    base["wrist_camera"]["uncertainty"]["source"] = ""
+    p.write_text(yaml.safe_dump(base))
+    with pytest.raises(kin.KinematicsError):
+        kin.load_end_effector(p)
+
+
 def test_nominal_optical_axis_mapping():
     T = kin.NOMINAL_T_CAMERA_LINK_CAMERA_COLOR_OPTICAL_FRAME
     R = T[:3, :3]

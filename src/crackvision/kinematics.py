@@ -233,7 +233,12 @@ def _load_block_sigma(block: dict, name: str, needs_rotation: bool, nominal_pos:
                 "§10 uncertainty.position_sigma_m field"
             )
         pos = float(uncertainty["position_sigma_m"])
-        source = uncertainty.get("source", "measured")
+        source = uncertainty.get("source")
+        if not source:
+            raise KinematicsError(
+                f"end_effector.yaml block {name!r} is value_status: measured but lacks the "
+                "§10 uncertainty.source field"
+            )
         if needs_rotation:
             if "rotation_sigma_rad" not in uncertainty:
                 raise KinematicsError(
