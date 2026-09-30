@@ -1,6 +1,6 @@
 # Progress — week of Mon Sep 28 – Sun Oct 04, 2026
 
-**28 task(s) completed and independently audited this week** · project total **35/74** accepted
+**29 task(s) completed and independently audited this week** · project total **24/77** accepted
 
 ## Notes
 
@@ -60,10 +60,12 @@
 …[416 chars clipped]
 - **PERC-09 — Path accuracy metrics on synthetic ground truth** ([details](PERC-09.md)): Added a synthetic crack generator with known ground-truth centerlines (straight, curved, branched, and noisy variants) and a test suite that measures the crack-path-extraction pipeline's accuracy agai
 …[232 chars clipped]
+- **GEOM-10 — End-of-arm model: tool_tip + wrist D405 (nominal CAD prior) in the planning model** ([details](GEOM-10.md)): Implemented interactively by the technical-lead recovery session (Claude Opus 5.5, operator-authorised, 2026-09-30); commit baed324. Operator facts: D405 eye-in-hand on Seeed stock D405_305_Mount (~15
+…[135 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 44 / 82
+- Implementation/review sessions run: 47 / 83
 - Audits that rejected work with evidence-backed findings: 6 (repairs created: 6)
 - Re-verified after an upstream change: CAM-02, GEOM-01, GEOM-01.R1, MOT-02, MOT-04.1, MOT-04.1.R1, MOT-04.2, MOT-04.3, MOT-04.3.R1, MOT-04.4, MOT-04.4.R1, PERC-03, PERC-03.R1, TC-001, TC-011
 
@@ -77,23 +79,14 @@
 |---|---|---|
 | Host platform & reproducibility (L-HOST) | 5 | 9 |
 | Local coding model (L-LLM) | 1 | 6 |
-| D405 capture (L-CAM) | 4 | 7 |
-| Perception (L-PERC) | 13 | 16 |
-| Geometry & calibration (L-GEOM) | 3 | 9 |
-| Motion planning (L-MOTION) | 6 | 15 |
+| D405 capture (L-CAM) | 3 | 7 |
+| Perception (L-PERC) | 11 | 16 |
+| Geometry & calibration (L-GEOM) | 2 | 11 |
+| Motion planning (L-MOTION) | 0 | 16 |
 | Integration & commissioning (L-INT) | 1 | 6 |
-| Operator workflow & handoff (L-OPS) | 1 | 4 |
+| Operator workflow & handoff (L-OPS) | 0 | 4 |
 | Imitation learning (later phase) (L-IL) | 0 | 1 |
 
 ## Waiting on the operator / hardware (snapshot)
 
-- GEOM-03: operator_decision — Camera mounting (eye-in-hand vs eye-to-hand) for the D405 is not documented anywhere in this repo or ~/rebot_ws — ARCHIT
-…[181 chars clipped]
-- LLM-02: other — This attempt's bwrap sandbox invocation (visible via /proc/1/cmdline) does not include a --bind for ~/opt/llama.cpp, eve
-…[181 chars clipped]
-- LLM-03: privilege — ~/models/llm (the card's declared extra writable path) is not bind-mounted read-write in this bubblewrap sandbox — mkdir
-…[181 chars clipped]
-- MOT-03: other — MOT-03's card scope.write omits scripts/ros/** (unlike MOT-02 and MOT-04.4, which included their respective wrapper scri
-…[181 chars clipped]
-- MOT-04.5: operator_decision — The committed standoffs [0.01, 0.04] m give no collision-free boresight-down IK solution anywhere: the gripper body exte
-…[181 chars clipped]
+- HOST-04: hardware — operator must declare: arm_usb_connected
