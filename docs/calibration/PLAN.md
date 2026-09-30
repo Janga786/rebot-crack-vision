@@ -4,30 +4,37 @@
 the operational checklist GEOM-04 (solver software) and GEOM-05 (operator hardware execution)
 follow; it does not re-argue the decision, only lays out what to build/do and in what order.
 
-## 0. Blocking status — read this first
+## 0. Mounting status — read this first
 
-**This plan is not authorized to run.** REQ-GEOM-2/3's calibration depends on one physical fact
-that is not recorded anywhere in this repository or in `~/rebot_ws`: **where the D405 is mounted.**
-Confirmed empty of any answer: the vendor/canonical URDF (`grep -rn "camera" *.urdf` → no hits),
-every `plan/cards/GEOM-*.md` and `plan/cards/CAM-*.md`, `docs/ARCHITECTURE.md` ("No D405 is attached
-to this machine right now"), and `docs/TECHNICAL_APPROACH.md` §2.1 ("there is no camera mounted on
-this arm yet").
+**Confirmed: eye-in-hand.** Operator decision, 2026-09-30 (authoritative; recorded in
+`docs/adr/014-end-effector-frames-and-task-phases.md` and `config/robot/end_effector.yaml`,
+`wrist_camera`): the D405 is wrist-mounted on the reBot B601-DM gripper using Seeed's stock
+`D405_305_Mount.step` (`Seeed-Projects/reBot-DevArm@590ff16c`,
+`hardware/reBot_B601_DM/3D_Printed_Parts/`), at an approximate 15° downward pitch (measured on the
+physically identical B601-RS gripper by `github.com/bowenszhu/rebot-b601-rs-d405-wrist-mount`).
+This plan applies **as written, eye-in-hand branch only** — `docs/adr/013-calibration-method.md`
+is `accepted` on this basis, and the eye-to-hand / robot-world material kept inline below (§§2–3)
+is a documented fallback only, **not applicable** to this rig unless a future mount change reopens
+the question (ADR-014 "Revisit when").
 
-`docs/adr/013-calibration-method.md` recommends **eye-in-hand** (wrist-mounted) with supporting
-reasoning, and this plan is written against that recommendation so it is ready to execute the
-moment it is confirmed. But a recommendation is not a decision. **Before GEOM-04 is implemented
-against this plan's specifics, or GEOM-05 executes any of it on hardware, the operator must confirm
-in writing (a comment/commit note referencing this file, or an edit to this section) one of:**
+Two things this confirmation does **not** yet settle:
 
-- [ ] **Confirmed: eye-in-hand.** D405 rigidly mounted to `_____________` (arm link/bracket), fixed
-      offset approximately `_____________`. → this plan applies as written.
-- [ ] **Confirmed: eye-to-hand.** D405 fixed to `_____________` (stand/gantry/frame, described or
-      referenced here). → §§2–5 switch to the robot-world branch noted inline below; the ChArUco
-      spec, pose-diversity and residual-threshold content is unchanged.
+- **The installed extrinsic is a CAD prior only** (`value_status: nominal` in
+  `config/robot/end_effector.yaml`), not a measurement. GEOM-04/05 (this plan's §§3–5) measure and
+  supersede it; GEOM-05 must flag any disagreement with the prior beyond ADR-014's 10 mm / 5°
+  thresholds rather than average it away.
+- **Remaining operator check, required before GEOM-05 runs on hardware:** confirm the camera sits
+  on the gripper face that points up at the all-zero joint pose (`gripper_link` −Z) — ADR-014's
+  open assumption behind the CAD-prior pose above. Record that confirmation (or a correction) below,
+  or in `config/robot/end_effector.yaml`'s `wrist_camera` provenance, before GEOM-05 proceeds past
+  synthetic-data testing.
+  - [ ] Confirmed: camera mounted on `gripper_link` −Z at the all-zero joint pose, as ADR-014
+        assumes.
+  - [ ] Correction: camera is actually mounted on `_____________` — ADR-014 §"Decision 1" and this
+        plan's pose prior must be revised before GEOM-05.
 
-Until one box above is checked (or an equivalent operator note exists), **GEOM-04/05 must not
-proceed past synthetic-data testing**, and any status report on this card returns
-`blocked` / `operator_decision` rather than `complete`.
+The mount *type* (eye-in-hand) is decided and this card (GEOM-03) is not blocked by it. GEOM-05 is
+blocked on hardware execution until the mount-*side* box above is checked.
 
 ## 1. Target: ChArUco board
 
@@ -51,16 +58,16 @@ proceed past synthetic-data testing**, and any status report on this card return
 
 ## 2. Pose capture procedure
 
-**Eye-in-hand branch (recommended, pending confirmation):** the board is fixed in the workspace
-(e.g. taped flat on the bench/specimen fixture); the arm carries the camera through the pose set
-below, capturing one still colour frame per pose (never during motion — matches this pipeline's
-existing still-frame capture convention, `crackvision.realsense_capture`).
+**Eye-in-hand (confirmed mounting, §0):** the board is fixed in the workspace (e.g. taped flat on
+the bench/specimen fixture); the arm carries the camera through the pose set below, capturing one
+still colour frame per pose (never during motion — matches this pipeline's existing still-frame
+capture convention, `crackvision.realsense_capture`).
 
-**Eye-to-hand branch (if confirmed instead):** the camera is fixed; the board is rigidly held by
-the gripper (a printed board bonded to a fixture the gripper grips or bolts to `gripper_link`), and
-the arm carries the *board* through an equivalent pose set relative to the fixed camera.
+**Not applicable to this rig (documented fallback only, §0):** the eye-to-hand branch — camera
+fixed, board rigidly held by the gripper and carried through an equivalent pose set relative to the
+fixed camera — would apply only if a future mount change made the camera eye-to-hand.
 
-Either branch, the captured pose set must satisfy:
+The captured pose set must satisfy:
 
 - **≥15 poses minimum, ≥20 recommended.**
 - **Rotation diversity:** at least 3 tilt bands off boresight-down (≈±15°, ≈±30°, ≈±45°) **and**
@@ -73,21 +80,22 @@ Either branch, the captured pose set must satisfy:
 - **Reserve ≥4 poses as held-out** (captured the same way, excluded from the solve) for the layer-3
   verification residual in §4.
 
-Record per pose: the robot's FK-reported `T_base_link_gripper_link` (or the fixed camera→world pose
-in the eye-to-hand branch) at capture time, the raw colour frame, and the ChArUco detection result
-(corner count, per-corner reprojection residual from `estimatePoseCharucoBoard`).
+Record per pose: the robot's FK-reported `T_base_link_gripper_link` at capture time, the raw colour
+frame, and the ChArUco detection result (corner count, per-corner reprojection residual from
+`estimatePoseCharucoBoard`).
 
 ## 3. Algorithms
 
-**Eye-in-hand branch:** `cv2.calibrateHandEye`, run with **all of**:
-`CALIBRATE_HAND_EYE_TSAI`, `CALIBRATE_HAND_EYE_PARK`, and (once pose count comfortably exceeds 15)
-`CALIBRATE_HAND_EYE_DANIILIDIS`. Report each method's `(R_cam2gripper, t_cam2gripper)` separately
-before comparing.
+`cv2.calibrateHandEye`, run with **all of**: `CALIBRATE_HAND_EYE_TSAI`, `CALIBRATE_HAND_EYE_PARK`,
+and (once pose count comfortably exceeds 15) `CALIBRATE_HAND_EYE_DANIILIDIS`. Report each method's
+`(R_cam2gripper, t_cam2gripper)` separately before comparing.
 
-**Eye-to-hand branch:** `cv2.calibrateRobotWorldHandEye`, run with both
-`CALIBRATE_ROBOT_WORLD_HAND_EYE_SHAH` and `CALIBRATE_ROBOT_WORLD_HAND_EYE_LI`.
+**Not applicable to this rig (documented fallback only, §0):** the eye-to-hand robot-world variant,
+`cv2.calibrateRobotWorldHandEye` cross-checking `CALIBRATE_ROBOT_WORLD_HAND_EYE_SHAH` against
+`CALIBRATE_ROBOT_WORLD_HAND_EYE_LI`, would apply only if a future mount change made the camera
+eye-to-hand.
 
-Neither branch accepts a single method's output on its own — see §4, layer 2.
+No single method's output is accepted on its own — see §4, layer 2.
 
 ## 4. Residual thresholds (all three layers must pass)
 
@@ -119,9 +127,8 @@ GEOM-02 (or later cards consuming it) reports must carry `sigma_total`, sourced 
 
 ## 6. Evidence to produce (GEOM-04/GEOM-05)
 
-- GEOM-04: synthetic-data test proving the solver recovers a known `T_gripper_camera` (or
-  `T_base_world` in the eye-to-hand branch) within the §4 thresholds under injected pose/detection
-  noise, before any hardware capture is attempted.
+- GEOM-04: synthetic-data test proving the solver recovers a known `T_gripper_camera` within the §4
+  thresholds under injected pose/detection noise, before any hardware capture is attempted.
 - GEOM-05: the real capture set (≥15 solve poses + ≥4 held-out), per-pose FK and detection
   residuals, the cross-method comparison table, and the held-out verification numbers — written as
   this card's evidence artefact once GEOM-05 is specified and run.
