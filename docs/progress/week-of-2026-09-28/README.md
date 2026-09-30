@@ -1,6 +1,6 @@
 # Progress — week of Mon Sep 28 – Sun Oct 04, 2026
 
-**29 task(s) completed and independently audited this week** · project total **24/77** accepted
+**30 task(s) completed and independently audited this week** · project total **25/77** accepted
 
 ## Notes
 
@@ -62,10 +62,12 @@
 …[232 chars clipped]
 - **GEOM-10 — End-of-arm model: tool_tip + wrist D405 (nominal CAD prior) in the planning model** ([details](GEOM-10.md)): Implemented interactively by the technical-lead recovery session (Claude Opus 5.5, operator-authorised, 2026-09-30); commit baed324. Operator facts: D405 eye-in-hand on Seeed stock D405_305_Mount (~15
 …[135 chars clipped]
+- **MOT-04.6 — Reachability on task frames (tool_tip / camera_link) with a workcell-faithful specimen proxy + camera view check** ([details](MOT-04.6.md)): Implemented interactively by the technical-lead recovery session (Claude Opus 5.5, operator-authorised, 2026-09-30); commit 54e522e. Fixes MOT-04.5's frame error (standoffs meant as tool-tip clearance
+…[217 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 47 / 83
+- Implementation/review sessions run: 47 / 84
 - Audits that rejected work with evidence-backed findings: 6 (repairs created: 6)
 - Re-verified after an upstream change: CAM-02, GEOM-01, GEOM-01.R1, MOT-02, MOT-04.1, MOT-04.1.R1, MOT-04.2, MOT-04.3, MOT-04.3.R1, MOT-04.4, MOT-04.4.R1, PERC-03, PERC-03.R1, TC-001, TC-011
 
@@ -82,7 +84,7 @@
 | D405 capture (L-CAM) | 3 | 7 |
 | Perception (L-PERC) | 11 | 16 |
 | Geometry & calibration (L-GEOM) | 2 | 11 |
-| Motion planning (L-MOTION) | 0 | 16 |
+| Motion planning (L-MOTION) | 1 | 16 |
 | Integration & commissioning (L-INT) | 1 | 6 |
 | Operator workflow & handoff (L-OPS) | 0 | 4 |
 | Imitation learning (later phase) (L-IL) | 0 | 1 |
