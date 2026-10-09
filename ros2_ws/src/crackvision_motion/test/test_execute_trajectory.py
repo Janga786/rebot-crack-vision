@@ -13,6 +13,8 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
+from types import SimpleNamespace
 from pathlib import Path
 from typing import Dict, List
 
@@ -22,6 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import crackvision_motion.execute_trajectory as et  # noqa: E402
 from crackvision_motion.cli_common import PreconditionError  # noqa: E402
+from crackvision_motion.execution_gate import load_execution_config  # noqa: E402
 from crackvision_motion.joint_trajectory import JOINT_NAMES  # noqa: E402
 from crackvision_motion.reachability_core import ConfigError  # noqa: E402
 
@@ -202,6 +205,58 @@ def test_default_profile_mismatch_with_mode_real_is_offline_refusal_not_usage_er
     args = _args(tmp_path, mode="real", profile=None)
     with pytest.raises(PreconditionError):
         et.run(args, env=_NO_ARM)
+
+
+# --------------------------------------------------------------------------------------
+# the §11.1 mode/profile table is hard-coded: a tampered --execution-config is a usage error
+# --------------------------------------------------------------------------------------
+
+SHIPPED_EXECUTION_CONFIG = REPO_ROOT / "config" / "motion" / "execution.yaml"
+
+
+def _tampered_config(tmp_path, old: str, new: str) -> Path:
+    text = SHIPPED_EXECUTION_CONFIG.read_text(encoding="utf-8")
+    assert text.count(old) == 1, old
+    path = tmp_path / "execution_tampered.yaml"
+    path.write_text(text.replace(old, new), encoding="utf-8")
+    load_execution_config(path)  # still schema-valid: only the §11.1 table check can catch it
+    return path
+
+
+def test_shipped_execution_config_matches_hard_coded_table():
+    et._check_profiles_match_table(load_execution_config(SHIPPED_EXECUTION_CONFIG))
+
+
+@pytest.mark.parametrize(
+    "old,new",
+    [
+        ("    modes: [dry, real]", "    modes: [mock, dry, real]"),  # vendor allows mock
+        ("    action: /rebotarm_controller/follow_joint_trajectory", "    action: /rebotarm/follow_joint_trajectory"),
+        ("    expected_node: mock_rebotarm_driver", "    expected_node: reBotArmController"),
+    ],
+)
+def test_tampered_profile_table_mock_vendor_is_config_error_and_never_executes(tmp_path, monkeypatch, old, new):
+    def _boom(*a, **kw):
+        raise AssertionError("a tampered §11.1 table must be refused before any gate or execute()")
+
+    monkeypatch.setattr(et, "execute", _boom)
+    monkeypatch.setattr(et, "evaluate_offline", _boom)
+    monkeypatch.setattr(et.rclpy, "init", _boom)
+    monkeypatch.setattr(et, "OnlineChecks", _FakeOnlineChecks)
+    cfg = _tampered_config(tmp_path, old, new)
+    args = _args(tmp_path, mode="mock", profile="vendor", execution_config=str(cfg))
+    with pytest.raises(ConfigError):
+        et.run(args, env=_NO_ARM)
+    assert not (tmp_path / "execution").exists()
+
+
+def test_mock_vendor_pair_refused_even_if_config_lists_it(tmp_path, monkeypatch):
+    # Even without the table check, the pair itself is judged from PROFILE_TABLE, not the config.
+    with pytest.raises(ConfigError):
+        et._validate_mode_profile("mock", "vendor")
+    with pytest.raises(ConfigError):
+        et._validate_mode_profile("real", "vendor_mock")
+    et._validate_mode_profile("real", "vendor")
 
 
 # --------------------------------------------------------------------------------------
@@ -415,8 +470,13 @@ def test_joint_trajectory_msg_holds_scaled_points_and_time_from_start():
 
 
 # --------------------------------------------------------------------------------------
-# execute(): the single ActionClient site -- an e-stop trips cancel-and-hold
+# execute(): the single ActionClient site -- trips cancel-and-hold, bounded waits, arrival check
 # --------------------------------------------------------------------------------------
+
+CANCEL_OK = SimpleNamespace(return_code=0)  # action_msgs/CancelGoal ERROR_NONE
+CANCEL_REJECTED = SimpleNamespace(return_code=1)  # ERROR_REJECTED
+RESULT_SUCCESSFUL = SimpleNamespace(result=SimpleNamespace(error_code=0))
+
 
 class _FakeFuture:
     def __init__(self, result=None, done=True):
@@ -429,11 +489,16 @@ class _FakeFuture:
     def result(self):
         return self._result
 
+    def complete(self, result):
+        self._result = result
+        self._done = True
+
 
 class _FakeGoalHandle:
-    def __init__(self, result_future):
+    def __init__(self, result_future, cancel_future=None):
         self.accepted = True
         self._result_future = result_future
+        self._cancel_future = cancel_future if cancel_future is not None else _FakeFuture(CANCEL_OK)
         self.cancel_calls = 0
 
     def get_result_async(self):
@@ -441,7 +506,7 @@ class _FakeGoalHandle:
 
     def cancel_goal_async(self):
         self.cancel_calls += 1
-        return _FakeFuture(result=None, done=True)
+        return self._cancel_future
 
 
 class _FakeSub:
@@ -463,16 +528,22 @@ class _FakeNode:
         if sub in self.subs:
             self.subs.remove(sub)
 
+    def publish(self, topic, msg):
+        for sub in list(self.subs):
+            if sub.topic == topic:
+                sub.callback(msg)
+
 
 class _Bool:
     def __init__(self, data: bool):
         self.data = data
 
 
-def test_execute_cancels_on_estop_and_returns_estopped(monkeypatch):
-    result_future = _FakeFuture(done=False)
-    goal_handle = _FakeGoalHandle(result_future)
+def _js(positions):
+    return SimpleNamespace(name=list(JOINT_NAMES), position=[float(v) for v in positions])
 
+
+def _fake_action_client(send_future):
     class _FakeActionClient:
         def __init__(self, node, action_type, action_name):
             self.node = node
@@ -481,30 +552,238 @@ def test_execute_cancels_on_estop_and_returns_estopped(monkeypatch):
             return True
 
         def send_goal_async(self, goal_msg):
-            return _FakeFuture(result=goal_handle, done=True)
+            return send_future
 
+    return _FakeActionClient
+
+
+EXEC_CFG_FAST = {
+    "estop_topics": ["/crackvision/estop", "/rebot_motion/estop"],
+    "tolerances": {"tracking_rad": 0.15, "start_state_rad": 0.02},
+    "timeouts": {"joint_state_s": 0.05, "goal_s": 5.0, "cancel_settle_s": 0.5},
+}
+JS_TOPIC = "/rebotarm/joint_states"
+ACTION = "/rebotarm/follow_joint_trajectory"
+SHORT_TRAJ = {"points": [{"t_s": 0.0, "positions": [0.0] * 6}, {"t_s": 1.0, "positions": [0.1] * 6}]}
+
+
+def test_execute_cancels_on_estop_and_returns_estopped(monkeypatch):
+    goal_handle = _FakeGoalHandle(_FakeFuture(done=False))
     node = _FakeNode()
     counter = {"n": 0}
 
     def _fake_spin_once(n, timeout_sec=0.0):
         counter["n"] += 1
+        time.sleep(0.002)
+        n.publish(JS_TOPIC, _js([0.0] * 6))
         if counter["n"] == 3:
-            for sub in n.subs:
-                if sub.topic == "/crackvision/estop":
-                    sub.callback(_Bool(True))
+            n.publish("/crackvision/estop", _Bool(True))
 
-    monkeypatch.setattr(et, "ActionClient", _FakeActionClient)
+    monkeypatch.setattr(et, "ActionClient", _fake_action_client(_FakeFuture(result=goal_handle, done=True)))
     monkeypatch.setattr(et.rclpy, "spin_once", _fake_spin_once)
 
-    exec_cfg = {
-        "estop_topics": ["/crackvision/estop", "/rebot_motion/estop"],
-        "tolerances": {"tracking_rad": 0.15, "start_state_rad": 0.02},
-        "timeouts": {"joint_state_s": 0.5, "goal_s": 30.0, "cancel_settle_s": 0.05},
-    }
-    scaled_traj = {"points": [{"t_s": 0.0, "positions": [0.0] * 6}, {"t_s": 1.0, "positions": [0.1] * 6}]}
-
-    outcome, trace = et.execute(node, "/rebotarm/follow_joint_trajectory", exec_cfg, scaled_traj, "/rebotarm/joint_states")
+    outcome, trace = et.execute(node, ACTION, EXEC_CFG_FAST, SHORT_TRAJ, JS_TOPIC)
 
     assert outcome == "estopped"
     assert goal_handle.cancel_calls == 1
     assert node.subs == []  # js_sub + estop subs all destroyed on the way out
+
+
+def test_execute_trip_while_send_pending_then_accepted_cancels_exactly_once(monkeypatch, capsys):
+    goal_handle = _FakeGoalHandle(_FakeFuture(done=False))
+    send_future = _FakeFuture(done=False)
+    node = _FakeNode()
+    counter = {"n": 0}
+
+    def _fake_spin_once(n, timeout_sec=0.0):
+        counter["n"] += 1
+        time.sleep(0.002)
+        n.publish(JS_TOPIC, _js([0.0] * 6))
+        if counter["n"] == 3:
+            n.publish("/crackvision/estop", _Bool(True))  # trip before the goal response
+        if counter["n"] == 10:
+            send_future.complete(goal_handle)  # ...then the driver accepts the goal
+
+    monkeypatch.setattr(et, "ActionClient", _fake_action_client(send_future))
+    monkeypatch.setattr(et.rclpy, "spin_once", _fake_spin_once)
+
+    outcome, _trace = et.execute(node, ACTION, EXEC_CFG_FAST, SHORT_TRAJ, JS_TOPIC)
+
+    assert counter["n"] >= 10, "execute() must keep waiting for the pending goal response after a trip"
+    assert outcome == "estopped"
+    assert goal_handle.cancel_calls == 1
+    assert "PRESS THE HARDWARE E-STOP" not in capsys.readouterr().out  # acked cancel, arm settled
+
+
+def test_execute_trip_while_send_pending_and_no_response_prints_estop(monkeypatch, capsys):
+    send_future = _FakeFuture(done=False)  # never answered
+    node = _FakeNode()
+    counter = {"n": 0}
+
+    def _fake_spin_once(n, timeout_sec=0.0):
+        counter["n"] += 1
+        time.sleep(0.002)
+        if counter["n"] == 2:
+            n.publish("/crackvision/estop", _Bool(True))
+
+    monkeypatch.setattr(et, "ActionClient", _fake_action_client(send_future))
+    monkeypatch.setattr(et.rclpy, "spin_once", _fake_spin_once)
+
+    t0 = time.monotonic()
+    outcome, _trace = et.execute(node, ACTION, EXEC_CFG_FAST, SHORT_TRAJ, JS_TOPIC)
+    assert time.monotonic() - t0 < EXEC_CFG_FAST["timeouts"]["cancel_settle_s"] + 0.5
+    assert outcome == "estopped"
+    assert "PRESS THE HARDWARE E-STOP" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("cancel_future", [_FakeFuture(done=False), _FakeFuture(CANCEL_REJECTED)], ids=["never_done", "rejected"])
+def test_execute_unacknowledged_cancel_is_bounded_and_prints_estop(monkeypatch, capsys, cancel_future):
+    goal_handle = _FakeGoalHandle(_FakeFuture(done=False), cancel_future=cancel_future)
+    node = _FakeNode()
+    counter = {"n": 0}
+
+    def _fake_spin_once(n, timeout_sec=0.0):
+        counter["n"] += 1
+        time.sleep(0.002)
+        n.publish(JS_TOPIC, _js([0.0] * 6))
+        if counter["n"] == 3:
+            n.publish("/crackvision/estop", _Bool(True))
+
+    monkeypatch.setattr(et, "ActionClient", _fake_action_client(_FakeFuture(result=goal_handle, done=True)))
+    monkeypatch.setattr(et.rclpy, "spin_once", _fake_spin_once)
+
+    cancel_settle_s = EXEC_CFG_FAST["timeouts"]["cancel_settle_s"]
+    t0 = time.monotonic()
+    outcome, _trace = et.execute(node, ACTION, EXEC_CFG_FAST, SHORT_TRAJ, JS_TOPIC)
+    elapsed = time.monotonic() - t0
+
+    assert elapsed < cancel_settle_s + 0.3, f"execute() blocked {elapsed:.2f}s on an unacknowledged cancel"
+    assert outcome == "estopped"
+    assert goal_handle.cancel_calls == 1
+    assert "PRESS THE HARDWARE E-STOP" in capsys.readouterr().out
+
+
+def test_execute_acked_cancel_but_arm_keeps_moving_prints_estop(monkeypatch, capsys):
+    goal_handle = _FakeGoalHandle(_FakeFuture(done=False))
+    node = _FakeNode()
+    counter = {"n": 0}
+
+    def _fake_spin_once(n, timeout_sec=0.0):
+        counter["n"] += 1
+        time.sleep(0.002)
+        # tracks SHORT_TRAJ closely before the trip, keeps drifting 0.01 rad/spin after it
+        drift = 0.0 if counter["n"] <= 3 else 0.01 * (counter["n"] - 3)
+        n.publish(JS_TOPIC, _js([drift] * 6))
+        if counter["n"] == 3:
+            n.publish("/crackvision/estop", _Bool(True))
+
+    monkeypatch.setattr(et, "ActionClient", _fake_action_client(_FakeFuture(result=goal_handle, done=True)))
+    monkeypatch.setattr(et.rclpy, "spin_once", _fake_spin_once)
+
+    t0 = time.monotonic()
+    outcome, _trace = et.execute(node, ACTION, EXEC_CFG_FAST, SHORT_TRAJ, JS_TOPIC)
+    assert time.monotonic() - t0 < EXEC_CFG_FAST["timeouts"]["cancel_settle_s"] + 0.3
+    assert outcome == "estopped"
+    assert goal_handle.cancel_calls == 1
+    assert "PRESS THE HARDWARE E-STOP" in capsys.readouterr().out
+
+
+class _FakeClock:
+    def __init__(self, t0: float = 100.0):
+        self.t = t0
+
+    def __call__(self) -> float:
+        return self.t
+
+
+def _run_tracked_goal(monkeypatch, scaled_traj, exec_cfg, tail: str):
+    """Drive execute() on a fake clock: joint_states track `scaled_traj` perfectly; the driver
+    reports SUCCESSFUL 0.2 s after the last t_s. `tail` sets what joint_states do afterwards:
+    "arrived" (at the final point), "short" (0.1 rad short of it) or "silent" (stop publishing)."""
+    clock = _FakeClock()
+    t_start = clock.t  # send_future is done immediately, so the goal starts at t0
+    duration = scaled_traj["points"][-1]["t_s"]
+    result_future = _FakeFuture(done=False)
+    goal_handle = _FakeGoalHandle(result_future)
+    node = _FakeNode()
+
+    def _fake_spin_once(n, timeout_sec=0.0):
+        clock.t += 0.05
+        rel = clock.t - t_start
+        if rel >= duration + 0.2 and not result_future.done():
+            result_future.complete(RESULT_SUCCESSFUL)
+            if tail == "silent":
+                return
+        if result_future.done() and tail == "silent":
+            return
+        positions = et.interpolate_positions(scaled_traj, rel)
+        if tail == "short" and rel >= duration:
+            positions = [q - 0.1 for q in positions]
+        n.publish(JS_TOPIC, _js(positions))
+
+    monkeypatch.setattr(et, "_now", clock)
+    monkeypatch.setattr(et, "ActionClient", _fake_action_client(_FakeFuture(result=goal_handle, done=True)))
+    monkeypatch.setattr(et.rclpy, "spin_once", _fake_spin_once)
+    outcome, trace = et.execute(node, ACTION, exec_cfg, scaled_traj, JS_TOPIC)
+    return outcome, trace, goal_handle, clock.t - t_start
+
+
+def _shipped_cfg():
+    cfg = load_execution_config(SHIPPED_EXECUTION_CONFIG)
+    assert cfg["timeouts"]["goal_s"] == 5.0
+    return cfg
+
+
+def _scaled_smoke(scale: float):
+    return et.scale_time(et.load_trajectory(TRAJECTORY_SMOKE), scale)
+
+
+def test_execute_goal_longer_than_goal_s_completes_when_tracking(monkeypatch):
+    cfg = _shipped_cfg()
+    scaled = _scaled_smoke(cfg["speed_scale"]["real_default"])
+    assert scaled["points"][-1]["t_s"] > cfg["timeouts"]["goal_s"]
+    outcome, trace, goal_handle, sim_elapsed = _run_tracked_goal(monkeypatch, scaled, cfg, tail="arrived")
+    assert outcome == "completed"
+    assert goal_handle.cancel_calls == 0
+    assert sim_elapsed > cfg["timeouts"]["goal_s"]
+    assert trace
+
+
+def test_execute_stuck_goal_cancelled_after_scaled_duration_plus_goal_s(monkeypatch):
+    cfg = _shipped_cfg()
+    scaled = {"points": [{"t_s": 0.0, "positions": [0.0] * 6}, {"t_s": 6.0, "positions": [0.0] * 6}]}
+    clock = _FakeClock()
+    goal_handle = _FakeGoalHandle(_FakeFuture(done=False))  # never finishes
+    node = _FakeNode()
+
+    def _fake_spin_once(n, timeout_sec=0.0):
+        clock.t += 0.05
+        n.publish(JS_TOPIC, _js([0.0] * 6))
+
+    monkeypatch.setattr(et, "_now", clock)
+    monkeypatch.setattr(et, "ActionClient", _fake_action_client(_FakeFuture(result=goal_handle, done=True)))
+    monkeypatch.setattr(et.rclpy, "spin_once", _fake_spin_once)
+    outcome, _trace = et.execute(node, ACTION, cfg, scaled, JS_TOPIC)
+    assert outcome == "aborted"
+    assert goal_handle.cancel_calls == 1
+    # cancelled just past 6.0 + 5.0 s, plus at most cancel_settle_s for cancel-and-hold
+    assert 11.0 < clock.t - 100.0 <= 11.0 + cfg["timeouts"]["cancel_settle_s"] + 0.2
+
+
+def test_execute_successful_but_not_arrived_is_aborted(monkeypatch):
+    cfg = _shipped_cfg()
+    outcome, _trace, _gh, _ = _run_tracked_goal(monkeypatch, _scaled_smoke(1.0), cfg, tail="short")
+    assert outcome == "aborted"
+
+
+def test_execute_successful_with_stale_joint_states_is_aborted(monkeypatch):
+    cfg = _shipped_cfg()
+    outcome, _trace, _gh, _ = _run_tracked_goal(monkeypatch, _scaled_smoke(1.0), cfg, tail="silent")
+    assert outcome == "aborted"
+
+
+def test_execute_successful_and_arrived_is_completed(monkeypatch):
+    cfg = _shipped_cfg()
+    outcome, trace, _gh, _ = _run_tracked_goal(monkeypatch, _scaled_smoke(1.0), cfg, tail="arrived")
+    assert outcome == "completed"
+    assert trace[-1]["commanded"] == pytest.approx(trace[-1]["actual"], abs=et.ARRIVAL_TOL_RAD)

@@ -28,6 +28,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Set, Tuple
 
 import rclpy
+from action_msgs.srv import CancelGoal
 from builtin_interfaces.msg import Duration
 from control_msgs.action import FollowJointTrajectory
 from moveit_msgs.msg import PlanningSceneComponents
@@ -67,6 +68,42 @@ DEFAULT_SERVICE_TIMEOUT_S = 30.0
 VALIDITY_GROUP = "arm"
 REAL_DRIVER_NODE = "reBotArmController"
 MOCK_DRIVER_NODE = "mock_rebotarm_driver"
+
+# docs/INTERFACES.md §11.1, hard-coded on purpose. execution.yaml must restate this table exactly
+# (checked by `_check_profiles_match_table`, exit 2 otherwise), but every decision -- which modes a
+# profile allows, which action goals go to, which node must host it -- is taken from here, never
+# from the overridable --execution-config. A config file can therefore never pair `mock` with the
+# real driver and so skip the real-only gates (ADR-016 §2/§9).
+PROFILE_TABLE: Mapping[str, Mapping[str, Any]] = {
+    "moveit_mock": {
+        "action": "/rebotarm_controller/follow_joint_trajectory",
+        "joint_states_topic": "/joint_states",
+        "expected_node": "ros2_control mock hardware (MOT-02)",
+        "modes": ("mock", "dry"),
+    },
+    "vendor_mock": {
+        "action": "/rebotarm/follow_joint_trajectory",
+        "joint_states_topic": "/rebotarm/joint_states",
+        "expected_node": MOCK_DRIVER_NODE,
+        "modes": ("mock", "dry"),
+    },
+    "vendor": {
+        "action": "/rebotarm/follow_joint_trajectory",
+        "joint_states_topic": "/rebotarm/joint_states",
+        "expected_node": REAL_DRIVER_NODE,
+        "arm_status_topic": "/rebotarm/arm_status",
+        "modes": ("dry", "real"),
+    },
+}
+
+# Post-SUCCESSFUL arrival check (§11.10 exit 0 = "goal completed and arrival verified"): max
+# per-joint |actual - final point| on the first joint_states received after the result. Equals the
+# vendor stack's own arrival tolerance (motion_runner.py tol_rad, cited in §11.12) -- looser than
+# tolerances.start_state_rad, which §11.12 reserves for "already at the start" and "stopped".
+ARRIVAL_TOL_RAD = 0.06
+
+# The only clock execute() and its helpers read; a module attribute so tests can drive it.
+_now = time.monotonic
 
 # §11.7's online read-only / confirmation gate ids. The offline gate ids live in execution_gate
 # (MOT-05.3); these three are evaluated here because they need a live ROS graph or a controlling
@@ -398,21 +435,27 @@ class OnlineChecks:
 # --------------------------------------------------------------------------------------
 
 def _wait_for_settle(
-    node: Node, joint_state_box: Dict[str, Any], start_tol_rad: float, joint_state_window_s: float, cancel_settle_s: float
+    node: Node, joint_state_box: Dict[str, Any], start_tol_rad: float, joint_state_window_s: float, deadline: float
 ) -> bool:
-    deadline = time.monotonic() + cancel_settle_s
+    """§11.8 step 2: True once max per-joint |Δq| < start_tol_rad across a full joint_state window,
+    reached before the absolute monotonic `deadline`."""
     history: List[Tuple[float, Dict[str, float]]] = []
-    while time.monotonic() < deadline:
+    observing_since: Optional[float] = None
+    while _now() < deadline:
         rclpy.spin_once(node, timeout_sec=0.05)
-        now = time.monotonic()
+        now = _now()
         last_monotonic = joint_state_box.get("monotonic")
         age_s = None if last_monotonic is None else now - last_monotonic
         if is_stale(age_s, joint_state_window_s) or joint_state_box.get("positions") is None:
             history = []
+            observing_since = None
             continue
+        if observing_since is None:
+            observing_since = now
         history.append((now, dict(joint_state_box["positions"])))
         history = [(t, p) for t, p in history if now - t <= joint_state_window_s]
-        if history and (now - history[0][0]) >= joint_state_window_s:
+        # Fresh data observed continuously for a full window, and still within it.
+        if (now - observing_since) >= joint_state_window_s:
             spans = [
                 max(p.get(j, 0.0) for _, p in history) - min(p.get(j, 0.0) for _, p in history)
                 for j in JOINT_NAMES
@@ -420,6 +463,50 @@ def _wait_for_settle(
             if max(spans) < start_tol_rad:
                 return True
     return False
+
+
+def _cancel_and_hold(
+    node: Node, goal_handle, joint_state_box: Dict[str, Any], start_tol_rad: float, joint_state_s: float, cancel_settle_s: float
+) -> bool:
+    """§11.8 steps 1-3. Cancel the goal, wait (bounded) for the cancel to be acknowledged, then for the
+    arm to settle -- all within `cancel_settle_s` of the cancel. Prints "PRESS THE HARDWARE E-STOP"
+    and returns False if the cancel is unacknowledged/rejected or the arm does not settle in time."""
+    deadline = _now() + cancel_settle_s
+    cancel_future = goal_handle.cancel_goal_async()
+    while not cancel_future.done() and _now() < deadline:
+        rclpy.spin_once(node, timeout_sec=0.05)
+    response = cancel_future.result() if cancel_future.done() else None
+    if response is None or response.return_code != CancelGoal.Response.ERROR_NONE:
+        detail = "not acknowledged" if response is None else f"rejected (return_code={response.return_code})"
+        print(f"cancel {detail} within timeouts.cancel_settle_s={cancel_settle_s}s", file=sys.stderr)
+        print("PRESS THE HARDWARE E-STOP")
+        return False
+    if not _wait_for_settle(node, joint_state_box, start_tol_rad, joint_state_s, deadline):
+        print(f"arm did not settle within timeouts.cancel_settle_s={cancel_settle_s}s of the cancel", file=sys.stderr)
+        print("PRESS THE HARDWARE E-STOP")
+        return False
+    return True
+
+
+def _verify_arrival(
+    node: Node, joint_state_box: Dict[str, Any], final_point: Sequence[float], joint_state_s: float, since: float
+) -> Tuple[bool, str, Optional[List[float]]]:
+    """§11.10 "arrival verified": the first joint_states received after `since` (the result's
+    arrival) must be within ARRIVAL_TOL_RAD of the final point; none within joint_state_s is stale."""
+    deadline = _now() + joint_state_s
+    while _now() < deadline:
+        last = joint_state_box["monotonic"]
+        positions = joint_state_box["positions"]
+        if last is not None and last >= since and positions is not None:
+            actual = [positions.get(j) for j in JOINT_NAMES]
+            if None in actual:
+                return False, f"joint_states missing arm joint name(s), got {sorted(positions)}", None
+            err = tracking_error_rad(final_point, actual)
+            if err > ARRIVAL_TOL_RAD:
+                return False, f"arrival error {err:.4f} rad exceeds ARRIVAL_TOL_RAD={ARRIVAL_TOL_RAD}", actual
+            return True, f"arrived (max |delta|={err:.4f} rad)", actual
+        rclpy.spin_once(node, timeout_sec=0.05)
+    return False, f"no fresh joint_states within {joint_state_s}s after the result (stale)", None
 
 
 def execute(
@@ -430,14 +517,15 @@ def execute(
     joint_states_topic: str,
 ) -> Tuple[str, List[Dict[str, Any]]]:
     """Send the goal and monitor it (§11.8). The only place this module constructs an
-    `ActionClient`. On any trip: cancel, wait for the arm to settle, and return without ever
-    calling any other vendor service (ADR-016 §7: cancel and hold, no auto-disable)."""
+    `ActionClient`. On any trip: cancel, wait (bounded) for the arm to settle, and return without
+    ever calling any other vendor service (ADR-016 §7: cancel and hold, no auto-disable). A trip
+    while the goal request is still pending keeps waiting (bounded) for the response, so an
+    accepted goal is always cancelled. After SUCCESSFUL, arrival at the final point is verified."""
     client = ActionClient(node, FollowJointTrajectory, action_name)
 
     tolerances = exec_cfg["tolerances"]
     timeouts = exec_cfg["timeouts"]
-    goal_deadline = time.monotonic() + timeouts["goal_s"]
-    if not client.wait_for_server(timeout_sec=max(goal_deadline - time.monotonic(), 0.0)):
+    if not client.wait_for_server(timeout_sec=timeouts["goal_s"]):
         return "aborted", []
 
     trip: Dict[str, Optional[str]] = {"kind": None, "reason": None}
@@ -460,7 +548,7 @@ def execute(
 
     def _on_joint_state(msg: JointState) -> None:
         joint_state_box["positions"] = dict(zip(msg.name, msg.position))
-        joint_state_box["monotonic"] = time.monotonic()
+        joint_state_box["monotonic"] = _now()
 
     js_sub = node.create_subscription(JointState, joint_states_topic, _on_joint_state, 10)
 
@@ -472,9 +560,10 @@ def execute(
         signal.signal(sig, _signal_handler)
 
     trace: List[Dict[str, Any]] = []
-    start_monotonic = time.monotonic()
     tracking_tol = tolerances["tracking_rad"]
     joint_state_timeout = timeouts["joint_state_s"]
+    # §11.12: a goal still running goal_s after its last scaled t_s is stuck.
+    goal_limit_s = float(scaled_traj["points"][-1]["t_s"]) + timeouts["goal_s"]
 
     def _cleanup() -> None:
         for sig, handler in old_handlers.items():
@@ -483,22 +572,45 @@ def execute(
         for sub in estop_subs:
             node.destroy_subscription(sub)
 
+    def _stop(goal_handle) -> Tuple[str, List[Dict[str, Any]]]:
+        print(f"{trip['kind']}: {trip['reason']}", file=sys.stderr)
+        _cancel_and_hold(
+            node, goal_handle, joint_state_box, tolerances["start_state_rad"], joint_state_timeout, timeouts["cancel_settle_s"]
+        )
+        return trip["kind"], trace
+
     try:
         goal_msg = FollowJointTrajectory.Goal()
         goal_msg.trajectory = joint_trajectory_msg(scaled_traj)
         send_future = client.send_goal_async(goal_msg)
+        response_deadline = _now() + timeouts["goal_s"]
         while not send_future.done() and trip["kind"] is None:
             rclpy.spin_once(node, timeout_sec=0.05)
-        goal_handle = send_future.result() if send_future.done() else None
-        if goal_handle is None or not goal_handle.accepted:
-            if trip["kind"] is not None:
+            if _now() > response_deadline:
+                _trip("aborted", f"no goal response within timeouts.goal_s={timeouts['goal_s']}s")
+        if not send_future.done():
+            # Tripped while the request is pending: the driver may still accept it, so keep
+            # waiting (bounded) for the response -- an accepted goal must be cancelled, never
+            # left running unmonitored.
+            pending_deadline = _now() + timeouts["cancel_settle_s"]
+            while not send_future.done() and _now() < pending_deadline:
+                rclpy.spin_once(node, timeout_sec=0.05)
+            if not send_future.done():
+                print(f"{trip['kind']}: {trip['reason']}", file=sys.stderr)
+                print(f"no goal response within timeouts.cancel_settle_s={timeouts['cancel_settle_s']}s after the trip", file=sys.stderr)
+                print("PRESS THE HARDWARE E-STOP")
                 return trip["kind"], trace
-            return "aborted", trace
+        goal_handle = send_future.result()
+        if goal_handle is None or not goal_handle.accepted:
+            return (trip["kind"] or "aborted"), trace
+        if trip["kind"] is not None:
+            return _stop(goal_handle)
 
+        start_monotonic = _now()
         result_future = goal_handle.get_result_async()
         while not result_future.done():
             rclpy.spin_once(node, timeout_sec=0.05)
-            now = time.monotonic()
+            now = _now()
             elapsed = now - start_monotonic
             last_monotonic = joint_state_box["monotonic"]
             age_s = None if last_monotonic is None else now - last_monotonic
@@ -516,22 +628,23 @@ def execute(
                     trace.append({"t_s": elapsed, "commanded": commanded, "actual": actual})
                     if err > tracking_tol:
                         _trip("aborted", f"tracking error {err:.4f} rad exceeds tolerances.tracking_rad={tracking_tol}")
-            if elapsed > timeouts["goal_s"]:
-                _trip("aborted", "goal exceeded timeouts.goal_s without completing")
+            if elapsed > goal_limit_s:
+                _trip("aborted", f"goal still running {elapsed:.2f}s > scaled duration + timeouts.goal_s = {goal_limit_s:.2f}s")
 
             if trip["kind"] is not None:
-                cancel_future = goal_handle.cancel_goal_async()
-                while not cancel_future.done():
-                    rclpy.spin_once(node, timeout_sec=0.05)
-                settled = _wait_for_settle(
-                    node, joint_state_box, tolerances["start_state_rad"], joint_state_timeout, timeouts["cancel_settle_s"]
-                )
-                if not settled:
-                    print("PRESS THE HARDWARE E-STOP")
-                return trip["kind"], trace
+                return _stop(goal_handle)
 
+        result_received = _now()
         result = result_future.result()
         if result is None or result.result.error_code != FollowJointTrajectory.Result.SUCCESSFUL:
+            return "aborted", trace
+
+        final_point = [float(v) for v in scaled_traj["points"][-1]["positions"]]
+        arrived, detail, actual = _verify_arrival(node, joint_state_box, final_point, joint_state_timeout, result_received)
+        if actual is not None:
+            trace.append({"t_s": result_received - start_monotonic, "commanded": final_point, "actual": actual})
+        if not arrived:
+            print(f"aborted: driver reported SUCCESSFUL but {detail}", file=sys.stderr)
             return "aborted", trace
         return "completed", trace
     finally:
@@ -559,15 +672,37 @@ def _resolve_paths(args: argparse.Namespace, root: Path) -> Dict[str, Path]:
     }
 
 
-def _validate_mode_profile(mode: str, profile: str, exec_cfg: Dict[str, Any]) -> None:
+def _check_profiles_match_table(exec_cfg: Dict[str, Any]) -> None:
+    """Usage error (exit 2) unless execution.yaml's driver_profiles restate `PROFILE_TABLE`
+    exactly: an edited/overridden config is refused, never trusted (§11.1)."""
+    profiles = exec_cfg["driver_profiles"]
+    if set(profiles) != set(PROFILE_TABLE):
+        raise ConfigError(f"execution config driver_profiles must be exactly {sorted(PROFILE_TABLE)} (docs/INTERFACES.md §11.1)")
+    for name, expected in PROFILE_TABLE.items():
+        got = profiles[name]
+        for key, value in expected.items():
+            actual = got.get(key)
+            if key == "modes":
+                actual = tuple(actual) if isinstance(actual, (list, tuple)) else actual
+            if actual != value:
+                raise ConfigError(
+                    f"execution config driver_profiles.{name}.{key}={actual!r} differs from docs/INTERFACES.md §11.1 "
+                    f"({value!r}); the mode/profile table is not configurable"
+                )
+        extra = set(got) - set(expected)
+        if extra:
+            raise ConfigError(f"execution config driver_profiles.{name} has key(s) not in §11.1: {sorted(extra)}")
+
+
+def _validate_mode_profile(mode: str, profile: str) -> None:
     if mode not in MODES:
         raise ConfigError(f"--mode must be one of {MODES}, got {mode!r}")
-    profiles = exec_cfg["driver_profiles"]
-    if profile not in profiles:
-        raise ConfigError(f"--profile must be one of {sorted(profiles)}, got {profile!r}")
-    if mode not in profiles[profile]["modes"]:
+    if profile not in PROFILE_TABLE:
+        raise ConfigError(f"--profile must be one of {sorted(PROFILE_TABLE)}, got {profile!r}")
+    valid = PROFILE_TABLE[profile]["modes"]
+    if mode not in valid:
         raise ConfigError(
-            f"mode {mode!r} is not valid for profile {profile!r}; valid modes are {profiles[profile]['modes']} (docs/INTERFACES.md §11.1)"
+            f"mode {mode!r} is not valid for profile {profile!r}; valid modes are {list(valid)} (docs/INTERFACES.md §11.1)"
         )
 
 
@@ -604,6 +739,7 @@ def run(
         exec_cfg = load_execution_config(paths["execution_config"])
     except GateConfigError as exc:
         raise ConfigError(f"execution config invalid: {exc}") from exc
+    _check_profiles_match_table(exec_cfg)
 
     mode = args.mode or exec_cfg["default_mode"]
     profile = args.profile or exec_cfg["default_driver_profile"]
@@ -612,7 +748,7 @@ def run(
         # §11.1). A mismatch against the *default* profile is instead caught just below, after the
         # offline gate -- so a run that the offline gate would refuse anyway (e.g. G-ARM unset)
         # reports that refusal (exit 3) rather than a profile-pairing usage error (exit 2).
-        _validate_mode_profile(mode, profile, exec_cfg)
+        _validate_mode_profile(mode, profile)
 
     record: Dict[str, Any] = {
         "schema": EXECUTION_RECORD_SCHEMA,
@@ -672,7 +808,7 @@ def run(
             raise PreconditionError(f"offline gate refused: {offline_report.refusals}")
 
         if args.profile is None:
-            _validate_mode_profile(mode, profile, exec_cfg)
+            _validate_mode_profile(mode, profile)
 
         # Offline gate passed: the trajectory loaded cleanly, so this cannot raise TrajectoryError.
         traj = load_trajectory(args.trajectory)
@@ -682,7 +818,7 @@ def run(
         rclpy.init(args=None)
         node = Node(TOOL)
 
-        profile_cfg = exec_cfg["driver_profiles"][profile]
+        profile_cfg = PROFILE_TABLE[profile]
         online_checks = OnlineChecks(node, args.service_timeout_s)
 
         graph_result = online_checks.graph(profile, profile_cfg["expected_node"], profile_cfg["action"])
