@@ -1,0 +1,36 @@
+# MOT-05.3 fixture: an end-effector config that is fully `measured`, so
+# end_effector.assert_commissioning_ready passes. NOT the real GEOM-05/GEOM-07 calibration --
+# test-only numbers.
+schema: crackvision.end_effector/1
+parent_link: gripper_link
+
+tool:
+  frame: tool_tip
+  xyz_m: [0.0, 0.0, 0.0]
+  rpy_rad: [0.0, 0.0, 0.0]
+  pointing_axis: [1.0, 0.0, 0.0]
+  value_status: measured
+  provenance: fixture
+  source: "MOT-05.3 fixture: measured for the execution_gate real-mode-passes test"
+
+wrist_camera:
+  model: fixture_camera
+  frame: camera_link
+  xyz_m: [-0.0783, -0.0090, -0.0640]
+  rpy_rad: [0.0, 0.0, 0.0]
+  value_status: measured
+  provenance: fixture
+  mount: "fixture"
+  source: "MOT-05.3 fixture: measured for the execution_gate real-mode-passes test"
+
+collision_padding_m: 0.005
+collision:
+  - id: camera_housing_link
+    frame: camera_link
+    box_size_m: [0.023, 0.042, 0.042]
+    xyz_m: [-0.0078, -0.009, 0.0]
+    rpy_rad: [0.0, 0.0, 0.0]
+    value_status: measured
+    source: "MOT-05.3 fixture"
+
+allowed_self_collisions: []

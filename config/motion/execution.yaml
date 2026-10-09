@@ -1,0 +1,86 @@
+# config/motion/execution.yaml — execution-time driver profiles and numeric defaults for
+# commissioning-gated execution (ADR-016, MOT-05).
+#
+# Schema: crackvision.execution_config/1 (validated by
+# ros2_ws/src/crackvision_motion/crackvision_motion/execution_gate.py:load_execution_config,
+# strict: an unknown key is a config error). Consumed by `execute_trajectory` (MOT-05.4) and the
+# offline gate (MOT-05.3). Numeric defaults and their rationale: docs/INTERFACES.md §11.12.
+schema: crackvision.execution_config/1
+
+# Safest non-refusing default (ADR-016 §1): an operator who forgets --mode gets a full offline +
+# online read-only report and no motion, never a silent mock "success" that looks like a rehearsal.
+default_mode: dry
+
+# §11.1. moveit_mock/vendor_mock are mock|dry only; vendor is dry|real only -- a mode/profile pair
+# outside this table is a usage error (exit 2), caught by MOT-05.4 before any gate runs.
+driver_profiles:
+  moveit_mock:
+    action: /rebotarm_controller/follow_joint_trajectory
+    joint_states_topic: /joint_states
+    expected_node: ros2_control mock hardware (MOT-02)
+    modes: [mock, dry]
+  vendor_mock:
+    action: /rebotarm/follow_joint_trajectory
+    joint_states_topic: /rebotarm/joint_states
+    expected_node: mock_rebotarm_driver
+    modes: [mock, dry]
+  vendor:
+    action: /rebotarm/follow_joint_trajectory
+    joint_states_topic: /rebotarm/joint_states
+    expected_node: reBotArmController
+    arm_status_topic: /rebotarm/arm_status
+    modes: [dry, real]
+
+default_driver_profile: moveit_mock
+
+speed_scale:
+  # Mock only: the unscaled file is already within limits (G-LIMITS (1)) and no torque is at
+  # stake, so full speed keeps mock smoke runs short (§11.12).
+  default: 1.0
+  # mock/dry hard cap: uniform retiming never speeds a trajectory up, so 1.0 is the natural upper
+  # bound (§11.12). dry additionally previews real's commissioning cap separately (MOT-05.4).
+  cap: 1.0
+  # dry/real default: matches the shipped commissioning.yaml speed_scale_cap (0.10) exactly, so a
+  # real run at the default moves at <=10% velocity / <=1% acceleration of the limits (§11.12).
+  # This value can never raise the real cap -- that is commissioning.yaml's job alone (§11.4/§4).
+  real_default: 0.10
+
+tolerances:
+  # Tight on purpose: this checks the robot is already AT the trajectory's first point before any
+  # goal is sent, a fraction of the vendor's own 0.06 rad arrival tolerance (§11.12). Also the
+  # post-cancel "stopped" threshold (§11.8).
+  start_state_rad: 0.02
+  # Strictly between the vendor's 0.06 rad arrival tolerance and its 0.20 rad hard-fail tolerance,
+  # so this executor's tracking cancel fires first while staying loose enough for ordinary
+  # speed_scale-retimed lag (§11.12).
+  tracking_rad: 0.15
+
+timeouts:
+  # 25-50 missed joint_states publishes at 50-100 Hz -- generous against jitter, far faster than
+  # human reaction time for a dead driver (§11.12).
+  joint_state_s: 0.5
+  # Scaled trajectory duration + this = stuck-goal cancel threshold (§11.12).
+  goal_s: 5.0
+  # Wide margin over the driver's single 20 ms hold-engagement tick at the 0.10 real cap, still
+  # short enough to tell the operator to hit the hardware e-stop promptly if the hold doesn't take
+  # (§11.12/§11.8).
+  cancel_settle_s: 2.0
+
+# Max tool-tip Cartesian displacement between consecutive G-COLLISION-checked configurations
+# before an extra linearly-interpolated config is inserted; below both the trace clearance
+# (0.01 m, ADR-014 §2) and the end-effector collision padding (0.005 m) (§11.12).
+densify_step_m: 0.01
+
+# Near-limit threshold for the §11.6 approach rule (not a bound narrowing). Equals the vendor's
+# own safe_park_tolerance_rad default (§11.12).
+position_margin_rad: 0.03
+
+# Long enough to review a MOT-08 preview and walk to the workstation; short enough to bound the
+# time window for an unrecorded physical change between approval and run (§11.12).
+approval_max_age_s: 3600
+
+# §11.1/§11.8. The hardware e-stop is the safety function this project relies on; these are
+# secondary, software-only conveniences.
+estop_topics:
+  - /crackvision/estop
+  - /rebot_motion/estop
