@@ -1,0 +1,19 @@
+# Provenance: derived from the official Intel librealsense udev rules.
+# Upstream source: https://raw.githubusercontent.com/IntelRealSense/librealsense/v2.57.7/config/99-realsense-libusb.rules
+# Upstream tag: v2.57.7
+# Upstream sha256: c610c3379d360006261b0fc26614316323551f5b11ffe81e9ebf48c4c0a43ce8
+# Upstream line this is derived from (D405, idProduct 0b5b):
+#   SUBSYSTEMS=="usb", ATTRS{idVendor}=="8086", ATTRS{idProduct}=="0b5b", MODE:="0666", GROUP:="plugdev"
+#
+# Narrowed per REQ-HOST-3 (least privilege): the upstream file sets MODE 0666
+# (world read/write) on ~50 Intel USB ids, including DFU/recovery ids not used
+# by this project, and runs root `chmod -R 0777` RUN hooks on the sysfs tree.
+# This project only needs the D405 (8086:0b5b) readable/writable by the
+# `plugdev` group, which the operator (boosterk1) already belongs to, so
+# MODE is tightened to 0660/GROUP plugdev, every other device id is dropped,
+# and no RUN hook is added. SUBSYSTEMS=="usb" matches the USB device node
+# itself; librealsense's RSUSB and V4L2 backends both walk up from the
+# video4linux/uvcvideo child nodes to this ancestor USB device via udev's
+# parent-attribute matching, so this single ATTRS{} rule covers both backends
+# without a separate video4linux-specific line.
+SUBSYSTEMS=="usb", ATTRS{idVendor}=="8086", ATTRS{idProduct}=="0b5b", MODE:="0660", GROUP:="plugdev"

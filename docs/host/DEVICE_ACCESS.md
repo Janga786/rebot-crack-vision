@@ -2,52 +2,83 @@
 
 ## Purpose
 
-Grants the logged-in user non-root access to the RealSense D405 (and other
-Intel RealSense USB devices) via the official librealsense udev rule, so
-`pyrealsense2` / `realsense2_camera` can open the device without `sudo`.
+Grants the logged-in user (`boosterk1`, already a member of the `plugdev`
+group) non-root access to the RealSense D405 via a project-specific udev
+rule, so `pyrealsense2` / `realsense2_camera` can open the device without
+`sudo`. No group membership, `chmod`, or other system change is made beyond
+installing this one rule file.
 
 ## Rule provenance
 
-- File: `host/udev/99-realsense-libusb.rules`
-- Source: `https://raw.githubusercontent.com/IntelRealSense/librealsense/v2.57.7/config/99-realsense-libusb.rules`
-- librealsense tag: `v2.57.7`, matching the installed apt package
-  `ros-humble-librealsense2 2.57.7-1jammy.20260324.115117` (the pip
-  `pyrealsense2` wheel is 2.58.4; no udev rule changes exist between these
-  minor versions upstream).
+- File: `host/udev/99-crackvision-d405.rules`
+- Derived from upstream: `https://raw.githubusercontent.com/IntelRealSense/librealsense/v2.57.7/config/99-realsense-libusb.rules`
+- Upstream tag: `v2.57.7`
 - Upstream file sha256: `c610c3379d360006261b0fc26614316323551f5b11ffe81e9ebf48c4c0a43ce8`
-- Fetched: 2026-09-29
-- The staged file carries this provenance as a header comment; the header is
-  additive (comment lines only) and does not alter any rule semantics.
+- Upstream line this rule derives from (D405, idProduct `0b5b`):
+  `SUBSYSTEMS=="usb", ATTRS{idVendor}=="8086", ATTRS{idProduct}=="0b5b", MODE:="0666", GROUP:="plugdev"`
 
-## Installation (privileged, done outside this repo's automation)
+### Why narrowed
+
+A privileged reviewer (Opus, xhigh effort) denied an earlier attempt
+(PRIV-1790720360-HOST-03) that staged the verbatim upstream file: it sets
+`MODE 0666` (world read/write) on ~50 Intel USB ids — including DFU/recovery
+ids this project never touches — and runs root `chmod -R 0777` `RUN` hooks
+on the sysfs tree. That is far broader than REQ-HOST-3 (least privilege)
+allows for a single camera whose operator is already in `plugdev`.
+
+The staged rule keeps exactly one active line: the D405 id (`8086:0b5b`),
+with `MODE:="0660"` and `GROUP:="plugdev"` instead of `0666`, no other
+device ids, and no `RUN` hook. `SUBSYSTEMS=="usb"` matches the USB device
+node; librealsense's RSUSB and V4L2 backends both resolve permissions by
+walking up from the `video4linux`/`uvcvideo` child device to this ancestor
+USB node via udev's parent-attribute matching, so the single `ATTRS{}` rule
+covers both backends without a separate video4linux-specific line.
+
+The former broad copy, `host/udev/99-realsense-libusb.rules` (staged by an
+earlier attempt), has been removed from this directory so it cannot be
+installed by mistake.
+
+## Installation (privileged — requires operator/reviewer-approved sudo)
+
+Exactly two privileged steps, run once:
 
 ```
-sudo install -m 0644 -o root -g root \
-  host/udev/99-realsense-libusb.rules \
-  /etc/udev/rules.d/99-realsense-libusb.rules
-sudo udevadm control --reload-rules
-sudo udevadm trigger
+/usr/bin/install -m 0644 -o root -g root \
+  host/udev/99-crackvision-d405.rules \
+  /etc/udev/rules.d/99-crackvision-d405.rules
+
+/usr/bin/udevadm control --reload-rules
 ```
 
-After installing, unplug and replug the D405 (or re-trigger udev) so the new
-rule applies to the already-connected device node.
+No `udevadm trigger` is run: no D405 is attached at install time, and
+`trigger` would re-run against unrelated already-attached USB devices. The
+new rule takes effect the next time the D405 is plugged in (or any time
+after a reload if it is already plugged in and replugged).
 
 ## Verify
 
+Content and ownership/mode of the installed rule:
+
 ```
-cmp host/udev/99-realsense-libusb.rules /etc/udev/rules.d/99-realsense-libusb.rules
-ls -l /dev/bus/usb/*/* | grep plugdev   # device group should be plugdev, mode 0666 after replug
+cmp host/udev/99-crackvision-d405.rules /etc/udev/rules.d/99-crackvision-d405.rules
+stat -c '%a %U %G' /etc/udev/rules.d/99-crackvision-d405.rules   # expect: 644 root root
+```
+
+Functional check once a D405 is physically attached (unplug/replug first so
+the rule applies to that device node):
+
+```
 ./env.sh python scripts/check_realsense.py
 ```
 
 ## Rollback
 
 ```
-sudo rm /etc/udev/rules.d/99-realsense-libusb.rules
-sudo udevadm control --reload-rules
-sudo udevadm trigger
+/usr/bin/rm /etc/udev/rules.d/99-crackvision-d405.rules
+/usr/bin/udevadm control --reload-rules
 ```
 
-This removes the least-privilege grant; the device falls back to whatever
-default USB permissions apply (typically root-only, or group access if
-another rule already grants it).
+This removes the least-privilege grant; the D405 falls back to whatever
+default USB permissions apply (typically root-only access). No other system
+state (group membership, other udev rules, file modes elsewhere) is
+touched by install or rollback.
