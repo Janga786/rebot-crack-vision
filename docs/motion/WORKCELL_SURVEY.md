@@ -103,9 +103,11 @@ by hand. `survey_to_scene` (MOT-10.3) does the arithmetic from §5 below.
 
 1. **Base mounting.** Confirm (and note) whether the base is bolted directly to the table or sits on an
    adapter plate. If there is a plate, measure its thickness with calipers or a rule.
-2. **Table.** From the front reference face (`x = +0.070`), tape-measure to the far table edge and (if
-   reachable) the near edge. From each side reference face (`y = ±0.100`), tape-measure to the
-   corresponding table edge. Lay the spirit level near where the specimen sits and record the
+2. **Table.** From the front reference face (`x = +0.070`), tape-measure in `+x` to the far table edge
+   and (if reachable), from that *same* front face but in `-x`, to the near table edge — there is no
+   separate "`-x` face" to measure from. From each side reference face (`y = ±0.100`), tape-measure in
+   the outward direction to the corresponding table edge. Measure the table top's thickness (top face to
+   underside) with a rule or calipers. Lay the spirit level near where the specimen sits and record the
    bubble/gap deviation and where you checked it.
 3. **Specimen.** Pick a consistent corner order (e.g. clockwise from the corner nearest the base) and
    record it in `survey.notes`. For each of the 4 top corners, measure its offset from the front
@@ -148,14 +150,18 @@ Both commands are delivered by **MOT-10.3** (not this card) and follow the commo
 
 `survey_to_scene` (MOT-10.3), not the operator, computes:
 
-- the specimen's centre, yaw and footprint, by fitting the minimum-area rectangle through the 4 measured
-  corners (refused if any corner deviates from that fit by more than
-  `derivation_params.rectangularity_tolerance_m`, default 3 mm);
+- the specimen's centre, yaw and footprint, by fitting a rectangle to the 4 measured corners and checking
+  a non-trivial residual (the larger of the diagonal-length difference and the two opposite-side-length
+  differences — refused if that residual exceeds `derivation_params.rectangularity_tolerance_m`, default
+  3 mm; a 5 mm-skewed corner on a nominal 0.2 m square is refused at the default, see §12.7's worked
+  example);
 - the specimen's top `z`, as the adapter-plate thickness (0 if bolted directly) plus the mean of the
   caliper thickness readings;
-- the table's collision box, placed so its top face sits at `z = -(adapter plate thickness)` — exactly
-  `0` when the base is bolted directly to the table;
-- each obstacle's collision box, from the same front-face/centerline/table-top references.
+- the table's collision box: footprint from the front/side reference faces (§12.7 rule 3's exact sign
+  conventions), thickness from `table.thickness`, placed so its top face sits at
+  `z = -(adapter plate thickness)` — exactly `0` when the base is bolted directly to the table;
+- each obstacle's collision box, from the same front-face/centerline/table-top references and sign
+  conventions.
 
 Every object `survey_to_scene` writes into `config/scene/scene.yaml` gets `value_status: measured` and a
 `source` string naming the survey file's path and sha256 — never a bare "measured", so a reviewer can
@@ -165,13 +171,15 @@ trace every number back to the exact survey record that produced it.
 
 `survey_to_scene` refuses to write anything (no partial scene update) if:
 
-- any specimen corner lies outside the rectangularity tolerance of the fitted rectangle;
+- the specimen corners' rectangularity residual (§5 above, §12.7 rule 1) exceeds
+  `derivation_params.rectangularity_tolerance_m`;
 - `specimen.resting_on_table` is `false`, or disagrees with `acm_observations.specimen_resting_on_table`;
 - `acm_observations.base_bolted_to_table` disagrees with `base_mounting.bolted_directly_to_table`;
 - any derived obstacle box overlaps the robot's base keep-out (`base_keepout_m`, `docs/INTERFACES.md` §8.3);
 - fewer than 3 specimen thickness readings are present;
 - any single reading anywhere in the file has a `null` `value_m`, `instrument`, `resolution_m` or
-  `uncertainty_1sigma_m`.
+  `uncertainty_1sigma_m` — **except** `base_mounting.adapter_plate_thickness` when
+  `bolted_directly_to_table` is `true` (it is treated as thickness `0` and is not required).
 
 ## 7. Out of scope
 

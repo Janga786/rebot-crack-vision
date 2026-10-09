@@ -1692,14 +1692,17 @@ blocks every derived value that depends on it (§12.7).
 | `bolted_directly_to_table` | bool | `true` if the base casting/plate sits directly on the table with no adapter |
 | `adapter_plate_thickness` | reading\|null | required iff `bolted_directly_to_table` is `false`; else `null` |
 
-**(b) `table`** — all distances measured from the §12.1 reference faces, along the base's own axes
+**(b) `table`** — all distances measured from the §12.1 reference faces, along the base's own axes.
+All four edge readings are positive distances measured *from* the named reference face, in the
+direction stated; §12.7 rule 3 gives the exact sign each one gets when mapped to `base_link`.
 
 | Field | Type | Meaning |
 |---|---|---|
-| `front_face_to_far_edge` | reading | table edge distance beyond the base's `+x` front face |
-| `front_face_to_near_edge` | reading | table edge distance behind the base's `-x` side (may be a small or negative offset if the table edge is behind the base) |
-| `pos_y_side_face_to_edge` | reading | table edge distance beyond the `+y` side face |
-| `neg_y_side_face_to_edge` | reading | table edge distance beyond the `-y` side face |
+| `front_face_to_far_edge` | reading | distance from the front reference face (`x = +0.070`), in the `+x` direction, to the table's far edge (the specimen side) |
+| `front_face_to_near_edge` | reading | distance from the *same* front reference face (`x = +0.070`), but in the `-x` direction, to the table's near edge (the edge behind the robot). A value smaller than the base's own depth (`0.140` m) means the near edge sits under/behind the base; this is normal and still a positive reading — there is no separate "`-x` face", the measurement is always taken from the one front reference face |
+| `pos_y_side_face_to_edge` | reading | distance from the `+y` side face (`y = +0.100`), in the `+y` direction, to the table's edge on that side |
+| `neg_y_side_face_to_edge` | reading | distance from the `-y` side face (`y = -0.100`), in the `-y` direction, to the table's edge on that side |
+| `thickness` | reading | table top thickness (top face to underside), used for the table collision box's `z` extent (§12.7 rule 3) |
 | `flatness_deviation` | reading | spirit-level bubble deviation / straightedge gap near the specimen location |
 | `flatness_note` | str | where on the table this was checked |
 
@@ -1707,7 +1710,7 @@ blocks every derived value that depends on it (§12.7).
 
 | Field | Type | Meaning |
 |---|---|---|
-| `corners` | list[4 maps] | each `{x_from_front_face, y_from_centerline}` (both readings), one per physical top corner, in a consistent winding order stated in `survey.notes` |
+| `corners` | list[4 maps] | each `{x_from_front_face, y_from_centerline}` (both readings), one per physical top corner, in a consistent winding order stated in `survey.notes`. `x_from_front_face` is positive in the `+x` direction from the front reference face (`x = +0.070`); `y_from_centerline` is positive in the `+y` direction from the `y = 0` centerline (the same direction as `pos_y_side_face_to_edge`) |
 | `thickness_readings` | list[≥3 readings] | caliper thickness at ≥3 distinct points on the specimen |
 | `resting_on_table` | bool | observed, not derived |
 
@@ -1716,7 +1719,7 @@ blocks every derived value that depends on it (§12.7).
 | Field | Type | Meaning |
 |---|---|---|
 | `radius_m` | float | the stated clearance radius around `base_link`'s origin that was surveyed |
-| `items` | list[map] | each `{id, description, x_from_front_face: {min, max} readings, y_from_centerline: {min, max} readings, z_from_table_top: {min, max} readings}` — one axis-aligned box per obstacle (wall, fixture, cable run, camera USB lead routing, etc.) inside `radius_m` |
+| `items` | list[map] | each `{id, description, x_from_front_face: {min, max} readings, y_from_centerline: {min, max} readings, z_from_table_top: {min, max} readings}` — one axis-aligned box per obstacle (wall, fixture, cable run, camera USB lead routing, etc.) inside `radius_m`. `x_from_front_face`/`y_from_centerline` use the same sign conventions as `specimen.corners` (§12.4(c)). `z_from_table_top` is positive going *up* from the table's top face (the `z = -(adapter_plate_thickness or 0)` datum of §12.7 rule 3), so a reading of `0` sits exactly on the table top and a fixture above the table has a positive `min`/`max` |
 
 **(e) `acm_observations`**
 
@@ -1741,19 +1744,51 @@ rest throughout and nothing is jogged.
 
 ### 12.7 Derived-value rules (normative, deterministic — implemented by MOT-10.3's `survey_to_scene`)
 
-1. **Specimen centre/yaw/footprint**: fit the minimum-area rectangle through the 4 `corners` (in the
-   base-face coordinates of §12.1, i.e. `x = front_face_offset`, `y = centerline_offset`). Centre =
-   rectangle centroid, `yaw_rad` = rectangle's long-axis angle from `base_link` `+x`, `footprint_m` = the
-   fitted rectangle's side lengths. **Refuse** if any corner lies more than `rectangularity_tolerance_m`
-   from the fitted rectangle.
+First, every raw reading is mapped to `base_link` coordinates (§12.1 reference faces; §12.4 states each
+field's sign convention):
+
+- `x_from_front_face` (specimen corners, obstacle x): `x = 0.070 + value_m`.
+- `y_from_centerline` (specimen corners, obstacle y): `y = value_m` (the centerline *is* `base_link`
+  `y = 0`).
+- `table.front_face_to_far_edge`: `x_far = 0.070 + value_m`.
+- `table.front_face_to_near_edge`: `x_near = 0.070 - value_m` (same front face, `-x` direction — see
+  §12.4(b)).
+- `table.pos_y_side_face_to_edge`: `y_pos = 0.100 + value_m`.
+- `table.neg_y_side_face_to_edge`: `y_neg = -0.100 - value_m`.
+- `obstacles.items[i].z_from_table_top`: `z = z_table_top + value_m`, where `z_table_top` is rule 3's
+  table-top datum below (positive `value_m` is above the table top).
+
+1. **Specimen centre/yaw/footprint**: let `P0, P1, P2, P3` be the 4 `corners`, converted to `base_link`
+   `(x, y)` above, in the winding order `survey.notes` states (consecutive, e.g. clockwise). Define:
+   - side lengths `s0 = |P1-P0|`, `s1 = |P2-P1|`, `s2 = |P3-P2|`, `s3 = |P0-P3|`;
+   - diagonal lengths `d0 = |P2-P0|`, `d1 = |P3-P1|`;
+   - `residual_m = max(|d0 - d1|, |s0 - s2|, |s1 - s3|)` — this is `0` only for an exact rectangle (equal
+     diagonals, equal opposite sides), unlike a bounding-rectangle fit, which every quadrilateral touches
+     exactly and so can never refuse anything.
+
+   **Refuse** if `residual_m > rectangularity_tolerance_m`.
+
+   Otherwise: `centre = mean(P0, P1, P2, P3)` (centroid); let `u_a = (P1-P0)/s0` and `u_c = -(P3-P2)/s2`
+   (both should point the same way for a rectangle) — `yaw_rad = atan2(u_a.y + u_c.y, u_a.x + u_c.x)`;
+   `footprint_m = [(s0+s2)/2, (s1+s3)/2]` (mean length of each pair of opposite sides, the first along the
+   `yaw_rad` axis, the second perpendicular to it).
+
+   **Worked example** (default `rectangularity_tolerance_m = 0.003`): an intended 0.200 m x 0.200 m square
+   `P0=(0,0), P1=(0.200,0), P2=(0.200,0.200), P3=(0,0.200)` with `P2` mis-measured 5 mm too far in `+x`,
+   i.e. `P2=(0.205,0.200)`. Then `s0=0.200`, `s1=0.200063`, `s2=0.205`, `s3=0.200`, `d0=0.286399`,
+   `d1=0.282843`: `|d0-d1|=0.00356` m, `|s0-s2|=0.00500` m, `|s1-s3|=0.00006` m, so
+   `residual_m = 0.00500 m = 5 mm > 0.003 m` — **refused**.
 2. **Specimen top z**: `z_top = adapter_plate_thickness.value_m (or 0 if bolted_directly_to_table) +
    mean(thickness_readings[*].value_m)`.
-3. **Table box**: footprint from `front_face_to_far_edge` + `front_face_to_near_edge` (x-extent, both
-   relative to the `base_link` `x = +0.070` front face) and `pos_y_side_face_to_edge` +
-   `neg_y_side_face_to_edge` (y-extent, relative to `x = ±0.100` side faces); top face placed at
-   `z = -(adapter_plate_thickness.value_m or 0)` — exactly `0` when `bolted_directly_to_table` is `true`.
-4. **Obstacle boxes**: each `items[i]` becomes one axis-aligned box directly from its `min`/`max` readings
-   on the same `base_link` references as the table.
+3. **Table box**: footprint `x` extent `[x_near, x_far]` and `y` extent `[y_neg, y_pos]` from the mapped
+   values above (`y = ±0.100` side faces, not `x = ±0.100`); `dimensions_m = [x_far - x_near, y_pos -
+   y_neg, table.thickness.value_m]`; top face (and this rule's `z_table_top` datum used throughout §12.7)
+   at `z_table_top = -(adapter_plate_thickness.value_m or 0)` — exactly `0` when `bolted_directly_to_table`
+   is `true`; box centre `position_m = [(x_near+x_far)/2, (y_neg+y_pos)/2, z_table_top -
+   table.thickness.value_m/2]`.
+4. **Obstacle boxes**: each `items[i]` becomes one axis-aligned box directly from its `min`/`max` readings,
+   mapped to `base_link` with the same `x_from_front_face`/`y_from_centerline` formulas as the table and
+   specimen, and `z_from_table_top` mapped via rule 3's `z_table_top` datum above.
 5. **Provenance**: every derived scene object (table, specimen, each obstacle) written to
    `config/scene/scene.yaml` by MOT-10.3 gets `value_status: measured` and `source` naming this survey
    file's path and `sha256`.
@@ -1762,6 +1797,8 @@ rest throughout and nothing is jogged.
    `acm_observations.base_bolted_to_table` disagrees with `base_mounting.bolted_directly_to_table`; any
    derived obstacle box overlaps the robot's base keep-out (`base_keepout_m`, §8.3); fewer than 3
    `thickness_readings`; and any reading anywhere in the file with a `null` `value_m`, `instrument`,
-   `resolution_m` or `uncertainty_1sigma_m`.
+   `resolution_m` or `uncertainty_1sigma_m` — **except** `base_mounting.adapter_plate_thickness`, which is
+   exempt from this null-check (and from rules 2/3 above, where it is treated as `0`) when
+   `bolted_directly_to_table` is `true`.
 
 ---
