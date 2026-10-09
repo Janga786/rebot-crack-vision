@@ -31,6 +31,7 @@ setup(
             "apply_scene = crackvision_motion.scene_apply:main",
             "assert_scene_objects = crackvision_motion.assert_scene_objects:main",
             "check_end_effector = crackvision_motion.check_end_effector:main",
+            "execute_trajectory = crackvision_motion.execute_trajectory:main",
         ],
     },
 )
