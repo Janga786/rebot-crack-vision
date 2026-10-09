@@ -205,3 +205,71 @@ MOT-03's own smoke test), not a candidate production scene value.
 Only axis-aligned box primitives are supported (`shape: box`). No cylinder/mesh/sphere support
 exists yet; if a future measured object needs one, `scene_core._SHAPES` and
 `scene_apply.build_collision_objects` both need a matching addition, each in one place.
+
+## 8. `survey_to_scene` — the measured-scene workflow (MOT-10.3)
+
+The full path from a physical workcell to a `measured` `config/scene/scene.yaml` is:
+
+```
+docs/motion/WORKCELL_SURVEY.md (procedure)
+    -> a filled-in crackvision.workcell_survey/1 file (docs/INTERFACES.md §12)
+    -> survey_to_scene                              (this section)
+    -> config/scene/scene.yaml, value_status: measured
+    -> scripts/ros/test_scene.sh                     (§5 above)
+```
+
+`crackvision_motion/survey_to_scene.py` (console script `survey_to_scene`) is a file-in/file-out
+tool — stdlib + PyYAML only, no rclpy import, no action-server/`/move_action` use — invoked via
+`scripts/ros/env_ros.sh` like every other tool in this package:
+
+```bash
+# validate-only: check a survey file against crackvision.workcell_survey/1 and exit (0/2)
+ros2 run crackvision_motion survey_to_scene --validate-survey data/workcell_survey/survey_2026-10-09.yaml
+
+# convert: derive measured scene objects and write them, plus (optionally) placement/view
+# reachability-check configs centred on the measured specimen pose
+ros2 run crackvision_motion survey_to_scene \
+    --survey data/workcell_survey/survey_2026-10-09.yaml \
+    --out config/scene/scene.yaml \
+    --emit-verify-config data/motion/survey_placement_verify.yaml \
+    --emit-view-config data/motion/survey_view_verify.yaml
+
+# drift check: does a committed scene.yaml still match a fresh regeneration from the survey?
+ros2 run crackvision_motion survey_to_scene \
+    --survey data/workcell_survey/survey_2026-10-09.yaml --check-scene config/scene/scene.yaml
+```
+
+- **Validation and derivation** reuse `survey_core.load_survey`/`derive_scene` (MOT-10.2) for the
+  whole of `docs/INTERFACES.md` §12.7's arithmetic and refusal rules — this tool does not
+  re-implement any of it. A refused survey (bad rectangularity, an unbolted/unconfirmed base or
+  specimen, an obstacle overlapping the base keep-out, or any incomplete reading) exits 2 before
+  anything is written.
+- **The written file** is this section's `crackvision.scene_config/1` schema unchanged: `frame:
+  base_link`, one object per table/specimen/obstacle plus the two ACM entries from §12.7 rules
+  3-5, every one of them `value_status: measured` with a `source` naming the survey file's path
+  and sha256. It carries a header comment naming the survey path, its sha256 and the generator;
+  generation is byte-deterministic (same survey bytes in, same scene bytes out), which is what
+  makes `--check-scene` a meaningful drift check rather than a heuristic diff.
+- **There is no default `--out`.** `survey_to_scene` only ever overwrites `config/scene/scene.yaml`
+  when that exact path is given explicitly — the same "never invent/auto-write a production path"
+  posture as the rest of this package.
+- **`--emit-verify-config`/`--emit-view-config`** build a `placement`-shaped input (centre, yaw,
+  footprint, top `z`) from the *measured* specimen pose the survey derives, then hand it to
+  `placement.verification_config`/`view_verification_config` (MOT-04.3) unchanged — the same
+  reachability-config emitters `recommend_placement` uses for its nominal recommendation, just fed
+  a measured placement instead. `tolerance_m`/`standoffs_m` are not survey quantities (§12 says
+  nothing about them); they come from `--reachability-config`'s own `placement.tolerance_m` /
+  `grid.standoffs_m` (default `config/motion/reachability.yaml`). Each emitted file is
+  self-validated against `reachability_core.load_config` before being left on disk.
+- **`--check-scene PATH`** regenerates from `--survey` and byte-compares against `PATH`, writing
+  nothing: exit 0 if identical, exit 1 with a unified diff logged if the committed file has
+  drifted from what the survey now produces (e.g. the survey was re-measured, or the file was
+  hand-edited).
+- `--dry-run` (§0.3) writes nothing in every mode, same as every other CLI in this package.
+
+`ros2_ws/src/crackvision_motion/test/fixtures/workcell_survey_example.yaml` is a synthetic survey
+fixture for `survey_to_scene`'s own tests (never a real measurement); `test_scene_core.py`'s
+commissioning-refusal test reads a frozen copy of today's nominal scene,
+`ros2_ws/src/crackvision_motion/test/fixtures/scene_nominal_example.yaml`, instead of the
+production `config/scene/scene.yaml`, so that test keeps passing once this workflow flips the
+production scene to measured.

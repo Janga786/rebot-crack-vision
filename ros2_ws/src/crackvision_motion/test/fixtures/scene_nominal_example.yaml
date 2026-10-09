@@ -1,0 +1,73 @@
+# scene_nominal_example.yaml -- test-only fixture (MOT-10.3): a frozen copy of
+# config/scene/scene.yaml's 100%-nominal content, taken when that file was still fully nominal.
+# test_scene_core.py's commissioning-refusal test reads this fixture instead of the production
+# scene so it keeps testing the "refuses while any value is nominal" behaviour even after MOT-10.5
+# flips the production scene to measured. Not re-synced with the production scene afterwards.
+#
+# config/scene/scene.yaml — collision scene for MoveIt planning against the canonical B601-DM
+# model (MOT-03: table + specimen collision objects and an allowed-collision-matrix (ACM) diff,
+# loaded and applied by ros2_ws/src/crackvision_motion/crackvision_motion/scene_apply.py).
+#
+# Schema id: crackvision.scene_config/1 (validated by
+# ros2_ws/src/crackvision_motion/crackvision_motion/scene_core.py:load_config).
+#
+# This models the WORKCELL only (table + specimen). ADR-014 (docs/adr/014-end-effector-frames-and-task-phases.md)
+# makes the D405 and its mount eye-in-hand: they are robot geometry (config/robot/end_effector.yaml,
+# GEOM-10), attached to gripper_link and moving with every joint state, not a static world object.
+# There is deliberately NO camera/camera_mount CollisionObject here -- adding one would be a second,
+# wrong (world-fixed) model of hardware that already has a correct, moving one.
+#
+# value_status: EVERY object and allowed_collisions entry below carries its own `value_status`
+# (measured|nominal) and `source`. Everything here is `nominal` today -- an engineering starting
+# guess, not a tape-measure/CAD-verified quantity of the real workcell. MOT-10 measures the real
+# workcell and must flip every entry to `measured` (with a real source) before
+# scene_core.assert_commissioning_ready() will let MOT-05's commissioning-gated executor use this
+# file for a real-hardware run -- see docs/motion/SCENE.md.
+schema: crackvision.scene_config/1
+frame: base_link
+
+objects:
+  # The bench the robot stands on. The robot base is bolted directly to the tabletop, so the
+  # table's top face is exactly at z=0 in base_link (base_link's own origin = the bottom face of
+  # base_link.STL, docs/motion/REACHABILITY.md's surface_collision.floor_z_m convention) --
+  # dimensions_m[2]=0.05, so the box is centred at z=-0.025. Footprint (1.20 x 1.00 m, centred
+  # (0.35, 0.0)) is wide enough to carry the whole reachability sweep grid
+  # (config/motion/reachability.yaml: x in [0.11, 0.50], |y| <= 0.39) plus margin, and the base
+  # itself.
+  - id: table
+    shape: box
+    dimensions_m: [1.20, 1.00, 0.05]
+    pose:
+      frame: base_link
+      position_m: [0.35, 0.0, -0.025]
+      rpy_rad: [0.0, 0.0, 0.0]
+    value_status: nominal
+    source: "Nominal bench footprint/position guess sized to cover the base and config/motion/reachability.yaml's grid (x [0.11,0.50], |y|<=0.39) plus margin, with the top face fixed at z=0 because the robot is bolted to the table (no real workcell measurement exists yet); MOT-10 tape-measures the real table and supersedes this entry."
+
+  # The inspected coupon, resting on the table top (table top at z=0, so a 0.01 m-thick slab
+  # centred at z=0.005 has its bottom face exactly at z=0). footprint reuses
+  # config/motion/specimen_placement.yaml's nominal footprint_m; that file's own placement search
+  # is currently infeasible (`feasible: false`, `placement: null`), so x/y here are an explicitly
+  # labelled placeholder centre within the table footprint and the reachability grid, not sourced
+  # from that file -- MOT-04.5/MOT-10 replace this once a feasible placement/measured pose exists.
+  - id: specimen
+    shape: box
+    dimensions_m: [0.20, 0.20, 0.01]
+    pose:
+      frame: base_link
+      position_m: [0.30, 0.0, 0.005]
+      rpy_rad: [0.0, 0.0, 0.0]
+    value_status: nominal
+    source: "PLACEHOLDER pose/height: config/motion/specimen_placement.yaml footprint_m (0.20x0.20, MOT-04.3) is reused for the footprint, but that file's placement search is currently infeasible (feasible: false, placement: null), so the (0.30, 0.0) centre and 0.01 m thickness here are a nominal engineering placeholder within the table footprint and reachability grid, not derived from a feasible recommendation. MOT-04.5/MOT-10 supersede this once a feasible placement or a measured as-placed pose exists."
+
+allowed_collisions:
+  - link_a: table
+    link_b: base_link
+    reason: "the robot base is bolted to the table, so the table top (z=0) and the base necessarily touch/overlap"
+    value_status: nominal
+    source: "Nominal mounting assumption (robot bolted to the table) pending the real workcell survey (MOT-10)."
+  - link_a: specimen
+    link_b: table
+    reason: "the specimen rests directly on the table top"
+    value_status: nominal
+    source: "Nominal placement assumption pending the real workcell survey (MOT-10)."
