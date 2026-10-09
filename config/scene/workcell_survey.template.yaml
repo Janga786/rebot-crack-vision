@@ -1,0 +1,104 @@
+# config/scene/workcell_survey.template.yaml — fill-in template for the MOT-10.1 workcell survey
+# procedure (docs/motion/WORKCELL_SURVEY.md). Schema: crackvision.workcell_survey/1
+# (docs/INTERFACES.md §12).
+#
+# Copy this file to data/workcell_survey/survey_<date>.yaml (data/ is git-ignored -- never commit
+# a filled-in survey or its photos) and replace every `null` below with a real reading or
+# observation. Every "reading" is the 4-key map {value_m, instrument, resolution_m,
+# uncertainty_1sigma_m} -- fill in ALL FOUR, not just value_m. MOT-10.3's `survey_to_scene`
+# refuses a file with any field still null.
+#
+# All x/y offsets below are measured from the three FIXED base_link reference faces
+# (docs/INTERFACES.md §12.1 -- these numbers are fixed by the robot model, do not re-measure them):
+#   bottom face (table contact): z = 0
+#   front face (+x, the direction the arm reaches): x = +0.070 m
+#   side faces (+/-y): y = +/-0.100 m
+# CONFIRM FIRST that these are the flat faces on the real casting/plate you can square a tape
+# against (docs/motion/WORKCELL_SURVEY.md §1); note any deviation in survey.notes below.
+
+schema: crackvision.workcell_survey/1
+
+survey:
+  operator: null                 # who took these measurements
+  date: null                     # ISO-8601 date, e.g. "2026-10-09"
+  photos: []                     # list of paths under data/workcell_survey/, e.g. ["data/workcell_survey/photo1.jpg"]
+  notes: null                    # corner-numbering convention used, any reference-face caveats, anything obstructed
+
+derivation_params:
+  rectangularity_tolerance_m: 0.003   # normative default (3 mm); only change with a stated reason in survey.notes
+
+# (a) Base mounting -----------------------------------------------------------------------------
+base_mounting:
+  bolted_directly_to_table: null      # true/false
+  adapter_plate_thickness:            # required (fill in) iff bolted_directly_to_table is false; else leave all null
+    value_m: null
+    instrument: null
+    resolution_m: null
+    uncertainty_1sigma_m: null
+
+# (b) Table extents from the base reference faces, and top-face flatness near the specimen ------
+table:
+  front_face_to_far_edge:             # table edge beyond the base's +x front face (x = +0.070)
+    value_m: null
+    instrument: null
+    resolution_m: null
+    uncertainty_1sigma_m: null
+  front_face_to_near_edge:            # table edge behind the base, opposite side
+    value_m: null
+    instrument: null
+    resolution_m: null
+    uncertainty_1sigma_m: null
+  pos_y_side_face_to_edge:            # table edge beyond the +y side face (y = +0.100)
+    value_m: null
+    instrument: null
+    resolution_m: null
+    uncertainty_1sigma_m: null
+  neg_y_side_face_to_edge:            # table edge beyond the -y side face (y = -0.100)
+    value_m: null
+    instrument: null
+    resolution_m: null
+    uncertainty_1sigma_m: null
+  flatness_deviation:                 # spirit-level bubble deviation / straightedge gap near the specimen
+    value_m: null
+    instrument: null
+    resolution_m: null
+    uncertainty_1sigma_m: null
+  flatness_note: null                 # where on the table this was checked
+
+# (c) Specimen: 4 top corners (x from front face, y from centerline) + thickness ------------------
+specimen:
+  corners:
+    - x_from_front_face: {value_m: null, instrument: null, resolution_m: null, uncertainty_1sigma_m: null}
+      y_from_centerline: {value_m: null, instrument: null, resolution_m: null, uncertainty_1sigma_m: null}
+    - x_from_front_face: {value_m: null, instrument: null, resolution_m: null, uncertainty_1sigma_m: null}
+      y_from_centerline: {value_m: null, instrument: null, resolution_m: null, uncertainty_1sigma_m: null}
+    - x_from_front_face: {value_m: null, instrument: null, resolution_m: null, uncertainty_1sigma_m: null}
+      y_from_centerline: {value_m: null, instrument: null, resolution_m: null, uncertainty_1sigma_m: null}
+    - x_from_front_face: {value_m: null, instrument: null, resolution_m: null, uncertainty_1sigma_m: null}
+      y_from_centerline: {value_m: null, instrument: null, resolution_m: null, uncertainty_1sigma_m: null}
+  thickness_readings:                 # caliper thickness at >= 3 distinct points
+    - {value_m: null, instrument: null, resolution_m: null, uncertainty_1sigma_m: null}
+    - {value_m: null, instrument: null, resolution_m: null, uncertainty_1sigma_m: null}
+    - {value_m: null, instrument: null, resolution_m: null, uncertainty_1sigma_m: null}
+  resting_on_table: null              # true/false, observed by eye
+
+# (d) Clearance obstacles inside a stated radius of base_link's origin ---------------------------
+obstacles:
+  radius_m: null                      # survey radius around base_link's origin, e.g. 1.2
+  items:
+    # One block per obstacle (walls, fixtures, cables, the camera USB lead routing, etc.).
+    # Duplicate this block for each additional obstacle; delete this placeholder if there are none.
+    - id: null                        # short unique string, e.g. "wall_east"
+      description: null
+      x_from_front_face: {min: {value_m: null, instrument: null, resolution_m: null, uncertainty_1sigma_m: null},
+                           max: {value_m: null, instrument: null, resolution_m: null, uncertainty_1sigma_m: null}}
+      y_from_centerline: {min: {value_m: null, instrument: null, resolution_m: null, uncertainty_1sigma_m: null},
+                           max: {value_m: null, instrument: null, resolution_m: null, uncertainty_1sigma_m: null}}
+      z_from_table_top: {min: {value_m: null, instrument: null, resolution_m: null, uncertainty_1sigma_m: null},
+                          max: {value_m: null, instrument: null, resolution_m: null, uncertainty_1sigma_m: null}}
+
+# (e) ACM-facing observations --------------------------------------------------------------------
+acm_observations:
+  base_bolted_to_table: null          # mirrors base_mounting.bolted_directly_to_table
+  specimen_resting_on_table: null     # mirrors specimen.resting_on_table
+  notes: null
