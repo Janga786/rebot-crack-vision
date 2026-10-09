@@ -135,16 +135,26 @@ Copy `config/scene/workcell_survey.template.yaml` to a working file (e.g.
 `reading` block (`{value_m, instrument, resolution_m, uncertainty_1sigma_m}`) must be fully filled in —
 `survey_to_scene` refuses a file with any field still `null` (`docs/INTERFACES.md` §12.7, refusal rule 6).
 
-```bash
-# validates the file against crackvision.workcell_survey/1 and reports what it would refuse
-./env.sh python -m crackvision.survey_to_scene --survey data/workcell_survey/survey_<date>.yaml --dry-run
+`survey_to_scene` (console script `survey_to_scene`, delivered by **MOT-10.3**, not this card) is an
+`rclpy`-side tool run via `scripts/ros/env_ros.sh` — like `reachability_sweep`/`recommend_placement`
+(`docs/INTERFACES.md` §7.4) — never `./env.sh`:
 
-# converts a valid survey into measured config/scene/scene.yaml entries
-./env.sh python -m crackvision.survey_to_scene --survey data/workcell_survey/survey_<date>.yaml
+```bash
+# validate-only: check the file against crackvision.workcell_survey/1 and exit (0 valid, 2 invalid)
+ros2 run crackvision_motion survey_to_scene --validate-survey data/workcell_survey/survey_<date>.yaml
+
+# convert: derive measured scene objects from the survey and write them to --out (there is no
+# default --out — survey_to_scene never overwrites config/scene/scene.yaml unless given explicitly)
+ros2 run crackvision_motion survey_to_scene \
+    --survey data/workcell_survey/survey_<date>.yaml \
+    --out config/scene/scene.yaml \
+    --emit-verify-config data/motion/survey_placement_verify.yaml \
+    --emit-view-config data/motion/survey_view_verify.yaml
 ```
 
-Both commands are delivered by **MOT-10.3** (not this card) and follow the common CLI conventions
-(`docs/INTERFACES.md` §0: exit 0 ok, 2 invalid/refused survey, 3 missing file).
+See `docs/motion/SCENE.md` §8 for the full workflow (including the `--check-scene` drift check) and
+the exact exit codes (0 ok; 2 invalid/refused survey or config error; 3 missing survey/scene file; 1
+drift detected under `--check-scene`, per `docs/INTERFACES.md` §0.2).
 
 ## 5. Derived-value rules (normative; see `docs/INTERFACES.md` §12.7 for the authoritative text)
 
