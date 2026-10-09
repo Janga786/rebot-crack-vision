@@ -1,6 +1,6 @@
 # Progress — week of Mon Oct 05 – Sun Oct 11, 2026
 
-**6 task(s) completed and independently audited this week** · project total **48/92** accepted
+**7 task(s) completed and independently audited this week** · project total **48/92** accepted
 
 ## Completed this week
 
@@ -16,10 +16,12 @@
 …[470 chars clipped]
 - **CAM-05.2 — Static optical-frame TF capture + joint-state capture bridge (crackvision_camera ROS 2 package)** ([details](CAM-05.2.md)): Built the crackvision_camera ROS 2 package with two small one-shot command-line tools: one reads the camera's optical-frame calibration transform off ROS's TF tree and saves it to JSON, the other read
 …[370 chars clipped]
+- **GEOM-08.3 — FK parity: crackvision.kinematics vs live MoveIt /compute_fk (gripper_link, tool_tip, camera_link) on the mock stack** ([details](GEOM-08.3.md)): Built an automated check that compares the project's own fast forward-kinematics math against MoveIt's official kinematics for the robot's gripper, tool tip, and wrist camera. Across 21 different arm 
+…[385 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 7 / 9
+- Implementation/review sessions run: 8 / 10
 - Audits that rejected work with evidence-backed findings: 1 (repairs created: 1)
 - Re-verified after an upstream change: GEOM-08.1, MOT-02
 
@@ -31,8 +33,8 @@
 | Local coding model (L-LLM) | 1 | 6 |
 | D405 capture (L-CAM) | 7 | 9 |
 | Perception (L-PERC) | 13 | 16 |
-| Geometry & calibration (L-GEOM) | 12 | 24 |
-| Motion planning (L-MOTION) | 7 | 16 |
+| Geometry & calibration (L-GEOM) | 13 | 24 |
+| Motion planning (L-MOTION) | 6 | 16 |
 | Integration & commissioning (L-INT) | 1 | 6 |
 | Operator workflow & handoff (L-OPS) | 1 | 4 |
 | Imitation learning (later phase) (L-IL) | 0 | 1 |
