@@ -1717,3 +1717,72 @@ ISSUES:
     `docs/adr/012-frames-and-conventions.md` and GEOM-08 cards left untouched as instructed.
 NEXT CARD: CAM-05.2 (implements capture_optical_tf and capture_joint_state per this ADR)
 ```
+
+---
+
+## GEOM-08.8 — Synthetic ground-truth verification of pixel->base_link 3D paths and tool waypoints
+
+```
+TASK: GEOM-08.8
+STATUS: COMPLETE
+CHANGES:
+  - tools/synth_scene3d.py — new deterministic synthetic-scene generator (library + CLI). Renders
+    a flat crack surface under the exact nominal eye-in-hand chain (FK(q) . T_gripper_link_camera_link
+    . T_camera_link_camera_color_optical_frame), solving the ADR-014 §2 view pose (camera_link 0.25 m
+    from the specimen centre, boresight along the anti-normal) by bounded numeric IK
+    (scipy.optimize.least_squares over a camera-roll grid + several seeds), forward-projects a sine-
+    arc crack to pixels via its own ray/plane intersection math (never crackvision.geometry.
+    deproject_pixels/lift3d/tool_waypoints), rasterises it into a thin 8-connected skeleton (two-pass
+    arc-length-sampled Bresenham -- see ISSUES), dilates a crack mask, renders an aligned depth PNG
+    (+3 mm cavity under the mask, optional Gaussian depth noise and two invalid-depth holes), writes
+    a §9 capture record (synthetic: true) and a ground-truth JSON, and reads
+    config/motion/specimen_placement.yaml for the specimen centre, falling back to the ADR-014 §3
+    nominal (0.29, 0, table_z=-0.01 from config/scene/scene.yaml) since that file is currently
+    feasible: false / placement: null.
+  - tests/test_path3d_synthetic.py — new. Generates scenes (module-scoped fixtures: flat @ 0 deg/15
+    deg tilt, one with injected holes, one with Gaussian depth noise + a zero-calibration-sigma
+    end_effector fixture), runs the real crackvision.paths CLI then crackvision.path3d.
+    build_case_paths3d, and checks: position error vs. the GT curve (median/max), normal angle vs.
+    GT, trace-waypoint boresight + clearance vs. GT, that the crack cavity never biases sampled
+    surface depth, that >=90% of valid points lie within 3*sigma_base per axis under injected depth
+    noise with the calibration term zeroed, that a short/long invalid-depth hole produce the §10.3
+    interpolate/split behaviour respectively, IK convergence (<1e-6 residual, within joint limits),
+    and the §9.4/§10.6 refusal/eligibility rules (missing robot block -> exit 3; nominal+synthetic ->
+    execution_eligible false). 17 tests, ~35 s.
+  - docs/geometry/PATH3D_VERIFICATION.md — new. Measured numbers table (median/max position error,
+    normal angle, waypoint boresight/clearance, sigma-coverage fractions, hole run lengths), seeds
+    and commands, the rasterisation bug found and fixed while building the generator, and the
+    limitations (nominal chain only, pinhole-only intrinsics, no real depth bias, synthetic flat
+    surfaces only, not a substitute for GEOM-05/07/INT-04/05).
+  - docs/COMPLETION_LOG.md — this entry.
+VERIFICATION:
+  - `./env.sh pytest tests/test_path3d_synthetic.py -q -p no:cacheprovider` -> `17 passed in ~35s`,
+    exit 0.
+  - `./env.sh pytest tests/ -q -p no:cacheprovider` -> `358 passed, 3 skipped`, exit 0 (the 3 skips
+    are pre-existing, unrelated to this card: pyrealsense2/model/GPU markers).
+  - `test -s docs/geometry/PATH3D_VERIFICATION.md` -> exit 0.
+  - Measured (seed 1, both tilts; see docs/geometry/PATH3D_VERIFICATION.md for the full table):
+    tilt 0 deg median 0.184 mm / max 0.539 mm; tilt 15 deg median 0.162 mm / max 0.531 mm; normal
+    angle 0.000 deg both; IK residual norm 1.4e-17 / 4.0e-17, both << 1e-6. Noise-consistency (seed
+    42, zero-sigma fixture): 100% of valid points within 3*sigma_base on every axis (>= 90%
+    required). Holes (seed 1): short hole -> 4 interpolated points (valid, reason: null); long hole
+    -> 15-point invalid run, polyline split into 2 segments.
+ISSUES:
+  - Found and fixed during development (not a pre-existing bug in reviewed code): a first version
+    of the chain rasteriser rounded a densely-oversampled projected curve independently per axis,
+    which produced spurious 3+-neighbour "thick corner" pixels (121/141 at one point), turning
+    PERC-02's graph build of a single simple crack into a tree with fake branches. Fixed by
+    resampling at ~1 anchor/px of estimated curve length and connecting anchors with a true integer
+    Bresenham segment; re-verified at 0 pixels of degree >= 3 for both tilts tested. This fix is
+    local to tools/synth_scene3d.py (test-only code) and was never present in any src/crackvision
+    module.
+  - `config/motion/specimen_placement.yaml` is currently infeasible (feasible: false, placement:
+    null) rather than carrying MOT-04.3's real recommended placement -- this card uses the
+    documented ADR-014 fallback instead and says so in the generator and the evidence doc; it does
+    not re-run recommend_placement (out of this card's scope).
+  - Per the card instructions, lift3d.py/tool_waypoints.py/path3d.py were not modified; every
+    acceptance-criteria tolerance passed on the first fully-correct generator, so no repair card is
+    needed.
+NEXT CARD: GEOM-09 (full first-order uncertainty budget) or GEOM-05/07 (real wrist-camera/tool
+calibration), which this card's docs/geometry/PATH3D_VERIFICATION.md feeds.
+```
