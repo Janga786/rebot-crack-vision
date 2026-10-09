@@ -1,6 +1,6 @@
 # Progress — week of Mon Oct 05 – Sun Oct 11, 2026
 
-**7 task(s) completed and independently audited this week** · project total **49/92** accepted
+**8 task(s) completed and independently audited this week** · project total **48/92** accepted
 
 ## Completed this week
 
@@ -18,10 +18,12 @@
 …[370 chars clipped]
 - **GEOM-08.3 — FK parity: crackvision.kinematics vs live MoveIt /compute_fk (gripper_link, tool_tip, camera_link) on the mock stack** ([details](GEOM-08.3.md)): Built an automated check that compares the project's own fast forward-kinematics math against MoveIt's official kinematics for the robot's gripper, tool tip, and wrist camera. Across 21 different arm 
 …[385 chars clipped]
+- **GEOM-08.8 — Synthetic ground-truth verification of pixel→base_link 3D paths and tool waypoints (+ evidence note)** ([details](GEOM-08.8.md)): Added a synthetic ground-truth generator and test suite that validates the full pixel-to-robot-base 3D crack-path pipeline against a known, independently-computed answer. Across two camera tilt angles
+…[633 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 9 / 14
+- Implementation/review sessions run: 10 / 15
 - Audits that rejected work with evidence-backed findings: 2 (repairs created: 2)
 - Re-verified after an upstream change: CAM-05.1, GEOM-08.1, MOT-02
 
@@ -31,7 +33,7 @@
 |---|---|---|
 | Host platform & reproducibility (L-HOST) | 5 | 9 |
 | Local coding model (L-LLM) | 1 | 6 |
-| D405 capture (L-CAM) | 7 | 9 |
+| D405 capture (L-CAM) | 6 | 9 |
 | Perception (L-PERC) | 13 | 16 |
 | Geometry & calibration (L-GEOM) | 13 | 24 |
 | Motion planning (L-MOTION) | 7 | 16 |
