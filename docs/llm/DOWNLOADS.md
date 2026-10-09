@@ -37,37 +37,36 @@ matching the candidates file exactly. The other two repos
 (`unsloth/Qwen3.6-27B-GGUF`, `bartowski/Laguna-XS-2.1-GGUF`) also
 returned HTTP 200 from the HF API.
 
-## Blocked: downloads not run in this environment
+## Downloads completed (2026-10-09)
 
-This card's declared extra writable path, `~/models/llm`, is **not
-actually writable** in the sandbox this attempt ran in:
-
-```
-$ mkdir -p ~/models/llm
-mkdir: cannot create directory '/home/boosterk1/models/llm': Read-only file system
-$ touch ~/models/testfile
-touch: cannot touch '/home/boosterk1/models/testfile': Read-only file system
-```
-
-`~/models` itself shows `drwxrwxr-x` ownership but every write into it
-fails with EROFS. `mount` inside the sandbox lists explicit rw bind
-mounts for `~/.cache`, `~/.claude`, this repo, etc., but has no entry
-for `~/models` — it is part of the base read-only home overlay, and no
-one ever bind-mounted it read-write despite the card's scope. This
-session has no sudo, so it cannot add that mount itself.
-
-Downloading the ~48 GB of candidate GGUF files therefore did not
-happen in this attempt. `scripts/llm/download_models.py` is written,
-disk-budget-checked, resumable, and hash-verifying, and is ready to
-run as soon as `~/models/llm` (or `LLM_MODELS_DIR` pointed at another
-writable, >=64 GB-free path) is actually writable — at that point:
+The sandbox fix noted in the card feedback held: `~/models/llm` is
+writable, and all 3 shortlisted candidates were downloaded there,
+one at a time, via `scripts/llm/download_models.py`:
 
 ```
-python3 scripts/llm/download_models.py   # populates config/llm_models.json
-python3 scripts/llm/verify_models.py     # exit 0 once all 3 verify
+$ python3 scripts/llm/download_models.py
+...
+$ python3 scripts/llm/verify_models.py
+[ok] Qwen3.6-27B-Q4_K_M.gguf: size and sha256 verified
+[ok] Laguna-XS-2.1-Q3_K_M.gguf: size and sha256 verified
+[ok] Qwen3-Coder-30B-A3B-Instruct-IQ4_XS.gguf: size and sha256 verified
+$ echo $?
+0
 ```
 
-`config/llm_models.json` does not exist yet (no downloads occurred),
-so `verify_models.py` currently exits 0 trivially (nothing listed to
-verify yet) — it will start reporting real per-file size/sha256
-results once a download actually lands a file.
+All three files' size and sha256 match `config/llm_candidates.json`
+exactly and are recorded with local path and verification timestamp
+in `config/llm_models.json`. Total on-disk size is ~46 GiB
+(16817244384 + 15575904128 + 16378076320 bytes), leaving 52 GB free
+on the `~/models/llm` filesystem — above the 40 GB floor.
+
+The downloader was interrupted twice by this session's own command
+timeouts mid-run (not by the script itself) and resumed cleanly both
+times from the `.part` file via HTTP `Range`, re-verifying the
+already-completed file(s) first and never recording a partial file
+as verified. The final run completed with exit code 0.
+
+Per LLM-01's `deletion_policy`, only the model selected by LLM-05's
+benchmark will be kept under `~/models/llm`; the other two candidates'
+GGUF files are deleted from local disk (not from Hugging Face) once
+that benchmark completes.

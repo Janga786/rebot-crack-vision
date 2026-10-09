@@ -1,0 +1,30 @@
+{
+  "min_free_disk_gb": 40,
+  "models_dir": "/home/boosterk1/models/llm",
+  "models": [
+    {
+      "name": "Qwen3.6-27B (Q4_K_M GGUF)",
+      "file": "Qwen3.6-27B-Q4_K_M.gguf",
+      "path": "/home/boosterk1/models/llm/Qwen3.6-27B-Q4_K_M.gguf",
+      "size_bytes": 16817244384,
+      "sha256": "5ed60d0af4650a854b1755bd392f9aef4872643dc25a254bc68043fa638392a0",
+      "verified_at": "2026-10-09T13:53:58.632778+00:00"
+    },
+    {
+      "name": "Laguna-XS-2.1 (Q3_K_M GGUF)",
+      "file": "Laguna-XS-2.1-Q3_K_M.gguf",
+      "path": "/home/boosterk1/models/llm/Laguna-XS-2.1-Q3_K_M.gguf",
+      "size_bytes": 15575904128,
+      "sha256": "00dda85ab74afccafa99b66e4d564a6ef76278a8c633d358cad630e7622cf618",
+      "verified_at": "2026-10-09T13:54:37.508988+00:00"
+    },
+    {
+      "name": "Qwen3-Coder-30B-A3B-Instruct (IQ4_XS GGUF)",
+      "file": "Qwen3-Coder-30B-A3B-Instruct-IQ4_XS.gguf",
+      "path": "/home/boosterk1/models/llm/Qwen3-Coder-30B-A3B-Instruct-IQ4_XS.gguf",
+      "size_bytes": 16378076320,
+      "sha256": "26cd4fef3ada9de84c6c59c4b93f9bc5df4d69a71e18cfe8a17369c2f8374ce7",
+      "verified_at": "2026-10-09T14:03:23.070939+00:00"
+    }
+  ]
+}
