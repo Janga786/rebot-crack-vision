@@ -1,0 +1,6 @@
+running 13 tasks on 3 model(s): Qwen3.6-27B (Q4_K_M GGUF), Laguna-XS-2.1 (Q3_K_M GGUF), Qwen3-Coder-30B-A3B-Instruct (IQ4_XS GGUF)
+[Qwen3.6-27B (Q4_K_M GGUF)] pass@1=0.92 peak_vram_mb=18638
+[Laguna-XS-2.1 (Q3_K_M GGUF)] pass@1=1.00 peak_vram_mb=16966
+[Qwen3-Coder-30B-A3B-Instruct (IQ4_XS GGUF)] pass@1=0.85 peak_vram_mb=19102
+full report written to evidence/llm/results/report.json
+EXIT=0
