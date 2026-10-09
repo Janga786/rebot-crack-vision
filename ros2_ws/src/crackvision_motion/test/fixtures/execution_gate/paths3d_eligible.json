@@ -1,0 +1,9 @@
+{
+  "schema": "crackvision.paths3d/1",
+  "case_id": "mot-05-3-fixture",
+  "frame": "base_link",
+  "execution_eligible": true,
+  "ineligible_reasons": [],
+  "counts": {"points": 1, "valid": 1, "interpolated": 0, "invalid_by_reason": {}},
+  "_note": "MOT-05.3 execution_gate fixture: a minimal G-ELIGIBLE stub, not a real §10 output."
+}

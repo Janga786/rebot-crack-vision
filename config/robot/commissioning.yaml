@@ -1,0 +1,36 @@
+# config/robot/commissioning.yaml — hardware commissioning record gating `--mode real`
+# (ADR-016 §11.4, REQ-INT-2).
+#
+# Schema: crackvision.commissioning/1 (validated by
+# ros2_ws/src/crackvision_motion/crackvision_motion/execution_gate.py:load_commissioning, strict:
+# an unknown key is a config error). Ships uncommissioned on purpose: `commissioned: false`, null
+# `limits_file_sha256`, both `estop.verified`/`joint_ranges_verified` false and no evidence. MOT-09
+# (arm bring-up commissioning, readback-only dry rehearsals per ADR-016 §3) is the only card that
+# may flip these to true/measured, with operator-sourced evidence -- never a placeholder guess.
+schema: crackvision.commissioning/1
+
+# Overall gate (G-COMMISSIONING, real-only). false until MOT-09 completes bring-up.
+commissioned: false
+
+# Must equal the current config/robot/b601_dm_limits.yaml sha256 for G-COMMISSIONING to pass
+# (proves the commissioning survey was run against the limits file currently in force, ADR-016
+# §5). null until MOT-09 records the sha of the limits file it actually surveyed against.
+limits_file_sha256: null
+
+# Real-mode hard speed cap (ADR-016 §4): a real run at execution.yaml's real_default (0.10)
+# therefore moves at exactly this cap until an operator raises it with evidence (MOT-09).
+speed_scale_cap: 0.10
+
+estop:
+  # Fixed: this attests the physical e-stop circuit, never a ROS topic (ADR-016 §7/§9).
+  kind: hardware
+  verified: false
+  verified_utc: null
+  operator: null
+  evidence: []
+
+joint_ranges_verified: false
+
+evidence: []
+
+source: "Shipped uncommissioned by MOT-05.3; MOT-09 fills every field above from operator-witnessed bring-up evidence on the physical B601-DM before any --mode real run is possible."

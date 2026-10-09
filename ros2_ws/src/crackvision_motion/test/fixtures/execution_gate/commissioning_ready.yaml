@@ -1,0 +1,16 @@
+# MOT-05.3 fixture: a commissioning record where G-COMMISSIONING and G-ESTOP pass.
+# limits_file_sha256 below must equal the current config/robot/b601_dm_limits.yaml sha256 --
+# test_execution_gate.py asserts this invariant so the fixture cannot silently drift stale.
+schema: crackvision.commissioning/1
+commissioned: true
+limits_file_sha256: "43f5e2e3a92bcae348b077bfc7d1dd223e555a28869789235813d4c2723aa82b"
+speed_scale_cap: 0.10
+estop:
+  kind: hardware
+  verified: true
+  verified_utc: "2026-01-01T00:00:00Z"
+  operator: "fixture"
+  evidence: ["MOT-05.3 fixture: no real evidence, test-only"]
+joint_ranges_verified: true
+evidence: ["MOT-05.3 fixture: no real evidence, test-only"]
+source: "MOT-05.3 test fixture, not a real commissioning survey"
