@@ -1,6 +1,6 @@
 # Progress — week of Mon Oct 05 – Sun Oct 11, 2026
 
-**22 task(s) completed and independently audited this week** · project total **65/104** accepted
+**23 task(s) completed and independently audited this week** · project total **66/106** accepted
 
 ## Completed this week
 
@@ -47,10 +47,12 @@
 …[483 chars clipped]
 - **LLM-05 — Run benchmark, select model, qualify task classes** ([details](LLM-05.md)): Ran the LLM-04 benchmark harness against all 3 LLM-01/03 candidates with identical settings (13 tasks, 3 classes each), selected Laguna-XS-2.1 (Q3_K_M GGUF, pass@1=13/13, lowest VRAM at 16966 MB) for 
 …[234 chars clipped]
+- **HOST-05 — Storage decision for the unmounted 1.9 TB NVMe (K1_Storage)** ([details](HOST-05.md)): Documented the storage decision for the unmounted 1.9 TB second NVMe drive (labelled K1_Storage, likely belonging to another project): per the operator's decision, it stays completely untouched - no m
+…[221 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 46 / 171
+- Implementation/review sessions run: 48 / 172
 - Audits that rejected work with evidence-backed findings: 12 (repairs created: 9)
 - Re-verified after an upstream change: CAM-02, CAM-05.1, CAM-05.2, GEOM-01, GEOM-01.R1, GEOM-08.1, GEOM-08.2, GEOM-08.2.R1, GEOM-08.5, GEOM-08.5.R1, GEOM-08.6, GEOM-08.7, GEOM-08.8, GEOM-08.8.R1, GEOM-10, MOT-02, MOT-03, MOT-04.1, MOT-04.1.R1, MOT-04.2, MOT-04.3, MOT-04.3.R1, MOT-04.4, MOT-04.4.R1, MOT-04.6, MOT-05.1, MOT-05.1.R1, MOT-05.2, MOT-05.4, MOT-05.4.R1, MOT-10.1, MOT-10.1.R1, MOT-10.2, MOT-10.3, PERC-03, PERC-03.R1, TC-011, TC-016
 
@@ -59,13 +61,14 @@
 - decomposed: HOST-06 → HOST-06.1
 - decomposed: MOT-05 → MOT-05.1, MOT-05.2, MOT-05.3, MOT-05.4, MOT-05.5, MOT-05.6
 - decomposed: MOT-10 → MOT-10.1, MOT-10.2, MOT-10.3, MOT-10.4, MOT-10.5
+- decomposed: LLM-06 → LLM-06.1, LLM-06.2
 
 ## Progress by work package
 
 | Work package | Accepted | Total |
 |---|---|---|
-| Host platform & reproducibility (L-HOST) | 7 | 10 |
-| Local coding model (L-LLM) | 5 | 6 |
+| Host platform & reproducibility (L-HOST) | 8 | 10 |
+| Local coding model (L-LLM) | 5 | 8 |
 | D405 capture (L-CAM) | 7 | 9 |
 | Perception (L-PERC) | 13 | 16 |
 | Geometry & calibration (L-GEOM) | 15 | 24 |
@@ -83,6 +86,8 @@
 - GEOM-09: escalation — lead decomposition failed twice: card GEOM-09.1: missing outcome; card GEOM-09.2: missing outcome; card GEOM-09.3: missing outcome
 - HOST-03: escalation — lead decomposition failed twice: card HOST-03.1: missing outcome
 - HOST-04: hardware — operator must declare: arm_usb_connected
+- LLM-06.1: other — This implementer's sandbox session mounts plan/ (and task_cards/, .claude-auto/) read-only per its own environment instr
+…[181 chars clipped]
 - MOT-04.6.R1: operator_decision — The fix needs a file outside this card's scope.write. Either (a) add `sys.path.insert(0, str(Path(__file__).resolve().pa
 …[181 chars clipped]
 - MOT-05.5: dependency — execute_trajectory.py (MOT-05.4, outside scope) subscribes to joint_states with RELIABLE QoS, which can never match the 
