@@ -67,8 +67,12 @@ and `docs/MACHINE_STATE.md` for the target machine's own inventory.
    ```bash
    ./env.sh python scripts/smoke_test.py
    ```
-   This runs the real checkpoint against synthetic fixtures on whatever device is available and
-   asserts the predictions are well-formed `{0,1}`-valued masks. It does not need real crack imagery.
+   This runs the real checkpoint against synthetic fixtures and asserts the predictions are
+   well-formed `{0,1}`-valued masks. It does not need real crack imagery. `--device` defaults to
+   `cuda` and, unlike `check_env.py`, does **not** fall back on its own: on a machine with no
+   visible CUDA device this exits `3` (precondition not met) with `--device cuda requested but
+   torch.cuda.is_available() is False`. On a CPU-only/no-GPU machine, run
+   `./env.sh python scripts/smoke_test.py --device cpu` instead.
 
 10. **Run the unit test suite.**
     ```bash
