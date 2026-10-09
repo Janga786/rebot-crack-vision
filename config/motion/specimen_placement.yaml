@@ -4,18 +4,88 @@
 # downstream consumer. Do not hand-edit; re-run recommend_placement instead.
 schema: crackvision.specimen_placement/1
 value_status: nominal
-feasible: false
+feasible: true
 frame: base_link
-placement: null
-alternatives: []
-max_feasible_square_m: 0.0
-map_sha256: b43a6a7b13ab8b18bc316cba9917b146d25d64a5ee396d7c1d5a038356c0f08f
-config_sha256: d0a1180cdfa23d9eae12489f7b82eec19d6ae4ee8fcb95a1e8f72c2e74d5fe4b
+placement:
+  center_xy_m:
+  - 0.26
+  - 0.0
+  surface_z_m: 0.0
+  yaw_rad: 0.0
+  footprint_m:
+  - 0.2
+  - 0.2
+  tolerance_m: 0.02
+  standoffs_m:
+  - 0.01
+  - 0.04
+  score_min_joint_margin_rad: 0.4707736967217091
+alternatives:
+- center_xy_m:
+  - 0.26
+  - -0.06
+  surface_z_m: 0.0
+  yaw_rad: 0.0
+  footprint_m:
+  - 0.2
+  - 0.2
+  tolerance_m: 0.02
+  standoffs_m:
+  - 0.01
+  - 0.04
+  score_min_joint_margin_rad: 0.416716456980605
+- center_xy_m:
+  - 0.26
+  - 0.06
+  surface_z_m: 0.0
+  yaw_rad: 0.0
+  footprint_m:
+  - 0.2
+  - 0.2
+  tolerance_m: 0.02
+  standoffs_m:
+  - 0.01
+  - 0.04
+  score_min_joint_margin_rad: 0.4167164578759752
+- center_xy_m:
+  - 0.23
+  - -0.12
+  surface_z_m: 0.0
+  yaw_rad: 0.0
+  footprint_m:
+  - 0.2
+  - 0.2
+  tolerance_m: 0.02
+  standoffs_m:
+  - 0.01
+  - 0.04
+  score_min_joint_margin_rad: 0.40602424729680364
+- center_xy_m:
+  - 0.23
+  - 0.12
+  surface_z_m: 0.0
+  yaw_rad: 0.0
+  footprint_m:
+  - 0.2
+  - 0.2
+  tolerance_m: 0.02
+  standoffs_m:
+  - 0.01
+  - 0.04
+  score_min_joint_margin_rad: 0.4060242428197569
+max_feasible_square_m: null
+map_sha256: c9dae86dbfa00eeb787cc3b9c159ec79d79fa2a4ae070f992ef30b897cf7e675
+config_sha256: 54150cc37c1d5777b6ddc73f6221a46f7bbdd011f763434c9bfd3a201f529f83
 boresight_provenance: prior_evidence
 caveats:
+- Nominal recommendation only; the operator places the specimen and MOT-10 measures
+  and supersedes this file with the real, as-placed pose.
 - The boresight is prior evidence until GEOM-07.
-- The TCP is gripper_tcp from the MoveIt config, not yet calibrated.
-- The camera mount is undecided (GEOM-03); re-run if the inspection frame changes.
-- The collision scene is only self-collision plus a surface slab, not the MOT-03 scene.
+- End-of-arm geometry (tool_tip, wrist D405 camera_link and mount collision proxies)
+  is the nominal CAD/URDF prior in config/robot/end_effector.yaml (ADR-014); re-run
+  after GEOM-07 (tool tip) and GEOM-05 (hand-eye) replace it.
 - The values are nominal until MOT-10.
+- Targets are poses of 'tool_tip' at the map's standoffs along its boresight.
+- 'Collision model: self-collision (incl. the camera proxies) + specimen proxy ''specimen_block'';
+  environment objects [''table''] from config/scene/scene.yaml.'
 source: recommend_placement (MOT-04.3)

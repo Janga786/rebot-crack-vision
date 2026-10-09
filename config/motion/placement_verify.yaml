@@ -1,0 +1,109 @@
+frame: base_link
+group: arm
+ik_link: tool_tip
+boresight:
+  axis_local:
+  - 1.0
+  - 0.0
+  - 0.0
+  down_world:
+  - 0.0
+  - 0.0
+  - -1.0
+  provenance: prior_evidence
+  source: "docs/INTERFACES.md \xA76.5 / docs/TECHNICAL_APPROACH.md \xA72.2-2.3 (simulation-derived\
+    \ local +X); tool_tip = gripper_link origin per config/robot/end_effector.yaml\
+    \ (ADR-014); GEOM-07 measures the real boresight"
+grid:
+  x_m:
+    min: 0.14
+    max: 0.38
+    step: 0.015
+  y_m:
+    min: -0.12000000000000001
+    max: 0.11999999999999998
+    step: 0.015
+  surface_z_m:
+  - 0.0
+  standoffs_m:
+  - 0.01
+  - 0.04
+orientation:
+  roll_samples: 8
+  tilt_deg:
+  - 0.0
+  tilt_azimuth_samples: 4
+ik:
+  timeout_s: 0.02
+  avoid_collisions: true
+  seed: neighbour
+  roll_search: best
+surface_collision:
+  enabled: true
+  thickness_m: 0.02
+  margin_m: 0.05
+  allowed_links: []
+  model: specimen_block
+  floor_z_m: 0.0
+  base_keepout_m:
+  - -0.09
+  - 0.09
+  - -0.12
+  - 0.12
+prefilter:
+  enabled: true
+placement:
+  footprint_m:
+  - 0.2
+  - 0.2
+  yaw_candidates_rad:
+  - 0.0
+  - 1.5707963267948966
+  tolerance_m: 0.02
+  top_k: 5
+value_status: nominal
+sources:
+  frame_group_ik_link: "base_link is the fixed planning frame (docs/INTERFACES.md\
+    \ \xA76.1); group 'arm' per docs/motion/ROBOT_MODEL.md \xA74; ik_link tool_tip\
+    \ is the physical crack-tool reference (ADR-014, config/robot/end_effector.yaml\
+    \ tool block: closed-finger tip = gripper_link origin, nominal until GEOM-07).\
+    \ gripper_tcp (grasp centre) stays the vendor SRDF chain tip for grasping."
+  boresight: "docs/INTERFACES.md \xA76.5 (prior_evidence only, not calibrated) / docs/TECHNICAL_APPROACH.md\
+    \ \xA72.2-2.3 simulation-derived local +X; GEOM-07 supersedes this with a measured\
+    \ value."
+  grid: "x/y bounds+step and surface_z_m are a nominal sweep resolution over the table\
+    \ in front of the robot, not a measured footprint. standoffs_m are tool-tip clearances\
+    \ above the surface along the boresight (ADR-014): 0.04 m = docs/TECHNICAL_APPROACH.md\
+    \ \xA72.5 STANDOFF_APPROACH_M (approach/retract hover, originally measured from\
+    \ gripper_link = the tip), 0.01 m = nominal no-contact trace clearance (3-5x the\
+    \ expected calibration + depth error budget of ADR-013). surface_z_m brackets\
+    \ plausible specimen top heights above the table (flat board .. raised block);\
+    \ MOT-10 measures the real one."
+  orientation: 8 roll samples / 4 azimuth samples is a nominal coarse angular sweep
+    resolution chosen for this card, not a measured or optimised value; tilt_deg=[0.0]
+    keeps the first sweep pure boresight-down.
+  ik: timeout_s/seed/roll_search are nominal MoveIt IK-call tuning defaults for MOT-04.4's
+    sweep node; avoid_collisions=true is the safe default per REQ-MOT-2.
+  surface_collision: 'specimen_block (ADR-014): the specimen proxy is a solid block
+    from the table top (floor_z_m 0.0 = base_link origin = bottom face of base_link.STL)
+    up to each surface_z over the grid + margin_m, excluding base_keepout_m = base_link.STL
+    footprint (x +/-0.070, y +/-0.100) + 0.02 m clearance. The previous grid-wide
+    thin slab also ran under the base and collided with the shoulder (link2) at surface_z
+    >= ~0.10, an artefact; allowed_links is now empty because the proxy never reaches
+    the base.'
+  environment: 'Static workcell objects from MOT-03''s scene config applied for the
+    whole sweep: the table (the robot base stands on it, so the arm may never go below
+    z=0). The specimen object in that file is NOT loaded here: its pose is what this
+    sweep recommends.'
+  prefilter: enabled=true turns on reach_bound_from_urdf's cheap norm-based prefilter
+    ahead of any IK call; a boolean toggle, not a measured value.
+  placement: footprint_m reuses the nominal coupon footprint; yaw_candidates_rad =
+    {0, 90deg} covers landscape and portrait placement; tolerance_m/top_k are nominal
+    search-grid parameters for MOT-04.3's placement scoring.
+  placement_verification: Emitted by recommend_placement (MOT-04.3) to independently
+    re-check the winning placement's dilated footprint at half the sweep grid step
+    -- points the original sweep never sampled.
+environment:
+  scene_config: config/scene/scene.yaml
+  objects:
+  - table
