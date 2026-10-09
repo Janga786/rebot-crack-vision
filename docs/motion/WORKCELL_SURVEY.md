@@ -165,8 +165,10 @@ drift detected under `--check-scene`, per `docs/INTERFACES.md` §0.2).
   differences — refused if that residual exceeds `derivation_params.rectangularity_tolerance_m`, default
   3 mm; a 5 mm-skewed corner on a nominal 0.2 m square is refused at the default, see §12.7's worked
   example);
-- the specimen's top `z`, as the adapter-plate thickness (0 if bolted directly) plus the mean of the
-  caliper thickness readings;
+- the specimen's top `z`, as the table-top datum `z_table_top = -(adapter plate thickness)` (exactly `0`
+  if bolted directly) plus the mean of the caliper thickness readings — the specimen rests on the table,
+  which sits *below* `base_link` `z = 0` by the plate thickness (e.g. a 0.010 m plate and a 0.040 m mean
+  thickness give `-0.010 + 0.040 = 0.030` m);
 - the table's collision box: footprint from the front/side reference faces (§12.7 rule 3's exact sign
   conventions), thickness from `table.thickness`, placed so its top face sits at
   `z = -(adapter plate thickness)` — exactly `0` when the base is bolted directly to the table;

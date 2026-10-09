@@ -1778,8 +1778,13 @@ field's sign convention):
    i.e. `P2=(0.205,0.200)`. Then `s0=0.200`, `s1=0.200063`, `s2=0.205`, `s3=0.200`, `d0=0.286399`,
    `d1=0.282843`: `|d0-d1|=0.00356` m, `|s0-s2|=0.00500` m, `|s1-s3|=0.00006` m, so
    `residual_m = 0.00500 m = 5 mm > 0.003 m` — **refused**.
-2. **Specimen top z**: `z_top = adapter_plate_thickness.value_m (or 0 if bolted_directly_to_table) +
-   mean(thickness_readings[*].value_m)`.
+2. **Specimen top z**: the specimen rests on the table top (rule 6 refuses otherwise), so
+   `z_top = z_table_top + mean(thickness_readings[*].value_m)`, i.e.
+   `z_top = -(adapter_plate_thickness.value_m or 0) + mean(thickness_readings[*].value_m)`, with
+   `z_table_top` from rule 3 (the adapter plate, if any, lifts the *base* above the table, so the table
+   top — and everything resting on it — sits *below* `base_link` `z = 0`). Example: a 0.010 m plate and a
+   0.040 m mean thickness give `z_top = -0.010 + 0.040 = 0.030` m; bolted directly, the same specimen
+   gives `0.040` m.
 3. **Table box**: footprint `x` extent `[x_near, x_far]` and `y` extent `[y_neg, y_pos]` from the mapped
    values above (`y = ±0.100` side faces, not `x = ±0.100`); `dimensions_m = [x_far - x_near, y_pos -
    y_neg, table.thickness.value_m]`; top face (and this rule's `z_table_top` datum used throughout §12.7)
