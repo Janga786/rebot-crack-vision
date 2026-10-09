@@ -91,6 +91,7 @@ def _apply_gap_policy(
     sigma_normal_rad: np.ndarray,
     cov_base: np.ndarray,
     params: LiftParams,
+    T_optical_base: np.ndarray,
 ) -> tuple[list[tuple[int, int]], int]:
     """§10.3 gap interpolation, splitting, trimming and minimum-segment-length policy.
 
@@ -116,11 +117,10 @@ def _apply_gap_policy(
         run_len = run_end - run_start + 1
         if not is_leading and not is_trailing and run_len <= params.max_gap_px:
             left, right = run_start - 1, run_end + 1
-            src_cov = (
-                cov_base[left]
-                if np.trace(cov_base[left]) >= np.trace(cov_base[right])
-                else cov_base[right]
-            )
+            conservative = left if np.trace(cov_base[left]) >= np.trace(cov_base[right]) else right
+            src_cov = cov_base[conservative]
+            src_rms = normal_rms_m[conservative]
+            src_sigma_normal = sigma_normal_rad[conservative]
             span = right - left
             for k in range(run_start, run_end + 1):
                 t = (k - left) / span
@@ -129,6 +129,13 @@ def _apply_gap_policy(
                 norm = np.linalg.norm(nlerp)
                 n_base[k] = nlerp / norm if norm > 1e-12 else nlerp
                 cov_base[k] = src_cov
+                normal_rms_m[k] = src_rms
+                sigma_normal_rad[k] = src_sigma_normal
+                p_opt_h = T_optical_base @ np.array(
+                    [p_base[k][0], p_base[k][1], p_base[k][2], 1.0]
+                )
+                p_optical[k] = p_opt_h[:3]
+                depth_m[k] = p_optical[k][2]
                 reason[k] = f"interpolated:{pre_interp_reason[k]}"
                 interpolated[k] = True
                 valid[k] = True
@@ -290,9 +297,10 @@ def lift_polyline(
         sigma_normal_rad[i] = sigma_normal
         cov_base[i] = sigma_base
 
+    T_optical_base = np.linalg.inv(np.asarray(T_base_link_optical))
     segments, dropped_segments = _apply_gap_policy(
         valid, reason, interpolated, depth_m, p_optical, p_base, n_base,
-        normal_rms_m, sigma_normal_rad, cov_base, params,
+        normal_rms_m, sigma_normal_rad, cov_base, params, T_optical_base,
     )
 
     return LiftedPolyline(
