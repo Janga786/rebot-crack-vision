@@ -1,6 +1,6 @@
 # Progress — week of Mon Oct 05 – Sun Oct 11, 2026
 
-**11 task(s) completed and independently audited this week** · project total **55/104** accepted
+**12 task(s) completed and independently audited this week** · project total **48/104** accepted
 
 ## Completed this week
 
@@ -26,10 +26,12 @@
 …[449 chars clipped]
 - **MOT-03 — Planning scene from config (nominal until measured)** ([details](MOT-03.md)): Corrected the MOT-03 collision scene per the 2026-09-30 re-spec: removed the world-fixed camera_mount object/ACM entry (the D405 and mount are eye-in-hand robot links from GEOM-10, already in every pl
 …[378 chars clipped]
+- **MOT-05.1 — Decision + contracts: commissioning-gated execution (ADR-016 + INTERFACES §11)** ([details](MOT-05.1.md)): Finished the design-and-contracts card for MOT-05's safety-gated robot-execution module: ADR-016 plus a new section 11 of INTERFACES.md now fully specify the modes, config schemas, the full real-motio
+…[538 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 15 / 44
+- Implementation/review sessions run: 16 / 45
 - Audits that rejected work with evidence-backed findings: 3 (repairs created: 3)
 - Re-verified after an upstream change: CAM-02, CAM-05.1, GEOM-01, GEOM-01.R1, GEOM-08.1, GEOM-08.2, GEOM-08.2.R1, GEOM-08.5, GEOM-08.5.R1, GEOM-08.6, GEOM-08.7, GEOM-08.8, GEOM-08.8.R1, GEOM-10, MOT-02, MOT-04.2, MOT-04.3, MOT-04.3.R1, MOT-04.6, PERC-03, PERC-03.R1, TC-011, TC-016
 
@@ -45,10 +47,10 @@
 |---|---|---|
 | Host platform & reproducibility (L-HOST) | 7 | 10 |
 | Local coding model (L-LLM) | 2 | 6 |
-| D405 capture (L-CAM) | 7 | 9 |
-| Perception (L-PERC) | 13 | 16 |
-| Geometry & calibration (L-GEOM) | 15 | 24 |
-| Motion planning (L-MOTION) | 8 | 27 |
+| D405 capture (L-CAM) | 6 | 9 |
+| Perception (L-PERC) | 12 | 16 |
+| Geometry & calibration (L-GEOM) | 12 | 24 |
+| Motion planning (L-MOTION) | 6 | 27 |
 | Integration & commissioning (L-INT) | 1 | 6 |
 | Operator workflow & handoff (L-OPS) | 1 | 4 |
 | Imitation learning (later phase) (L-IL) | 0 | 1 |
