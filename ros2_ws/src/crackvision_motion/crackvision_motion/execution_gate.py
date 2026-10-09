@@ -9,16 +9,15 @@ a `GateReport`. The online read-only gates (`G-GRAPH`, `G-START-STATE`, `G-COLLI
 interactive `G-CONFIRM` are not evaluated here -- they need a ROS graph / a controlling tty and
 belong to MOT-05.4/.5/.6.
 
-Simplification from §11.7's five outcomes to three (`pass`/`fail`/`skip`), per the MOT-05.3 card
-body (which wins over §11 on this point): a `warn` outcome ("this mode's rule holds, but `real`'s
-rule would fail") collapses to `pass` here, because in `mock`/`dry` it never refuses -- exactly
-what `pass` means for `evaluate_offline`'s caller. An `error` outcome (precondition gate failed)
-collapses to `fail`, since it refuses identically to `fail` (§11.7). Only the three real-only
-authorization gates (`G-ARM`, `G-COMMISSIONING`, `G-ESTOP`) are ever reported `skip`, matching
-§11.7's own table exactly (they are literally not evaluated outside `real`, not evaluated-and-
-passing). `mock`/`dry`'s "preview what `real` would refuse" (`real_preview`/`would_refuse_in_real`,
-§11.9) is not reconstructable from this collapsed report; MOT-05.4 gets it for free by calling
-`evaluate_offline(mode="real", ...)` a second time with the same inputs.
+`GateCheck.outcome` carries all five §11.7 outcomes verbatim: `pass`, `fail`, `warn` (evaluated in
+`mock`/`dry`, this mode's rule holds but `real`'s rule would fail; never refuses; never produced in
+`real`), `skip` (the three real-only authorization/commissioning gates `G-ARM`, `G-COMMISSIONING`,
+`G-ESTOP` outside `real`) and `error` (could not be evaluated: a precondition gate failed, or an
+input file was missing/unreadable/malformed; refuses like `fail`). `GateReport.passed`/`.refusals`
+treat `fail` and `error` as refusing and `warn`/`skip`/`pass` as non-refusing, matching §11.7's
+refusal rule exactly. `mock`/`dry`'s "preview what `real` would refuse" (`real_preview`/
+`would_refuse_in_real`, §11.9) is not reconstructable from this report; MOT-05.4 gets it for free by
+calling `evaluate_offline(mode="real", ...)` a second time with the same inputs.
 """
 
 from __future__ import annotations
@@ -78,6 +77,14 @@ GATE_IDS = (
 # Real-only authorization/commissioning gates: skip (never evaluated) outside real (§11.7).
 _REAL_ONLY_GATES = frozenset({G_ARM, G_COMMISSIONING, G_ESTOP})
 
+# §11.7's own category column: G-ARM and G-CONFIRM are "confirmation"; every other gate evaluated
+# here (G-CONFIRM is not -- it needs a controlling tty, MOT-05.5/.6) is "offline".
+_CONFIRMATION_GATES = frozenset({G_ARM})
+
+OUTCOMES = ("pass", "fail", "warn", "skip", "error")
+# §11.7 refusal rule: the run refuses iff at least one gate reports `fail` or `error`.
+_REFUSING_OUTCOMES = frozenset({"fail", "error"})
+
 
 class GateConfigError(ValueError):
     """Raised for a structurally or numerically invalid gate-input config file."""
@@ -86,11 +93,15 @@ class GateConfigError(ValueError):
 @dataclass(frozen=True)
 class GateCheck:
     id: str
-    status: str  # "pass" | "fail" | "skip"
+    outcome: str  # "pass" | "fail" | "warn" | "skip" | "error"
     message: str
 
+    @property
+    def category(self) -> str:
+        return "confirmation" if self.id in _CONFIRMATION_GATES else "offline"
+
     def to_dict(self) -> Dict[str, Any]:
-        return {"id": self.id, "status": self.status, "message": self.message}
+        return {"gate": self.id, "category": self.category, "outcome": self.outcome, "detail": self.message}
 
 
 @dataclass(frozen=True)
@@ -101,11 +112,11 @@ class GateReport:
 
     @property
     def passed(self) -> bool:
-        return not any(c.status == "fail" for c in self.checks)
+        return not any(c.outcome in _REFUSING_OUTCOMES for c in self.checks)
 
     @property
     def refusals(self) -> List[str]:
-        return [c.id for c in self.checks if c.status == "fail"]
+        return [c.id for c in self.checks if c.outcome in _REFUSING_OUTCOMES]
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -125,7 +136,14 @@ def _load_yaml_mapping(path: Union[str, Path], ctx: str) -> Dict[str, Any]:
     path = Path(path)
     if not path.is_file():
         raise GateConfigError(f"{ctx} not found: {path}")
-    raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise GateConfigError(f"{ctx} unreadable: {exc}") from exc
+    try:
+        raw = yaml.safe_load(text)
+    except yaml.YAMLError as exc:
+        raise GateConfigError(f"{ctx} is not valid YAML: {exc}") from exc
     if not isinstance(raw, dict):
         raise GateConfigError(f"{ctx} must be a mapping at the top level: {path}")
     return raw
@@ -376,10 +394,14 @@ def evaluate_offline(
     else:
         checks.append(GateCheck(G_ARM, "skip", f"G-ARM is real-only, mode={mode}"))
 
-    # G-TRAJ
+    # G-TRAJ. `load_trajectory` can raise before its own validation even starts (the file is
+    # missing/unreadable) -- that is "unreadable input" (§11.7 `error`), distinct from a file that
+    # reads fine but fails schema validation (`TrajectoryError`, an evaluated `fail`).
     traj: Optional[dict] = None
     try:
         traj = load_trajectory(trajectory_path)
+    except OSError as exc:
+        checks.append(GateCheck(G_TRAJ, "error", f"trajectory file unreadable: {exc}"))
     except TrajectoryError as exc:
         checks.append(GateCheck(G_TRAJ, "fail", str(exc)))
     else:
@@ -387,7 +409,7 @@ def evaluate_offline(
             if mode == "real":
                 checks.append(GateCheck(G_TRAJ, "fail", "purpose 'test' is refused in real mode"))
             else:
-                checks.append(GateCheck(G_TRAJ, "pass", "schema valid; purpose 'test' only refuses in real"))
+                checks.append(GateCheck(G_TRAJ, "warn", "schema valid; purpose 'test' only refuses in real"))
         else:
             checks.append(GateCheck(G_TRAJ, "pass", "schema valid"))
 
@@ -408,12 +430,12 @@ def evaluate_offline(
     try:
         current_limits_sha = _sha256_of(limits_path)
         limits = load_limits(limits_path)
-    except (OSError, KeyError, TypeError, ValueError) as exc:
-        checks.append(GateCheck(G_LIMITS_HASH, "fail", f"cannot read current limits file: {exc}"))
-        checks.append(GateCheck(G_LIMITS, "fail", "cannot evaluate: current limits file unreadable"))
+    except (OSError, KeyError, TypeError, ValueError, yaml.YAMLError) as exc:
+        checks.append(GateCheck(G_LIMITS_HASH, "error", f"cannot read current limits file: {exc}"))
+        checks.append(GateCheck(G_LIMITS, "error", "cannot evaluate: current limits file unreadable"))
     else:
         if not traj_ok:
-            checks.append(GateCheck(G_LIMITS_HASH, "fail", "cannot evaluate: G-TRAJ failed to load trajectory"))
+            checks.append(GateCheck(G_LIMITS_HASH, "error", "cannot evaluate: G-TRAJ failed to load trajectory"))
         else:
             declared = traj["limits_file"]["sha256"]
             if declared is not None and declared != current_limits_sha:
@@ -425,18 +447,18 @@ def evaluate_offline(
                 if mode == "real":
                     checks.append(GateCheck(G_LIMITS_HASH, "fail", "limits_file.sha256 is null; required in real"))
                 else:
-                    checks.append(GateCheck(G_LIMITS_HASH, "pass", "limits_file.sha256 is null (allowed outside real)"))
+                    checks.append(GateCheck(G_LIMITS_HASH, "warn", "limits_file.sha256 is null (warn outside real)"))
             else:
                 checks.append(GateCheck(G_LIMITS_HASH, "pass", "limits_file.sha256 matches current limits file"))
 
         # G-LIMITS
         if not traj_ok:
-            checks.append(GateCheck(G_LIMITS, "fail", "cannot evaluate: G-TRAJ failed to load trajectory"))
+            checks.append(GateCheck(G_LIMITS, "error", "cannot evaluate: G-TRAJ failed to load trajectory"))
         else:
             try:
                 exec_cfg_for_scale = load_execution_config(execution_config_path)
             except GateConfigError as exc:
-                checks.append(GateCheck(G_LIMITS, "fail", f"cannot evaluate: execution config unreadable: {exc}"))
+                checks.append(GateCheck(G_LIMITS, "error", f"cannot evaluate: execution config unreadable: {exc}"))
             else:
                 position_margin_rad = exec_cfg_for_scale["position_margin_rad"]
                 violations = check_limits(traj, limits, position_margin_rad=position_margin_rad)
@@ -447,33 +469,42 @@ def evaluate_offline(
                     ))
                 else:
                     effective_scale = _resolve_speed_scale(mode, speed_scale, exec_cfg_for_scale)
-                    scaled_traj = scale_time(traj, effective_scale)
-                    scaled_limits = {
-                        j: {
-                            "lower": spec["lower"],
-                            "upper": spec["upper"],
-                            "velocity": spec["velocity"] * effective_scale,
-                            "acceleration": spec["acceleration"] * effective_scale * effective_scale,
-                        }
-                        for j, spec in limits.items()
-                    }
-                    scaled_violations = check_limits(
-                        scaled_traj, scaled_limits, position_margin_rad=position_margin_rad
-                    )
-                    if scaled_violations:
+                    try:
+                        scaled_traj = scale_time(traj, effective_scale)
+                    except TrajectoryError as exc:
                         checks.append(GateCheck(
-                            G_LIMITS, "fail",
-                            f"{len(scaled_violations)} scaled (s={effective_scale}) limit violation(s), "
-                            f"e.g. {scaled_violations[0]}",
+                            G_LIMITS, "error",
+                            f"cannot evaluate: effective speed_scale {effective_scale!r} invalid: {exc}",
                         ))
                     else:
-                        checks.append(GateCheck(G_LIMITS, "pass", f"within limits unscaled and at s={effective_scale}"))
+                        scaled_limits = {
+                            j: {
+                                "lower": spec["lower"],
+                                "upper": spec["upper"],
+                                "velocity": spec["velocity"] * effective_scale,
+                                "acceleration": spec["acceleration"] * effective_scale * effective_scale,
+                            }
+                            for j, spec in limits.items()
+                        }
+                        scaled_violations = check_limits(
+                            scaled_traj, scaled_limits, position_margin_rad=position_margin_rad
+                        )
+                        if scaled_violations:
+                            checks.append(GateCheck(
+                                G_LIMITS, "fail",
+                                f"{len(scaled_violations)} scaled (s={effective_scale}) limit violation(s), "
+                                f"e.g. {scaled_violations[0]}",
+                            ))
+                        else:
+                            checks.append(GateCheck(
+                                G_LIMITS, "pass", f"within limits unscaled and at s={effective_scale}"
+                            ))
 
     # G-SPEED
     try:
         exec_cfg = load_execution_config(execution_config_path)
     except GateConfigError as exc:
-        checks.append(GateCheck(G_SPEED, "fail", f"execution config unreadable: {exc}"))
+        checks.append(GateCheck(G_SPEED, "error", f"cannot evaluate: execution config unreadable: {exc}"))
         exec_cfg = None
     else:
         effective_scale = _resolve_speed_scale(mode, speed_scale, exec_cfg)
@@ -482,7 +513,7 @@ def evaluate_offline(
                 commissioning_for_cap = load_commissioning(commissioning_path)
                 cap = commissioning_for_cap["speed_scale_cap"]
             except GateConfigError as exc:
-                checks.append(GateCheck(G_SPEED, "fail", f"cannot read commissioning speed_scale_cap: {exc}"))
+                checks.append(GateCheck(G_SPEED, "error", f"cannot read commissioning speed_scale_cap: {exc}"))
                 cap = None
         else:
             cap = exec_cfg["speed_scale"]["cap"]
@@ -496,11 +527,15 @@ def evaluate_offline(
                     f"effective speed_scale {effective_scale} outside (0, {cap}] for mode {mode}",
                 ))
 
-    # G-SCENE
+    # G-SCENE. `scene_core.load_config` only raises `SceneError` for a file it could read and
+    # parse but that fails schema validation (an evaluated `fail`); a missing file or unparseable
+    # YAML is "unreadable input" (§11.7 `error`).
     try:
         scene_cfg = scene_load_config(scene_config_path)
     except SceneError as exc:
         checks.append(GateCheck(G_SCENE, "fail", str(exc)))
+    except (OSError, yaml.YAMLError) as exc:
+        checks.append(GateCheck(G_SCENE, "error", f"scene config unreadable: {exc}"))
     else:
         try:
             scene_assert_commissioning_ready(scene_cfg)
@@ -508,15 +543,17 @@ def evaluate_offline(
             if mode == "real":
                 checks.append(GateCheck(G_SCENE, "fail", str(exc)))
             else:
-                checks.append(GateCheck(G_SCENE, "pass", f"loads; not commissioning-ready (warn in {mode}): {exc}"))
+                checks.append(GateCheck(G_SCENE, "warn", f"loads; not commissioning-ready (warn in {mode}): {exc}"))
         else:
             checks.append(GateCheck(G_SCENE, "pass", "scene config loads and is commissioning-ready"))
 
-    # G-EE
+    # G-EE. Same unreadable-input/evaluated-fail split as G-SCENE above.
     try:
         ee_cfg = ee_load_config(end_effector_config_path)
     except EndEffectorError as exc:
         checks.append(GateCheck(G_EE, "fail", str(exc)))
+    except (OSError, yaml.YAMLError) as exc:
+        checks.append(GateCheck(G_EE, "error", f"end-effector config unreadable: {exc}"))
     else:
         try:
             ee_assert_commissioning_ready(ee_cfg)
@@ -524,7 +561,7 @@ def evaluate_offline(
             if mode == "real":
                 checks.append(GateCheck(G_EE, "fail", str(exc)))
             else:
-                checks.append(GateCheck(G_EE, "pass", f"loads; not commissioning-ready (warn in {mode}): {exc}"))
+                checks.append(GateCheck(G_EE, "warn", f"loads; not commissioning-ready (warn in {mode}): {exc}"))
         else:
             checks.append(GateCheck(G_EE, "pass", "end-effector config loads and is commissioning-ready"))
 
@@ -536,8 +573,8 @@ def evaluate_offline(
         try:
             commissioning = load_commissioning(commissioning_path)
         except GateConfigError as exc:
-            checks.append(GateCheck(G_COMMISSIONING, "fail", str(exc)))
-            checks.append(GateCheck(G_ESTOP, "fail", f"cannot evaluate: commissioning record unreadable: {exc}"))
+            checks.append(GateCheck(G_COMMISSIONING, "error", str(exc)))
+            checks.append(GateCheck(G_ESTOP, "error", f"cannot evaluate: commissioning record unreadable: {exc}"))
         else:
             if commissioning["commissioned"] and commissioning["limits_file_sha256"] == current_limits_sha:
                 checks.append(GateCheck(G_COMMISSIONING, "pass", "commissioned and limits_file_sha256 matches"))
@@ -557,21 +594,19 @@ def evaluate_offline(
 
     # G-ELIGIBLE
     if not traj_ok:
-        checks.append(GateCheck(G_ELIGIBLE, "fail", "cannot evaluate: G-TRAJ failed to load trajectory"))
+        checks.append(GateCheck(G_ELIGIBLE, "error", "cannot evaluate: G-TRAJ failed to load trajectory"))
     else:
         checks.append(_evaluate_eligible(traj, root, mode))
 
     # G-APPROVAL
     if not traj_ok or traj_sha is None:
-        checks.append(GateCheck(G_APPROVAL, "fail" if mode == "real" else "pass",
-                                 "cannot evaluate: trajectory unavailable" if mode == "real" else
-                                 "trajectory unavailable; warn only outside real"))
+        checks.append(GateCheck(G_APPROVAL, "error", "cannot evaluate: trajectory unavailable"))
     else:
         checks.append(_evaluate_approval(approval_path, traj_sha, execution_config_path, mode))
 
     # G-STALE-CONFIG
     if not traj_ok:
-        checks.append(GateCheck(G_STALE_CONFIG, "fail", "cannot evaluate: G-TRAJ failed to load trajectory"))
+        checks.append(GateCheck(G_STALE_CONFIG, "error", "cannot evaluate: G-TRAJ failed to load trajectory"))
     else:
         checks.append(_evaluate_stale_config(traj, scene_config_path, end_effector_config_path, mode))
 
@@ -587,19 +622,26 @@ def _resolve_speed_scale(mode: str, speed_scale: Optional[float], exec_cfg: Dict
     return exec_cfg["speed_scale"]["real_default"]
 
 
+def _eligible_violation(mode: str, msg: str) -> GateCheck:
+    if mode == "real":
+        return GateCheck(G_ELIGIBLE, "fail", msg)
+    return GateCheck(G_ELIGIBLE, "warn", f"{msg} (warn outside real)")
+
+
 def _evaluate_eligible(traj: dict, root: Path, mode: str) -> GateCheck:
     source = traj["source"]["paths3d"]
     if source is None:
         if traj["purpose"] == "crack_task":
-            msg = "purpose crack_task with source.paths3d: null"
-            return GateCheck(G_ELIGIBLE, "fail" if mode == "real" else "pass",
-                              msg if mode == "real" else f"{msg} (warn outside real)")
+            return _eligible_violation(mode, "purpose crack_task with source.paths3d: null")
         return GateCheck(G_ELIGIBLE, "pass", "purpose 'test' with no paths3d binding: nothing to check")
 
     p3d_path = _resolve(root, source["path"])
     if not p3d_path.is_file():
         return GateCheck(G_ELIGIBLE, "fail", f"source.paths3d.path does not exist: {p3d_path}")
-    actual_sha = file_sha256(p3d_path)
+    try:
+        actual_sha = file_sha256(p3d_path)
+    except OSError as exc:
+        return GateCheck(G_ELIGIBLE, "error", f"source.paths3d.path unreadable: {exc}")
     if actual_sha != source["sha256"]:
         return GateCheck(
             G_ELIGIBLE, "fail",
@@ -617,48 +659,46 @@ def _evaluate_eligible(traj: dict, root: Path, mode: str) -> GateCheck:
     declared_eligible = source["execution_eligible"]
 
     if declared_eligible != file_eligible:
-        msg = f"trajectory's execution_eligible copy ({declared_eligible}) disagrees with the file ({file_eligible})"
-        return GateCheck(G_ELIGIBLE, "fail" if mode == "real" else "pass",
-                          msg if mode == "real" else f"{msg} (warn outside real)")
+        return _eligible_violation(
+            mode, f"trajectory's execution_eligible copy ({declared_eligible}) disagrees with the file ({file_eligible})"
+        )
     if not file_eligible:
-        msg = f"paths3d file reports execution_eligible=false, reasons={reasons}"
-        return GateCheck(G_ELIGIBLE, "fail" if mode == "real" else "pass",
-                          msg if mode == "real" else f"{msg} (warn outside real)")
+        return _eligible_violation(mode, f"paths3d file reports execution_eligible=false, reasons={reasons}")
     return GateCheck(G_ELIGIBLE, "pass", "paths3d sha matches and is execution_eligible")
 
 
 def _evaluate_approval(
     approval_path: Optional[Union[str, Path]], traj_sha: str, execution_config_path: Union[str, Path], mode: str
 ) -> GateCheck:
-    fail_status = "fail" if mode == "real" else "pass"
+    violation_outcome = "fail" if mode == "real" else "warn"
+    suffix = "" if mode == "real" else " (warn outside real)"
 
     if approval_path is None:
-        return GateCheck(G_APPROVAL, fail_status, "no approval file given" + ("" if mode == "real" else " (warn outside real)"))
+        return GateCheck(G_APPROVAL, violation_outcome, "no approval file given" + suffix)
     try:
         approval = load_approval(approval_path)
         exec_cfg = load_execution_config(execution_config_path)
     except GateConfigError as exc:
-        return GateCheck(G_APPROVAL, fail_status, f"approval unusable: {exc}" + ("" if mode == "real" else " (warn outside real)"))
+        return GateCheck(G_APPROVAL, violation_outcome, f"approval unusable: {exc}" + suffix)
 
     if approval["trajectory_sha256"] != traj_sha:
         return GateCheck(
-            G_APPROVAL, fail_status,
-            f"approval.trajectory_sha256 {approval['trajectory_sha256']} does not match trajectory {traj_sha}"
-            + ("" if mode == "real" else " (warn outside real)"),
+            G_APPROVAL, violation_outcome,
+            f"approval.trajectory_sha256 {approval['trajectory_sha256']} does not match trajectory {traj_sha}" + suffix,
         )
 
     approved_at = _parse_utc(approval["approved_utc"])
     if approved_at is None:
-        return GateCheck(G_APPROVAL, fail_status, "approval.approved_utc is not a parseable ISO-8601 timestamp"
-                          + ("" if mode == "real" else " (warn outside real)"))
+        return GateCheck(
+            G_APPROVAL, violation_outcome, "approval.approved_utc is not a parseable ISO-8601 timestamp" + suffix
+        )
     if approved_at.tzinfo is None:
         approved_at = approved_at.replace(tzinfo=timezone.utc)
     age_s = (datetime.now(timezone.utc) - approved_at).total_seconds()
     if age_s > exec_cfg["approval_max_age_s"]:
         return GateCheck(
-            G_APPROVAL, fail_status,
-            f"approval is {age_s:.0f}s old, exceeds approval_max_age_s={exec_cfg['approval_max_age_s']}"
-            + ("" if mode == "real" else " (warn outside real)"),
+            G_APPROVAL, violation_outcome,
+            f"approval is {age_s:.0f}s old, exceeds approval_max_age_s={exec_cfg['approval_max_age_s']}" + suffix,
         )
     return GateCheck(G_APPROVAL, "pass", "approval binds the current trajectory and is fresh")
 
@@ -666,8 +706,12 @@ def _evaluate_approval(
 def _evaluate_stale_config(
     traj: dict, scene_config_path: Union[str, Path], end_effector_config_path: Union[str, Path], mode: str
 ) -> GateCheck:
-    current_scene_sha = _sha256_of(scene_config_path)
-    current_ee_sha = _sha256_of(end_effector_config_path)
+    try:
+        current_scene_sha = _sha256_of(scene_config_path)
+        current_ee_sha = _sha256_of(end_effector_config_path)
+    except OSError as exc:
+        return GateCheck(G_STALE_CONFIG, "error", f"cannot read current scene/end-effector config: {exc}")
+
     declared_scene = traj["scene_config_sha256"]
     declared_ee = traj["end_effector_config_sha256"]
 
@@ -687,5 +731,5 @@ def _evaluate_stale_config(
     if nulls:
         if mode == "real":
             return GateCheck(G_STALE_CONFIG, "fail", f"{', '.join(nulls)} is null; required in real")
-        return GateCheck(G_STALE_CONFIG, "pass", f"{', '.join(nulls)} is null (allowed outside real)")
+        return GateCheck(G_STALE_CONFIG, "warn", f"{', '.join(nulls)} is null (warn outside real)")
     return GateCheck(G_STALE_CONFIG, "pass", "scene/end-effector config shas match current files")
