@@ -28,11 +28,17 @@ allows for a single camera whose operator is already in `plugdev`.
 
 The staged rule keeps exactly one active line: the D405 id (`8086:0b5b`),
 with `MODE:="0660"` and `GROUP:="plugdev"` instead of `0666`, no other
-device ids, and no `RUN` hook. `SUBSYSTEMS=="usb"` matches the USB device
-node; librealsense's RSUSB and V4L2 backends both resolve permissions by
-walking up from the `video4linux`/`uvcvideo` child device to this ancestor
-USB node via udev's parent-attribute matching, so the single `ATTRS{}` rule
-covers both backends without a separate video4linux-specific line.
+device ids, and no `RUN` hook. `SUBSYSTEMS=="usb"` and `ATTRS{...}` are
+udev's *ancestor-matching* keys: udev evaluates the rule for every device
+event and matches if the device itself or any parent satisfies them. So the
+rule applies both to the USB device node (`/dev/bus/usb/BBB/DDD`, used by
+librealsense's RSUSB/libusb backend) and to its `video4linux` children
+(`/dev/videoN`, used by the V4L2/uvcvideo backend), whose USB ancestor
+carries `idVendor=8086`/`idProduct=0b5b`. No separate video4linux line is
+needed. (The header comment in the rule file words this as the backends
+"walking up" to the USB ancestor; the matching is done by udev as described
+here. The installed file is intentionally left byte-identical to the staged
+one so the `cmp` verification keeps holding.)
 
 The former broad copy, `host/udev/99-realsense-libusb.rules` (staged by an
 earlier attempt), has been removed from this directory so it cannot be
@@ -63,6 +69,12 @@ Content and ownership/mode of the installed rule:
 cmp host/udev/99-crackvision-d405.rules /etc/udev/rules.d/99-crackvision-d405.rules
 stat -c '%a %U %G' /etc/udev/rules.d/99-crackvision-d405.rules   # expect: 644 root root
 ```
+
+Note: inside the claude-auto bubblewrap sandbox (unprivileged user
+namespace) `stat` reports root-owned files as `nobody nogroup` and `id` does
+not list `plugdev`, because host uid/gid 0 and supplementary groups are not
+mapped into the namespace. Run the owner/mode check from a normal host shell;
+there it reports `644 root root`. `cmp` (content) is valid in both.
 
 Functional check once a D405 is physically attached (unplug/replug first so
 the rule applies to that device node):
