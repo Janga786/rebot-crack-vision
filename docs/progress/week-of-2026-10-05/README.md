@@ -1,6 +1,6 @@
 # Progress — week of Mon Oct 05 – Sun Oct 11, 2026
 
-**11 task(s) completed and independently audited this week** · project total **55/93** accepted
+**11 task(s) completed and independently audited this week** · project total **43/104** accepted
 
 ## Completed this week
 
@@ -29,13 +29,15 @@
 
 ## Quality loop
 
-- Implementation/review sessions run: 14 / 24
-- Audits that rejected work with evidence-backed findings: 2 (repairs created: 2)
-- Re-verified after an upstream change: CAM-05.1, GEOM-08.1, GEOM-10, MOT-02, TC-011, TC-016
+- Implementation/review sessions run: 15 / 32
+- Audits that rejected work with evidence-backed findings: 3 (repairs created: 3)
+- Re-verified after an upstream change: CAM-05.1, GEOM-01.R1, GEOM-08.1, GEOM-08.2.R1, GEOM-08.5.R1, GEOM-08.8.R1, GEOM-10, MOT-02, MOT-04.3.R1, PERC-03.R1, TC-011, TC-016
 
 ## Planning changes
 
 - decomposed: HOST-06 → HOST-06.1
+- decomposed: MOT-05 → MOT-05.1, MOT-05.2, MOT-05.3, MOT-05.4, MOT-05.5, MOT-05.6
+- decomposed: MOT-10 → MOT-10.1, MOT-10.2, MOT-10.3, MOT-10.4, MOT-10.5
 
 ## Progress by work package
 
@@ -43,10 +45,10 @@
 |---|---|---|
 | Host platform & reproducibility (L-HOST) | 7 | 10 |
 | Local coding model (L-LLM) | 2 | 6 |
-| D405 capture (L-CAM) | 7 | 9 |
-| Perception (L-PERC) | 13 | 16 |
-| Geometry & calibration (L-GEOM) | 15 | 24 |
-| Motion planning (L-MOTION) | 8 | 16 |
+| D405 capture (L-CAM) | 6 | 9 |
+| Perception (L-PERC) | 12 | 16 |
+| Geometry & calibration (L-GEOM) | 8 | 24 |
+| Motion planning (L-MOTION) | 5 | 27 |
 | Integration & commissioning (L-INT) | 1 | 6 |
 | Operator workflow & handoff (L-OPS) | 1 | 4 |
 | Imitation learning (later phase) (L-IL) | 0 | 1 |
