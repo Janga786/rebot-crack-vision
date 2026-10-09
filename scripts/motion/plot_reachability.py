@@ -217,9 +217,13 @@ def render(data: dict[str, Any], placement: dict[str, Any] | None, out_path: Pat
     if placement is not None:
         status = "feasible placement" if placement.get("feasible") else "NO feasible placement"
     standoffs = ", ".join(f"{s:g}" for s in data["grid"]["grid"]["standoffs_m"])
+    collision = data["grid"].get("surface_collision", {})
+    model = collision.get("model", "slab")
+    env = data["grid"].get("environment")
+    env_desc = f"+ {', '.join(env['objects'])}" if env else "no workcell objects"
     fig.suptitle(
-        f"B601-DM reachability ({data['robot']['ik_link']}, {data['robot']['ik_solver']}, boresight down)\n"
-        f"standoffs {standoffs} m - {status}",
+        f"B601-DM reachability (task frame {data['robot']['ik_link']}, {data['robot']['ik_solver']}, boresight down)\n"
+        f"standoffs {standoffs} m - collision model {model} ({env_desc}) - {status}",
         fontsize=10, color=INK,
     )
     fig.tight_layout(rect=(0, 0.1, 1, 0.93))
