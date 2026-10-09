@@ -12,8 +12,8 @@ rest throughout; nothing is jogged.
 single scene value is `nominal`. Today every table/specimen/ACM entry in `config/scene/scene.yaml` is
 nominal — an engineering guess, not a measurement. This document tells an operator, with hand tools and no
 robot motion, exactly what to measure, in what frame, with what uncertainty, and how those raw readings
-turn into `scene.yaml`'s `measured` values. MOT-10.3 (a later card, not implemented by this one) is the
-`survey_to_scene` tool that reads a filled-in survey record and performs that conversion.
+turn into `scene.yaml`'s `measured` values. MOT-10.3 (a separate card, not this one) delivers the
+`survey_to_scene` tool (`docs/motion/SCENE.md` §8, invocation in §4 below) that reads a filled-in survey record and performs that conversion.
 
 ## 1. Datum: `base_link` and its physical reference faces
 
@@ -151,6 +151,11 @@ ros2 run crackvision_motion survey_to_scene \
     --emit-verify-config data/motion/survey_placement_verify.yaml \
     --emit-view-config data/motion/survey_view_verify.yaml
 ```
+
+**`--dry-run` is not a validation step.** Like every tool in this package, `survey_to_scene
+--dry-run` (§0.3, via `cli_common.run_cli`) skips the tool body entirely and exits 0 after writing
+only its logs — it does not read, check or refuse the survey. Always use `--validate-survey PATH` to
+check a filled-in file before converting it; an exit 0 from `--dry-run` says nothing about the survey.
 
 See `docs/motion/SCENE.md` §8 for the full workflow (including the `--check-scene` drift check) and
 the exact exit codes (0 ok; 2 invalid/refused survey or config error; 3 missing survey/scene file; 1

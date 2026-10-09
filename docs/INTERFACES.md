@@ -1637,7 +1637,7 @@ state explicitly; the oracle contributes only its collision/self-collision geome
 **Normative source:** `docs/motion/WORKCELL_SURVEY.md` (MOT-10.1). That document is the operator-facing
 procedure (tools, checklist, re-measure triggers); this section is the normative schema for the file the
 procedure produces — the **raw** instrument readings, never operator-computed `base_link` coordinates.
-Nothing here edits §0–§11. MOT-10.3 (`survey_to_scene`, not yet implemented) is the only consumer that
+Nothing here edits §0–§11. MOT-10.3 (`survey_to_scene`, `docs/motion/SCENE.md` §8) is the only consumer that
 turns a validated survey record into `config/scene/scene.yaml` entries (§3) with `value_status: measured`.
 
 ### 12.1 Datum (fixed, not a survey field)
