@@ -1,0 +1,18 @@
+{
+  "schema": "crackvision.joint_trajectory/1",
+  "created_utc": "2026-01-01T00:00:00Z",
+  "producer": "MOT-05.2 fixture",
+  "purpose": "test",
+  "planning_frame": "base_link",
+  "joint_names": ["joint1", "joint2", "joint3", "joint4", "joint5", "joint6"],
+  "notes": "Pose P = [0.1, -0.6, -0.9, 0.1, 0.1, 0.1]: well inside b601_dm_limits.yaml on every joint and far from the §11.6 margin band near joint2/joint3's upper=0.0. Chosen so MOT-05.5 can reuse the same home->P pose on the mock stack.",
+  "points": [
+    {"t_s": 0.0, "positions": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]},
+    {"t_s": 1.5, "positions": [0.05, -0.3, -0.45, 0.05, 0.05, 0.05]},
+    {"t_s": 3.0, "positions": [0.1, -0.6, -0.9, 0.1, 0.1, 0.1]}
+  ],
+  "limits_file": {"path": "config/robot/b601_dm_limits.yaml", "sha256": null},
+  "end_effector_config_sha256": null,
+  "scene_config_sha256": null,
+  "source": {"paths3d": null}
+}
