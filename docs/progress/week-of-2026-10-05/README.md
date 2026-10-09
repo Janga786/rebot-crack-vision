@@ -1,6 +1,6 @@
 # Progress — week of Mon Oct 05 – Sun Oct 11, 2026
 
-**16 task(s) completed and independently audited this week** · project total **59/104** accepted
+**17 task(s) completed and independently audited this week** · project total **58/104** accepted
 
 ## Completed this week
 
@@ -36,10 +36,12 @@
 …[521 chars clipped]
 - **MOT-10.2 — Workcell survey core: validate a crackvision.workcell_survey/1 record and derive measured scene objects (pure Python)** ([details](MOT-10.2.md)): Added the workcell-survey validator/derivation module (survey_core.py) that turns a raw tape-measure/caliper survey file into MoveIt-ready collision objects (table, specimen, obstacles) with propagate
 …[367 chars clipped]
+- **MOT-04.5 — Run the full reachability sweep, recommend + independently verify the specimen placement, document** ([details](MOT-04.5.md)): Ran the full-resolution MoveIt reachability sweep (3,780 poses, ~27 minutes) for the B601-DM using the corrected tool-tip/specimen-block model and found a feasible specimen placement at x=0.26 m, y=0.
+…[526 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 24 / 95
+- Implementation/review sessions run: 25 / 96
 - Audits that rejected work with evidence-backed findings: 7 (repairs created: 5)
 - Re-verified after an upstream change: CAM-02, CAM-05.1, GEOM-01, GEOM-01.R1, GEOM-08.1, GEOM-08.2, GEOM-08.2.R1, GEOM-08.5, GEOM-08.5.R1, GEOM-08.6, GEOM-08.7, GEOM-08.8, GEOM-08.8.R1, GEOM-10, MOT-02, MOT-03, MOT-04.2, MOT-04.3, MOT-04.3.R1, MOT-04.6, MOT-05.1, MOT-05.1.R1, MOT-05.2, PERC-03, PERC-03.R1, TC-011, TC-016
 
@@ -57,7 +59,7 @@
 | Local coding model (L-LLM) | 2 | 6 |
 | D405 capture (L-CAM) | 7 | 9 |
 | Perception (L-PERC) | 13 | 16 |
-| Geometry & calibration (L-GEOM) | 15 | 24 |
+| Geometry & calibration (L-GEOM) | 14 | 24 |
 | Motion planning (L-MOTION) | 12 | 27 |
 | Integration & commissioning (L-INT) | 1 | 6 |
 | Operator workflow & handoff (L-OPS) | 1 | 4 |
