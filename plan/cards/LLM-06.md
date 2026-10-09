@@ -2,14 +2,13 @@
 
 ```json card
 {
-  "kind": "integration",
+  "kind": "branch",
   "depends_on": [
     "LLM-05"
   ],
   "requirements": [
     "REQ-LLM-2"
   ],
-  "spec_state": "draft",
   "refine_after": [
     "LLM-05"
   ],
@@ -22,3 +21,6 @@
 ```
 
 Draft: after qualification, pick 2–3 real mechanical cards and verify acceptance + ledger attribution.
+
+## Decomposed 2026-10-09T16:18:41Z by L-LLM (claude-sonnet-5, high)
+Children: LLM-06.1, LLM-06.2
