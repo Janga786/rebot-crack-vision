@@ -1,6 +1,6 @@
 # Progress — week of Mon Oct 05 – Sun Oct 11, 2026
 
-**12 task(s) completed and independently audited this week** · project total **56/104** accepted
+**13 task(s) completed and independently audited this week** · project total **56/104** accepted
 
 ## Completed this week
 
@@ -28,10 +28,12 @@
 …[378 chars clipped]
 - **MOT-05.1 — Decision + contracts: commissioning-gated execution (ADR-016 + INTERFACES §11)** ([details](MOT-05.1.md)): Finished the design-and-contracts card for MOT-05's safety-gated robot-execution module: ADR-016 plus a new section 11 of INTERFACES.md now fully specify the modes, config schemas, the full real-motio
 …[538 chars clipped]
+- **MOT-05.2 — Joint-trajectory file library: validation, hashing, limit checks, time scaling, densification (pure Python)** ([details](MOT-05.2.md)): Built the joint-trajectory validation library for the robot motion-execution safety gate: it checks a planned trajectory file against the real B601-DM joint limits (position, velocity, acceleration) a
+…[367 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 16 / 56
+- Implementation/review sessions run: 17 / 57
 - Audits that rejected work with evidence-backed findings: 3 (repairs created: 3)
 - Re-verified after an upstream change: CAM-02, CAM-05.1, GEOM-01, GEOM-01.R1, GEOM-08.1, GEOM-08.2, GEOM-08.2.R1, GEOM-08.5, GEOM-08.5.R1, GEOM-08.6, GEOM-08.7, GEOM-08.8, GEOM-08.8.R1, GEOM-10, MOT-02, MOT-04.2, MOT-04.3, MOT-04.3.R1, MOT-04.6, PERC-03, PERC-03.R1, TC-011, TC-016
 
