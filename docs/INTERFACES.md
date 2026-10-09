@@ -1331,15 +1331,17 @@ file reports `execution_eligible: false`.
 ## 11. Commissioning-gated execution (ADR-016)
 
 **Normative source:** `docs/adr/016-commissioning-gated-execution.md`. MOT-05.2–.6 implement this section
-verbatim. Nothing here edits §0–§10.
+verbatim. Nothing here edits §0–§10. Exception to §0.1: `execute_trajectory` is an `rclpy` node and is
+invoked as a ROS entry point (§11.10), not through `./env.sh python`.
 
 ### 11.1 Modes, driver profiles and `config/motion/execution.yaml` (schema `crackvision.execution_config/1`)
 
 Modes: `mock` (goals only ever reach a mock driver), `dry` (every offline gate plus every online read-only
 gate; never constructs a `follow_joint_trajectory` `ActionClient`; usable against the live vendor driver as
-a motion-free rehearsal; also reports what `real` would additionally refuse) and `real`. `execute_trajectory
---mode` defaults to `dry`. `--dry-run` (§0.3) is a separate, stronger thing: offline gates only, no ROS node,
-no file writes, exit 0 regardless of gate outcome — it is not the same as `--mode dry`.
+a motion-free rehearsal; also reports what `real` would additionally refuse, §11.7) and `real`.
+`execute_trajectory --mode` defaults to `dry`. `--dry-run` (§0.3) is a separate, stronger thing: offline
+gates only, no ROS node, no file writes, exit 0 regardless of gate outcome. It is not the same as
+`--mode dry` (§11.10).
 
 Driver profiles:
 
@@ -1349,22 +1351,28 @@ Driver profiles:
 | `vendor_mock` | `/rebotarm/follow_joint_trajectory` | `/rebotarm/joint_states` | `mock_rebotarm_driver` | `mock`, `dry` |
 | `vendor` | `/rebotarm/follow_joint_trajectory` | `/rebotarm/joint_states` | `reBotArmController` | `dry`, `real` |
 
+A `--mode`/`--profile` pair not in this table is a usage error (exit 2), raised before any gate runs.
+
 `config/motion/execution.yaml`:
 
 | Field | Meaning |
 |---|---|
 | `schema` | `"crackvision.execution_config/1"` |
 | `default_mode` | `mock \| dry \| real`, CLI default when `--mode` is omitted (ships `dry`) |
-| `driver_profiles.<name>` | `{action, joint_states_topic, expected_node, modes}` for each row above |
+| `driver_profiles.<name>` | `{action, joint_states_topic, expected_node, modes}` for each row above; `vendor` also has `arm_status_topic` (`/rebotarm/arm_status`) |
 | `default_driver_profile` | one of the three profile names |
-| `speed_scale.default` | default `speed_scale` for `mock`/`dry` runs (§11.12) |
-| `speed_scale.cap` | hard cap for `mock`/`dry` (`real`'s cap comes from `commissioning.yaml`, §11.4, never this file) |
+| `speed_scale.default` | `speed_scale` for `mock` when `--speed-scale` is omitted (§11.12) |
+| `speed_scale.cap` | hard cap for `mock` and `dry` (§11.12) |
+| `speed_scale.real_default` | `speed_scale` for `dry` and `real` when `--speed-scale` is omitted; ships `0.10`. It never raises the real cap: `real`'s cap is `commissioning.yaml.speed_scale_cap` (§11.4), never this file |
 | `tolerances.start_state_rad`, `tolerances.tracking_rad` | §11.12 |
-| `timeouts.joint_state_s`, `timeouts.goal_s` | §11.12; `goal_s` bounds how long a single `follow_joint_trajectory` goal may run before the executor treats it as stuck and cancels |
+| `timeouts.joint_state_s`, `timeouts.goal_s`, `timeouts.cancel_settle_s` | §11.12; `goal_s` bounds how long a single `follow_joint_trajectory` goal may run before the executor treats it as stuck and cancels; `cancel_settle_s` is the §11.8 post-cancel stop window |
 | `densify_step_m` | §11.12 |
 | `position_margin_rad` | §11.6 below |
 | `approval_max_age_s` | §11.5/§11.12 |
 | `estop_topics` | list, default `["/crackvision/estop", "/rebot_motion/estop"]` (§11.8) |
+
+These are the only `speed_scale` key names. `execution.yaml` is loaded strictly: an unknown key is a
+config error (exit 2), and so is a `speed_scale` value outside `(0, 1]`.
 
 ### 11.2 `crackvision.joint_trajectory/1` (file, produced by MOT-07)
 
@@ -1376,11 +1384,11 @@ Driver profiles:
 | `purpose` | str | `"crack_task"` \| `"test"` — `real` mode refuses `"test"` unconditionally |
 | `planning_frame` | str | `"base_link"` |
 | `joint_names` | list[str] | exactly `["joint1", ..., "joint6"]`, this order |
-| `points[]` | list | `{t_s, positions[6], velocities[6]?, accelerations[6]?}`; `t_s` strictly increasing, first point `t_s == 0` |
-| `limits_file.path`, `limits_file.sha256` | str, str\|null | repo-relative path and sha256 of the limits file this trajectory was planned/retimed against; `null` allowed only outside `real` (§11.5 of ADR-016 / Decision §5) |
-| `end_effector_config_sha256` | str\|null | sha256 of `config/robot/end_effector.yaml` at plan time |
-| `scene_config_sha256` | str\|null | sha256 of `config/scene/scene.yaml` at plan time |
-| `source.paths3d.path`, `.sha256`, `.execution_eligible` | str, str, bool \| null (whole `source.paths3d` object is `null` for a trajectory not derived from a §10 paths3d file) | provenance for `G-ELIGIBLE` (§11.7) |
+| `points[]` | list | `{t_s, positions[6], velocities[6]?, accelerations[6]?}`; `t_s` strictly increasing, first point `t_s == 0`. The file holds the **unscaled** trajectory (scale 1.0); it must be within the limits as written (§11.7 `G-LIMITS`) |
+| `limits_file.path`, `limits_file.sha256` | str, str\|null | repo-relative path and sha256 of the limits file this trajectory was planned/retimed against; `null` allowed only outside `real` (ADR-016 Decision §5) |
+| `end_effector_config_sha256` | str\|null | sha256 of `config/robot/end_effector.yaml` at plan time; `null` allowed only outside `real` (`G-STALE-CONFIG`) |
+| `scene_config_sha256` | str\|null | sha256 of `config/scene/scene.yaml` at plan time; `null` allowed only outside `real` (`G-STALE-CONFIG`) |
+| `source.paths3d.path`, `.sha256`, `.execution_eligible` | str, str, bool \| null (whole `source.paths3d` object is `null` for a trajectory not derived from a §10 paths3d file) | provenance for `G-ELIGIBLE` (§11.7). `execution_eligible` is a copy, kept for the reader. The gate never trusts it and reads the file instead. `real` refuses a `crack_task` with `source.paths3d: null` |
 
 ### 11.3 (reserved — numbering continues at 11.4 to match the card's gate-id ordering)
 
@@ -1391,7 +1399,7 @@ Driver profiles:
 | `schema` | str | `"crackvision.commissioning/1"` |
 | `commissioned` | bool | overall gate; ships `false` |
 | `limits_file_sha256` | str\|null | must equal the current `config/robot/b601_dm_limits.yaml` sha256 for `G-COMMISSIONING` to pass |
-| `speed_scale_cap` | float | real-mode hard cap (ADR-016 §4); ships `0.10` |
+| `speed_scale_cap` | float | real-mode hard cap (ADR-016 §4), in `(0, 1]`; ships `0.10`. Raised only by an operator with evidence (MOT-09) |
 | `estop.kind` | str | fixed `"hardware"` — the record attests the physical e-stop circuit, never a ROS topic |
 | `estop.verified` | bool | ships `false` |
 | `estop.verified_utc`, `estop.operator` | str\|null | when/who verified it |
@@ -1413,47 +1421,93 @@ Ships uncommissioned (`commissioned: false`, both `verified` flags `false`). MOT
 | `preview_artifacts[]` | list[{path, sha256}] | the rendered preview(s) the operator reviewed |
 
 `G-APPROVAL` fails unless an approval file names the current trajectory's sha256 and
-`now - approved_utc <= execution.yaml.approval_max_age_s`.
+`now - approved_utc <= execution.yaml.approval_max_age_s`. It refuses only in `real` (§11.7).
 
 ### 11.6 Position-margin policy
 
 The hard pass/fail bound for every point's position, in every mode, is `[lower, upper]` inclusive from
-`config/robot/b601_dm_limits.yaml` — never narrowed. This is required because the SRDF's all-zero `home`
-sits with `joint2`/`joint3` exactly on `upper = 0.0`; narrowing the bound would fail the vendor's own
-canonical rest pose. `execution.yaml.position_margin_rad` does not change this pass/fail bound; it only (a)
-marks a point `near_limit: true` in the `G-LIMITS` detail when within `position_margin_rad` of either bound
-(informational) and (b) requires that any `near_limit` point's velocity in that joint be `<= 0` moving
-toward the bound it is near. `home`'s zero velocity passes (b) trivially; a point approaching a limit with
-nonzero velocity into it fails (b) even while still passing the inclusive bound in (a).
+`config/robot/b601_dm_limits.yaml`, and it is never narrowed. This is required because the SRDF's all-zero
+`home` sits with `joint2`/`joint3` exactly on `upper = 0.0`; narrowing the bound would fail the vendor's own
+canonical rest pose.
+
+`execution.yaml.position_margin_rad` (`m` below) does not change this bound. Per joint and point, with
+position `q`:
+
+- `near_upper` ⇔ `upper − q ≤ m`; `near_lower` ⇔ `q − lower ≤ m`. Both flags are reported in the
+  `G-LIMITS` detail (informational).
+- **Toward-bound speed** `w`: `w = +v` with respect to the upper bound and `w = −v` with respect to the
+  lower bound.
+- **Margin violation** (`kind: position_margin`): a near-limit point `i` that is not the last point, with
+  `w_i > 0` (moving toward the bound it is near) and `w_{i+1} > w_i` (speeding up toward it). The last
+  point is a violation only if it carries an explicit velocity with `w > 0`; without one it ends at rest.
+  Moving away (`w ≤ 0`) always passes. Arriving at an inclusive bound at constant or falling speed passes.
+- The rule is evaluated twice: once on the explicit `velocities` when present, and always on forward finite
+  differences, where `v_i = (q_{i+1} − q_i) / (t_{i+1} − t_i)` is the per-segment velocity the vendor
+  driver's linear interpolation commands. For the finite-difference pass, the last point has no forward
+  segment and is never a violation.
+- Uniform retiming (§11.7 `G-SPEED`) multiplies every `w` by the same `scale > 0`, so the outcome is the
+  same scaled or unscaled. It is evaluated on the unscaled file.
+
+**Home-approach example** (`m = 0.03`). `joint2` points `…, −0.04, −0.02, −0.01, 0.00` at `t_s` spacing that
+gives 0.10 rad/s on every segment. −0.02 and −0.01 are `near_upper` with `w = 0.10`. The following segment
+speed is 0.10, which is not greater, so they pass. 0.00 is the last point, on the inclusive bound, and
+passes with explicit velocity 0 or none. **The trajectory passes**, and so does any TOTG-style approach
+whose speed falls to 0 at home. Passing through the bound also passes: in `−0.20, −0.01, 0.00, −0.01, −0.20` (equal Δt), the first
+−0.01 has `w = +0.01/Δt` and the next segment's `w = −0.01/Δt` is not larger; from 0.00 on, `w < 0`. Counter-example: `−0.03 → −0.02` at
+0.10 rad/s, then `−0.02 → 0.00` at 0.20 rad/s, is a `position_margin` violation at −0.02, though every
+position is within bounds. The lower bound is the mirror image (`w = −v`).
 
 ### 11.7 Gate catalogue
 
-Categories: **offline** (file/config only, no ROS), **online read-only** (ROS graph/service queries that
-never command motion), **confirmation** (human-in-the-loop). `check` = evaluated, pass/fail recorded;
-`skip` = not evaluated in this mode, always reported as `skip`, never `pass`. **Every gate listed `check`
-for the active mode is evaluated and reported, even if an earlier gate already failed** — the executor
-does not stop at the first failure; a gate whose precondition gate failed (e.g. `G-LIMITS` when `G-TRAJ`
-failed) is reported with its own `error` outcome (not evaluable) rather than being silently dropped from
-the report. `real` passes only if every gate marked `check` for `real` reports `pass`.
+Categories: **offline** (file/config only, no ROS), **online read-only** (ROS graph/topic/service queries
+that never command motion), **confirmation** (human-in-the-loop). **Every gate listed for the active mode
+is evaluated and reported, even if an earlier gate already failed.** The executor does not stop at the
+first failure. A gate whose precondition gate failed (e.g. `G-LIMITS` when `G-TRAJ` failed) is reported
+with outcome `error` (not evaluable) rather than being dropped from the report.
+
+**Outcomes** (`gate_report[].outcome`, §11.9):
+
+| Outcome | Meaning |
+|---|---|
+| `pass` | evaluated; this mode's rule holds |
+| `fail` | evaluated; this mode's rule is violated, so this mode refuses |
+| `warn` | evaluated in `mock`/`dry`; this mode's rule holds but the `real` rule would fail. Only reported, never refuses. Never produced in `real` |
+| `skip` | not evaluated in this mode (real-only gates in `mock`/`dry`). Never `pass` |
+| `error` | could not be evaluated (precondition gate failed, unreadable input). Refuses like `fail` |
+
+**Refusal rule, every mode:** the run refuses (exit 3, record `outcome: refused`, nothing sent to any
+driver) iff at least one gate reports `fail` or `error`. `real` therefore proceeds only if every gate in the
+table reports `pass`. `mock` and `dry` proceed with `warn` entries present.
+
+**`dry` rehearsal of `real`:** besides its own `gate_report`, `dry` evaluates the offline real-only gates
+`G-ARM`, `G-COMMISSIONING` and `G-ESTOP` with `real`'s rules. It writes them to the record's
+`real_preview[]`, and their outcomes are never copied into `gate_report`, where they stay `skip`. It also
+sets `would_refuse_in_real` to the ids of every `warn` gate plus every failing `real_preview` gate.
+`G-CONFIRM` is interactive and is never previewed. `dry` exits **0** when no gate reports `fail`/`error`,
+however long `would_refuse_in_real` is. `mock` reports `warn` the same way, but has no `real_preview`.
+
+In the table, **refuse** = a violation is `fail`; **warn** = a violation is `warn`; `skip` = not evaluated.
+"Integrity" violations refuse in every mode. "Authorization/commissioning" violations refuse only in
+`real`.
 
 | Gate | Category | mock | dry | real | Checks |
 |---|---|---|---|---|---|
-| `G-ARM` | confirmation | skip | skip | check | env `CRACKVISION_ARM_REAL=1` set |
-| `G-TRAJ` | offline | check | check | check | trajectory file matches `crackvision.joint_trajectory/1` schema; `real` additionally refuses `purpose: "test"` |
-| `G-LIMITS-HASH` | offline | check | check | check | trajectory's `limits_file.sha256`, when non-null, equals current `b601_dm_limits.yaml` sha256; null passes only outside `real` |
-| `G-LIMITS` | offline | check | check | check | every point's positions/velocities/accelerations, after `speed_scale` retiming, within `b601_dm_limits.yaml` (§11.6), checked both from the point's explicit `velocities`/`accelerations` fields and from finite-differencing `positions` over `t_s` |
-| `G-SPEED` | offline | check | check | check | effective `speed_scale <=` the mode-appropriate cap (`execution.yaml` for mock/dry, `commissioning.yaml.speed_scale_cap` for real) |
-| `G-SCENE` | offline | check | check | check | `scene_core.load_config` succeeds; `real` additionally requires `scene_core.assert_commissioning_ready` (all `measured`) |
-| `G-EE` | offline | check | check | check | `end_effector.load_config` succeeds; `real` additionally requires `end_effector.assert_commissioning_ready` (all `measured`) |
-| `G-COMMISSIONING` | offline | skip | skip | check | `commissioning.yaml.commissioned == true` and `limits_file_sha256` matches current `b601_dm_limits.yaml` |
-| `G-ESTOP` | offline | skip | skip | check | `commissioning.yaml.estop.kind == "hardware"` and `estop.verified == true` |
-| `G-ELIGIBLE` | offline | check | check | check | when `source.paths3d` is present: its recorded `execution_eligible == true` and its `sha256` matches the paths3d file's current sha256 |
-| `G-APPROVAL` | offline | check | check | check | §11.5 |
-| `G-STALE-CONFIG` | offline | check | check | check | trajectory's `end_effector_config_sha256`/`scene_config_sha256`, when non-null, match the *current* config files |
-| `G-GRAPH` | online read-only | check | check | check | driver-profile node-identity discrimination (§11.1): mock/vendor_mock refuse if `reBotArmController` is visible; vendor refuses unless `reBotArmController` is the server and no `mock_rebotarm_driver` is visible |
-| `G-START-STATE` | online read-only | check | check | check | live `joint_states` fresher than `timeouts.joint_state_s`; current position within `tolerances.start_state_rad` of the trajectory's first point |
-| `G-COLLISION` | online read-only | check | check | check | densified waypoints (§11.12) valid via the MOT-02 mock stack's `/check_state_validity`, production scene applied, explicit `RobotState` per query (ADR-016 Decision §11) |
-| `G-CONFIRM` | confirmation | skip | skip | check | typed phrase (§11.8) |
+| `G-ARM` | confirmation | skip | skip (previewed) | refuse | env `CRACKVISION_ARM_REAL=1` set (the literal variable, read from the process environment) |
+| `G-TRAJ` | offline | refuse | refuse | refuse | file matches the `crackvision.joint_trajectory/1` schema (§11.2). `purpose: "test"`: **warn** in mock/dry, **refuse** in real |
+| `G-LIMITS-HASH` | offline | refuse | refuse | refuse | non-null `limits_file.sha256` ≠ current `b601_dm_limits.yaml` sha256: refuse in every mode. `null`: **warn** in mock/dry, **refuse** in real |
+| `G-LIMITS` | offline | refuse | refuse | refuse | **(1) unscaled**: the file's trajectory at scale 1.0 is within `b601_dm_limits.yaml` positions (inclusive), velocities and accelerations, plus the §11.6 margin rule. **(2) scaled**: after retiming at the effective `speed_scale` `s`, every velocity is `≤ s · velocity_limit` and every acceleration `≤ s² · acceleration_limit`. Both are checked from explicit `velocities`/`accelerations` when present and always from finite differences of `positions` over `t_s`. (2) follows from (1) and is a cross-check on retiming. A file over the limits at scale 1.0 is refused whatever `s` is |
+| `G-SPEED` | offline | refuse | refuse | refuse | effective `s` (`--speed-scale`, else the mode default: `speed_scale.default` for mock, `speed_scale.real_default` for dry/real) must be in `(0, cap]`. mock/dry cap = `execution.yaml.speed_scale.cap`; real cap = `commissioning.yaml.speed_scale_cap`. **Refuse, never clamp.** In dry, `s > commissioning.yaml.speed_scale_cap` (or an unreadable record) is **warn** |
+| `G-SCENE` | offline | refuse | refuse | refuse | `scene_core.load_config` succeeds (refuse in every mode). `scene_core.assert_commissioning_ready` raises: **warn** in mock/dry, **refuse** in real, with the exception message |
+| `G-EE` | offline | refuse | refuse | refuse | `end_effector.load_config` succeeds (refuse in every mode). `end_effector.assert_commissioning_ready` raises: **warn** in mock/dry, **refuse** in real, with the exception message |
+| `G-COMMISSIONING` | offline | skip | skip (previewed) | refuse | `commissioning.yaml` loads, `commissioned == true`, and `limits_file_sha256` matches the current `b601_dm_limits.yaml` |
+| `G-ESTOP` | offline | skip | skip (previewed) | refuse | `commissioning.yaml.estop.kind == "hardware"` and `estop.verified == true` |
+| `G-ELIGIBLE` | offline | refuse | refuse | refuse | **Integrity (refuse in every mode):** when `source.paths3d` is non-null, the file at `source.paths3d.path` (resolved against `--root`) exists, its sha256 equals `source.paths3d.sha256`, and it parses as `crackvision.paths3d/1`. **Eligibility (only after the sha check passes; read from the file, never from the trajectory's copy):** the file's `execution_eligible` must be `true`, and its `ineligible_reasons` go into the detail. A trajectory copy of `execution_eligible` that differs from the file also counts as an eligibility failure. `purpose: "crack_task"` with `source.paths3d: null` is also an eligibility failure. Eligibility failures: **warn** in mock/dry, **refuse** in real |
+| `G-APPROVAL` | offline | warn | warn | refuse | §11.5: an approval names the trajectory sha256 and is within `approval_max_age_s`. Missing, mismatched or expired approval: **warn** in mock/dry, **refuse** in real |
+| `G-STALE-CONFIG` | offline | refuse | refuse | refuse | non-null `end_effector_config_sha256`/`scene_config_sha256` ≠ the current `config/robot/end_effector.yaml`/`config/scene/scene.yaml` sha256: **refuse in every mode** (replan). `null` either one: **warn** in mock/dry, **refuse** in real |
+| `G-GRAPH` | online read-only | refuse | refuse | refuse | driver-profile node-identity discrimination (§11.1). `moveit_mock`/`vendor_mock` refuse if `reBotArmController` is visible. `vendor` refuses unless `reBotArmController` hosts the action server and no `mock_rebotarm_driver` is visible. `vendor` also refuses if any publisher exists on `/rebotarm/joints/*/cmd/*` or `/rebotarm/gripper/cmd/*` |
+| `G-START-STATE` | online read-only | refuse | refuse | refuse | live `joint_states` on the profile topic are fresher than `timeouts.joint_state_s`, and the current position is within `tolerances.start_state_rad` of the first point (refuse in every mode). `vendor` profile only: the latched `/rebotarm/arm_status` must be received, with `enabled == true`, `state_machine == "IDLE"` and empty `error_codes`. A violation is **warn** in dry and **refuse** in real. The executor never calls `enable` |
+| `G-COLLISION` | online read-only | refuse | refuse | refuse | densified waypoints (§11.12) valid via the MOT-02 mock stack's `/check_state_validity`, production scene applied, explicit `RobotState` per query (§11.11) |
+| `G-CONFIRM` | confirmation | skip | skip | refuse | typed phrase (§11.8); asked only after every other gate passed |
 
 ### 11.8 Confirmation, monitoring and e-stop
 
@@ -1462,44 +1516,91 @@ Confirmation phrase: `EXECUTE <first 8 hex chars of the trajectory's sha256>`, t
 effective `speed_scale` are printed immediately before the prompt. No flag, env var or non-tty input
 satisfies `G-CONFIRM`; no controlling tty is a refusal (exit 3), not a fallback.
 
-E-stop sources, each treated identically: a `True` message on any topic in `execution.yaml.estop_topics`
+E-stop triggers, each treated identically: a `True` message on any topic in `execution.yaml.estop_topics`
 (default `/crackvision/estop`, `/rebot_motion/estop`, `std_msgs/Bool`), `SIGINT`/`SIGTERM`, `joint_states`
-staleness beyond `timeouts.joint_state_s`, or tracking error beyond `tolerances.tracking_rad`. Response, in
-order: cancel the active `follow_joint_trajectory` goal, then call `/{ns}/disable`
-(ADR-016 Decision §7 — vendor precedent `motion_runner.py:124-134`). **The physical/hardware e-stop is the
-safety function this project relies on; `/crackvision/estop` and `/rebot_motion/estop` are secondary,
-software-only conveniences** that depend on the ROS graph being alive. `commissioning.yaml.estop.kind` is
-fixed to `"hardware"` and `G-ESTOP` checks that the physical circuit was verified, not either topic.
+staleness beyond `timeouts.joint_state_s`, tracking error beyond `tolerances.tracking_rad`, or a goal running
+longer than `timeouts.goal_s`.
+
+**Response: cancel and hold. No trigger disables** (ADR-016 Decision §7):
+1. Cancel the active `follow_joint_trajectory` goal. The vendor driver then holds the measured position with
+   torque on (`ros_actions.py:175-180` → `hardware_manager.py:237-241`).
+2. Watch `joint_states` until the arm has stopped: max per-joint `|Δq|` < `tolerances.start_state_rad`
+   across a window of `timeouts.joint_state_s`, reached within `timeouts.cancel_settle_s` of the cancel.
+3. If the cancel is not acknowledged, the arm does not settle within `timeouts.cancel_settle_s`, or
+   `joint_states` are stale, print **"PRESS THE HARDWARE E-STOP"**. Software cannot do more safely.
+4. Write the record (`outcome: estopped`, or `aborted` for tracking/timeout/driver loss) and exit 1.
+
+The executor **never** calls `/{ns}/disable` or any other vendor service, during an e-stop or at teardown.
+On exit the arm is left energised and holding. Bringing it to rest is the operator's job, using the vendor
+sequence (safe_home or park, *then* disable), or the hardware e-stop. That stays so until MOT-09 confirms
+on the physical unit that `disable` brings the arm to a safe rest.
+
+**The physical/hardware e-stop is the safety function this project relies on; `/crackvision/estop` and
+`/rebot_motion/estop` are secondary, software-only conveniences** that depend on the ROS graph being alive.
+`commissioning.yaml.estop.kind` is fixed to `"hardware"` and `G-ESTOP` checks that the physical circuit
+was verified, not either topic.
 
 ### 11.9 Execution record `crackvision.execution_record/1`
 
 Written in **every** mode, including on refusal, to `logs/execution/<stamp>_<mode>_<sha8>.json`
-(`<sha8>` = first 8 hex chars of the trajectory sha256). The §0.4 `logs/<tool>_*.log`/`.json` artefacts are
-written in addition, not instead.
+(`<sha8>` = first 8 hex chars of the trajectory sha256; directory overridable with `--record-dir`). The
+§0.4 `logs/<tool>_*.log`/`.json` artefacts are written in addition, not instead. `--dry-run` writes
+neither (§11.10).
 
 | Field | Type | Meaning |
 |---|---|---|
 | `schema` | str | `"crackvision.execution_record/1"` |
 | `mode`, `driver_profile` | str | as invoked |
 | `trajectory_sha256` | str | |
-| `gate_report[]` | list[{gate, category, outcome, detail}] | one entry per §11.7 row, `outcome` ∈ `pass\|fail\|skip\|error` |
-| `input_shas` | object | every sha256 this run read: trajectory, limits file, end_effector config, scene config, commissioning record, approval file |
+| `gate_report[]` | list[{gate, category, outcome, detail}] | one entry per §11.7 row, `outcome` ∈ `pass\|fail\|warn\|skip\|error` |
+| `real_preview[]` | list[{gate, category, outcome, detail}] | `dry` only (§11.7): `G-ARM`, `G-COMMISSIONING`, `G-ESTOP` evaluated with `real`'s rules; `[]` in other modes |
+| `would_refuse_in_real` | list[str] | gate ids `real` would refuse (`warn` gates plus failing `real_preview` gates); `[]` in `real` |
+| `input_shas` | object | every sha256 this run read: trajectory, limits file, end_effector config, scene config, commissioning record, approval file, paths3d file |
 | `effective_speed_scale` | float | |
-| `outcome` | str | `refused \| aborted \| estopped \| completed` |
+| `outcome` | str | `refused \| rehearsed \| aborted \| estopped \| completed`. `rehearsed` = a `dry` run with no refusal |
 | `joint_trace[]` | list | sampled `{t_s, commanded[6], actual[6]}`, sampling rate from `execution.yaml` (not separately specified here — MOT-05.6 picks it; must be dense enough to reconstruct tracking-error decisions) |
 
 ### 11.10 `execute_trajectory` CLI
 
+`execute_trajectory` is a console-script entry point of the `crackvision_motion` ROS package (MOT-05.4). It
+runs under `/usr/bin/python3` with ROS Humble, never under the conda interpreter that `./env.sh` scrubs ROS
+from (ADR-007):
+
 ```bash
-./env.sh python -m crackvision.execute_trajectory --trajectory PATH [--mode mock|dry|real]
-    [--driver-profile moveit_mock|vendor_mock|vendor] [--approval PATH] [other §0.3 flags]
+source scripts/ros/env_ros.sh                  # scrubbed ROS Humble + ~/rebot_ws underlay
+set +u; source ros2_ws/install/setup.bash      # crackvision overlay
+ros2 run crackvision_motion execute_trajectory --trajectory PATH [--mode mock|dry|real]
+    [--profile moveit_mock|vendor_mock|vendor] [--speed-scale S] [--approval PATH]
+    [--execution-config PATH] [--commissioning PATH] [--limits PATH] [--scene-config PATH]
+    [--end-effector-config PATH] [--service-timeout-s SEC] [--record-dir DIR] [§0.3 flags]
 ```
 
-Exit codes (§0.2): `0` completed; `1` runtime failure (aborted, e-stopped, tracking violation, action
-failure); `2` usage/config error; `3` precondition not met (any `G-*` gate refusal, a required service/topic
-missing). `--dry-run` (§0.3): offline gates only (`G-TRAJ` through `G-STALE-CONFIG`), no ROS node
-constructed, nothing written, exit 0 regardless of gate outcome — distinct from `--mode dry`, which runs
-the full online gate set, requires ROS, and always writes §11.9's record.
+`--mode` default `execution.yaml.default_mode` (ships `dry`); `--profile` default
+`execution.yaml.default_driver_profile`; `--speed-scale` default per mode (§11.7 `G-SPEED`; `real`/`dry`:
+`speed_scale.real_default` = 0.10); config paths default to `config/motion/execution.yaml`,
+`config/robot/commissioning.yaml`, `config/robot/b601_dm_limits.yaml`, `config/scene/scene.yaml` and
+`config/robot/end_effector.yaml` under `--root`; `--record-dir` default `logs/execution`.
+
+Order: the offline gates run first, before `rclpy.init()`. If any offline gate refuses, no ROS node is
+created and nothing is sent. Online gates follow. `dry` stops after them. `mock` sends the goal. `real`
+asks `G-CONFIRM` and then sends the goal under §11.8 monitoring.
+
+Exit codes (§0.2), per mode:
+
+| Code | mock | dry | real |
+|---|---|---|---|
+| `0` | goal completed and arrival verified | no gate `fail`/`error` (`warn`, `real_preview` failures and a non-empty `would_refuse_in_real` allowed) | goal completed and arrival verified |
+| `1` | runtime: aborted, e-stopped, tracking violation, goal timeout, action failure | runtime failure while running online checks (node crash, unexpected exception) | as mock |
+| `2` | usage/config error, incl. a mode/profile pair outside §11.1 | same | same |
+| `3` | any gate `fail`/`error`, or a required service/topic missing | same | same, incl. `G-ARM`/`G-CONFIRM` (no tty) refusals |
+
+`--dry-run` (§0.3) evaluates only the offline gates (`G-TRAJ` through `G-STALE-CONFIG`, with the active
+mode's rules), in-process, before `rclpy.init()`. It constructs no node, contacts no ROS graph, writes no
+record or log file, and exits 0 regardless of gate outcome, printing the report to stdout. It still uses
+the ROS entry point above to resolve the console script. The offline gate itself lives in the ROS-free
+module `crackvision_motion.execution_gate` (MOT-05.3), which runs under system `python3` without a ROS graph
+or colcon build. `--mode dry` is different: it runs the full online gate set, requires ROS, and always
+writes the §11.9 record.
 
 ### 11.11 Real-mode collision-validity topology
 
@@ -1517,11 +1618,16 @@ state explicitly; the oracle contributes only its collision/self-collision geome
 
 | Parameter | Default | Rationale |
 |---|---|---|
-| `tolerances.start_state_rad` | 0.02 rad | Must be tight: this checks the robot is *already* at the trajectory's first point before any goal is sent, not that a move *completed* — a fraction of the vendor stack's own 0.06 rad arrival tolerance (`motion_runner.py` `tol_rad`), which is itself an arrival (not a starting) tolerance. |
+| `speed_scale.real_default` | 0.10 | Real and dry runs default to the shipped commissioning cap: a real run at the default moves at ≤ 10% of the velocity limits and ≤ 1% of the acceleration limits, which `G-LIMITS` (1)+(2) check. Raising it beyond `commissioning.yaml.speed_scale_cap` is refused, not clamped. |
+| `speed_scale.default` | 1.0 | Mock only. The unscaled file is already within the limits (`G-LIMITS` (1)), and no torque is at stake. Full speed keeps mock smoke runs short. |
+| `speed_scale.cap` | 1.0 | Mock/dry cap. Uniform retiming never speeds a trajectory up, so 1.0 is the natural upper bound. Dry also reports `warn` above the real cap. |
+| `tolerances.start_state_rad` | 0.02 rad | Must be tight: this checks the robot is *already* at the trajectory's first point before any goal is sent, not that a move *completed* — a fraction of the vendor stack's own 0.06 rad arrival tolerance (`motion_runner.py` `tol_rad`), which is itself an arrival (not a starting) tolerance. Also the post-cancel "stopped" threshold (§11.8). |
 | `tolerances.tracking_rad` | 0.15 rad | Must sit strictly between the vendor's own arrival tolerance (0.06 rad) and its hard-fail tolerance (0.20 rad, `motion_runner.py` `fail_tol_rad`) so this executor's independent tracking cancel fires before any vendor-side hard failure, while staying loose enough that ordinary planned-motion lag under `speed_scale` retiming doesn't spuriously trip it. |
 | `timeouts.joint_state_s` | 0.5 s | `joint_states` publishes at 50 Hz (mock driver) to 100 Hz (`reBotArmController`'s `joint_state_rate` default); 0.5 s is 25–50 missed publishes — generous against network/scheduler jitter, far faster than human reaction time for a dead driver. |
+| `timeouts.cancel_settle_s` | 2.0 s | At the 0.10 real cap the arm moves slowly, and the driver's hold (`ros_actions.py:175-176`) acts within one 20 ms control tick (`ros_actions.py:184`). 2 s leaves a wide margin for that and is still short enough that the operator is told to press the hardware e-stop promptly if the hold does not take. |
+| `timeouts.goal_s` | scaled trajectory duration + 5 s | A goal still running 5 s after its last scaled `t_s` is stuck. Cancel and hold (§11.8). |
 | `densify_step_m` | 0.01 m | Max tool-tip Cartesian displacement between consecutive `G-COLLISION`-checked configurations before an extra linearly-interpolated joint configuration is inserted; chosen below both the trace clearance (0.01 m, ADR-014 §2) and the end-effector collision padding (0.005 m, `end_effector.yaml`), so any swept collision this could still miss is already smaller than margins the system carries elsewhere. |
-| `position_margin_rad` | 0.03 rad (≈1.7°) | Informational near-limit threshold (§11.6), not a bound narrowing; picked as roughly half the smallest joint's own position tolerance band used elsewhere in the vendor stack, small enough not to flag ordinary mid-range motion. |
+| `position_margin_rad` | 0.03 rad (≈1.7°) | Near-limit threshold for the §11.6 approach rule, not a bound narrowing. It equals the vendor's own `safe_park_tolerance_rad` default (`rebotarm_controller.py:39`), small enough not to flag ordinary mid-range motion, and wide enough to cover the last segments of an approach to home. |
 | `approval_max_age_s` | 3600 s (1 h) | Long enough for an operator to review a MOT-08 preview and walk to the workstation without re-approving; short enough that a stale approval can't silently authorize a run on a physically-rearranged cell later the same day (sha-bindings catch *file* changes; this bounds the *time* window for unrecorded physical changes). |
 
 ---
