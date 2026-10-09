@@ -2,7 +2,7 @@
 
 One folder per week: a summary (`README.md`) plus one page per completed task describing what was done, why, how it moves the project forward and what it unlocks next. Every task listed here passed automated checks and an independent audit of the exact commit.
 
-**Overall: 51/104 tasks accepted.**
+**Overall: 52/104 tasks accepted.**
 
 ## Weeks
 
@@ -17,5 +17,5 @@ One folder per week: a summary (`README.md`) plus one page per completed task de
 | calibration | 11 | 22 |
 | camera | 6 | 12 |
 | physical | 0 | 6 |
-| simulation | 8 | 23 |
+| simulation | 9 | 23 |
 | software | 24 | 35 |
