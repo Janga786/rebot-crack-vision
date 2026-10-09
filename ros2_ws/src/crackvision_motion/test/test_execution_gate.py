@@ -437,6 +437,160 @@ def test_error_for_limits_when_traj_cannot_load(tmp_path):
 
 
 # --------------------------------------------------------------------------------------
+# MOT-05.3.R1 attempt-1 feedback: dry-mode G-SPEED previews the commissioning cap as warn
+# --------------------------------------------------------------------------------------
+
+def test_dry_speed_above_commissioning_cap_warns(tmp_path):
+    # repo commissioning.yaml cap is 0.10; 0.5 is within execution.yaml's cap (1.0) but above it.
+    report = evaluate_offline("dry", TRAJECTORY_SMOKE, **_common_kwargs(tmp_path, speed_scale=0.5))
+    assert _get(report, G_SPEED).outcome == "warn"
+    assert report.passed
+
+
+def test_dry_speed_unreadable_commissioning_warns(tmp_path):
+    bad_commissioning = _unparseable_yaml(tmp_path, "bad_commissioning.yaml")
+    report = evaluate_offline(
+        "dry", TRAJECTORY_SMOKE,
+        **_common_kwargs(tmp_path, commissioning_path=bad_commissioning, speed_scale=0.5),
+    )
+    assert _get(report, G_SPEED).outcome == "warn"
+    assert report.passed
+
+
+def test_dry_speed_within_commissioning_cap_passes(tmp_path):
+    report = evaluate_offline("dry", TRAJECTORY_SMOKE, **_common_kwargs(tmp_path, speed_scale=0.05))
+    assert _get(report, G_SPEED).outcome == "pass"
+    assert report.passed
+
+
+def test_mock_speed_above_commissioning_cap_unaffected(tmp_path):
+    # mock never consults the commissioning record at all.
+    report = evaluate_offline("mock", TRAJECTORY_SMOKE, **_common_kwargs(tmp_path, speed_scale=0.5))
+    assert _get(report, G_SPEED).outcome == "pass"
+
+
+# --------------------------------------------------------------------------------------
+# MOT-05.3.R1 attempt-1 feedback: strict loaders raise GateConfigError (not TypeError) on a
+# non-mapping section, and evaluate_offline reports 'error' rather than raising
+# --------------------------------------------------------------------------------------
+
+def test_load_execution_config_rejects_non_mapping_speed_scale(tmp_path):
+    import yaml
+
+    raw = yaml.safe_load(PRODUCTION_EXECUTION_CONFIG.read_text())
+    raw["speed_scale"] = 0.5
+    bad = tmp_path / "execution.yaml"
+    bad.write_text(yaml.safe_dump(raw))
+    with pytest.raises(GateConfigError):
+        load_execution_config(bad)
+
+
+def test_load_execution_config_rejects_non_mapping_tolerances(tmp_path):
+    import yaml
+
+    raw = yaml.safe_load(PRODUCTION_EXECUTION_CONFIG.read_text())
+    raw["tolerances"] = 1.0
+    bad = tmp_path / "execution.yaml"
+    bad.write_text(yaml.safe_dump(raw))
+    with pytest.raises(GateConfigError):
+        load_execution_config(bad)
+
+
+def test_load_execution_config_rejects_non_mapping_driver_profile(tmp_path):
+    import yaml
+
+    raw = yaml.safe_load(PRODUCTION_EXECUTION_CONFIG.read_text())
+    raw["driver_profiles"]["vendor"] = "not a mapping"
+    bad = tmp_path / "execution.yaml"
+    bad.write_text(yaml.safe_dump(raw))
+    with pytest.raises(GateConfigError):
+        load_execution_config(bad)
+
+
+def test_load_commissioning_rejects_non_mapping_estop(tmp_path):
+    import yaml
+
+    raw = yaml.safe_load(PRODUCTION_COMMISSIONING.read_text())
+    raw["estop"] = "not a mapping"
+    bad = tmp_path / "commissioning.yaml"
+    bad.write_text(yaml.safe_dump(raw))
+    with pytest.raises(GateConfigError):
+        load_commissioning(bad)
+
+
+def test_non_mapping_speed_scale_in_execution_config_does_not_raise(tmp_path):
+    import yaml
+
+    raw = yaml.safe_load(PRODUCTION_EXECUTION_CONFIG.read_text())
+    raw["speed_scale"] = 0.5
+    bad = tmp_path / "execution.yaml"
+    bad.write_text(yaml.safe_dump(raw))
+    report = evaluate_offline(
+        "dry", TRAJECTORY_SMOKE, **_common_kwargs(tmp_path, execution_config_path=bad)
+    )
+    assert not report.passed
+    assert _get(report, G_SPEED).outcome == "error"
+    assert _get(report, G_LIMITS).outcome == "error"
+
+
+# --------------------------------------------------------------------------------------
+# MOT-05.3.R1 attempt-1 feedback: non-UTF-8 input files become 'error', never raise
+# --------------------------------------------------------------------------------------
+
+def _non_utf8_file(tmp_path, name: str) -> Path:
+    path = tmp_path / name
+    path.write_bytes(b"\xff\xfe\x00bad")
+    return path
+
+
+def test_non_utf8_trajectory_does_not_raise(tmp_path):
+    bad_traj = _non_utf8_file(tmp_path, "bad_traj.json")
+    report = evaluate_offline("real", bad_traj, **_common_kwargs(tmp_path))
+    assert not report.passed
+    assert _get(report, G_TRAJ).outcome == "error"
+
+
+def test_non_utf8_scene_config_does_not_raise(tmp_path):
+    bad_scene = _non_utf8_file(tmp_path, "bad_scene.yaml")
+    report = evaluate_offline(
+        "real", TRAJECTORY_SMOKE, **_common_kwargs(tmp_path, scene_config_path=bad_scene)
+    )
+    assert not report.passed
+    assert _get(report, G_SCENE).outcome == "error"
+
+
+def test_non_utf8_end_effector_config_does_not_raise(tmp_path):
+    bad_ee = _non_utf8_file(tmp_path, "bad_ee.yaml")
+    report = evaluate_offline(
+        "real", TRAJECTORY_SMOKE, **_common_kwargs(tmp_path, end_effector_config_path=bad_ee)
+    )
+    assert not report.passed
+    assert _get(report, G_EE).outcome == "error"
+
+
+def test_non_utf8_commissioning_record_does_not_raise(tmp_path):
+    bad_commissioning = _non_utf8_file(tmp_path, "bad_commissioning.yaml")
+    report = evaluate_offline(
+        "real", TRAJECTORY_SMOKE,
+        **_common_kwargs(tmp_path, commissioning_path=bad_commissioning, env=_ARM_REAL),
+    )
+    assert not report.passed
+    assert _get(report, G_COMMISSIONING).outcome == "error"
+    assert _get(report, G_ESTOP).outcome == "error"
+    assert _get(report, G_SPEED).outcome == "error"
+
+
+def test_non_utf8_approval_file_does_not_raise(tmp_path):
+    bad_approval = _non_utf8_file(tmp_path, "bad_approval.json")
+    report = evaluate_offline(
+        "real", TRAJECTORY_SMOKE,
+        **_common_kwargs(tmp_path, approval_path=bad_approval, env=_ARM_REAL),
+    )
+    assert not report.passed
+    assert _get(report, G_APPROVAL).outcome == "fail"
+
+
+# --------------------------------------------------------------------------------------
 # confirmation helpers (pure)
 # --------------------------------------------------------------------------------------
 
