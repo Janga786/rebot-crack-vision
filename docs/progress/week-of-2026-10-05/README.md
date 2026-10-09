@@ -1,6 +1,6 @@
 # Progress — week of Mon Oct 05 – Sun Oct 11, 2026
 
-**18 task(s) completed and independently audited this week** · project total **62/104** accepted
+**19 task(s) completed and independently audited this week** · project total **53/104** accepted
 
 ## Completed this week
 
@@ -40,10 +40,12 @@
 …[526 chars clipped]
 - **MOT-05.4 — execute_trajectory ROS node/CLI: online read-only checks, mock/dry/real execution, typed confirmation, e-stop + tracking monitor, execution record** ([details](MOT-05.4.md)): Implemented execute_trajectory, the ADR-016/§11 commissioning-gated-execution ROS node/CLI for crackvision_motion. It runs the MOT-05.3 offline gate before any rclpy.init() call, then online read-only
 …[571 chars clipped]
+- **MOT-10.3 — survey_to_scene CLI: survey → scene.yaml (+ verify configs at the measured pose), drift check; decouple scene tests from the production scene's nominal state** ([details](MOT-10.3.md)): Built the survey_to_scene tool that turns a physically-measured workcell survey into the robot's collision-safety scene file, replacing engineering guesses with real tape-measure/caliper numbers. It c
+…[390 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 28 / 115
+- Implementation/review sessions run: 29 / 116
 - Audits that rejected work with evidence-backed findings: 9 (repairs created: 7)
 - Re-verified after an upstream change: CAM-02, CAM-05.1, CAM-05.2, GEOM-01, GEOM-01.R1, GEOM-08.1, GEOM-08.2, GEOM-08.2.R1, GEOM-08.5, GEOM-08.5.R1, GEOM-08.6, GEOM-08.7, GEOM-08.8, GEOM-08.8.R1, GEOM-10, MOT-02, MOT-03, MOT-04.1, MOT-04.1.R1, MOT-04.2, MOT-04.3, MOT-04.3.R1, MOT-04.4, MOT-04.4.R1, MOT-04.6, MOT-05.1, MOT-05.1.R1, MOT-05.2, MOT-10.1, MOT-10.1.R1, PERC-03, PERC-03.R1, TC-011, TC-016
 
@@ -61,8 +63,8 @@
 | Local coding model (L-LLM) | 2 | 6 |
 | D405 capture (L-CAM) | 7 | 9 |
 | Perception (L-PERC) | 13 | 16 |
-| Geometry & calibration (L-GEOM) | 15 | 24 |
-| Motion planning (L-MOTION) | 15 | 27 |
+| Geometry & calibration (L-GEOM) | 14 | 24 |
+| Motion planning (L-MOTION) | 7 | 27 |
 | Integration & commissioning (L-INT) | 1 | 6 |
 | Operator workflow & handoff (L-OPS) | 1 | 4 |
 | Imitation learning (later phase) (L-IL) | 0 | 1 |
