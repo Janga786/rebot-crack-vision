@@ -222,6 +222,104 @@ def test_depth_shape_match_loads(tmp_path: Path):
     assert arr.dtype == np.uint16
 
 
+def test_kinematic_model_sha_mismatch_refused(tmp_path: Path):
+    ee = _end_effector()
+    doc = _base_doc(tmp_path, ee=ee, kinematic_sha="f" * 64)
+    path = tmp_path / "case_a_capture.json"
+    write_record(doc, path)
+    with pytest.raises(CaptureRecordError, match="kinematic_model.sha256"):
+        load_capture_record(path, root=tmp_path, end_effector=ee)
+
+
+def test_case_map_downscaled_refused(tmp_path: Path):
+    ee = _end_effector()
+    doc = _base_doc(tmp_path, ee=ee)
+    path = tmp_path / "case_a_capture.json"
+    write_record(doc, path)
+    case_map_path = tmp_path / "data" / "case_map.json"
+    case_map_path.parent.mkdir(parents=True, exist_ok=True)
+    case_map_path.write_text(
+        json.dumps({"cases": [{"case_id": "case_a", "downscaled": True}]}), encoding="utf-8"
+    )
+    with pytest.raises(CaptureRecordError, match="downscaled|§0.5"):
+        load_capture_record(path, root=tmp_path, end_effector=ee)
+
+
+def test_image_hw_mismatch_against_depth_png_refused(tmp_path: Path):
+    ee = _end_effector()
+    doc = _base_doc(tmp_path, ee=ee)
+    path = tmp_path / "case_a_capture.json"
+    write_record(doc, path)
+    _write_depth(tmp_path, "data/d405/depth/case_a_depth.png", shape=(10, 10))
+    with pytest.raises(CaptureRecordError, match="depth PNG"):
+        load_capture_record(path, root=tmp_path, end_effector=ee)
+
+
+def test_image_hw_mismatch_against_colour_image_refused(tmp_path: Path):
+    ee = _end_effector()
+    doc = _base_doc(tmp_path, ee=ee)
+    doc["source"] = {
+        "kind": "d405_metadata",
+        "ref": "data/d405/metadata/case_a.json",
+        "frame_index": 0,
+    }
+    color_rel = "data/d405/color/case_a_color.png"
+    color_path = tmp_path / color_rel
+    color_path.parent.mkdir(parents=True, exist_ok=True)
+    Image.fromarray(np.zeros((10, 10, 3), dtype=np.uint8)).save(color_path)
+    meta_path = tmp_path / "data" / "d405" / "metadata" / "case_a.json"
+    meta_path.parent.mkdir(parents=True, exist_ok=True)
+    meta_path.write_text(json.dumps({"files": {"color": color_rel}}), encoding="utf-8")
+    path = tmp_path / "case_a_capture.json"
+    write_record(doc, path)
+    with pytest.raises(CaptureRecordError, match="colour image"):
+        load_capture_record(path, root=tmp_path, end_effector=ee)
+
+
+def test_image_hw_mismatch_against_mask_refused(tmp_path: Path):
+    ee = _end_effector()
+    doc = _base_doc(tmp_path, ee=ee)
+    path = tmp_path / "case_a_capture.json"
+    write_record(doc, path)
+    mask_path = tmp_path / "data" / "overlays" / "case_a_mask.png"
+    mask_path.parent.mkdir(parents=True, exist_ok=True)
+    Image.fromarray(np.zeros((10, 10), dtype=np.uint8)).save(mask_path)
+    with pytest.raises(CaptureRecordError, match="mask"):
+        load_capture_record(path, root=tmp_path, end_effector=ee)
+
+
+def test_image_hw_mismatch_against_paths_json_refused(tmp_path: Path):
+    ee = _end_effector()
+    doc = _base_doc(tmp_path, ee=ee)
+    path = tmp_path / "case_a_capture.json"
+    write_record(doc, path)
+    paths_json_path = tmp_path / "data" / "paths" / "case_a_paths.json"
+    paths_json_path.parent.mkdir(parents=True, exist_ok=True)
+    paths_json_path.write_text(
+        json.dumps({"image_height": 10, "image_width": 10}), encoding="utf-8"
+    )
+    with pytest.raises(CaptureRecordError, match="paths.json"):
+        load_capture_record(path, root=tmp_path, end_effector=ee)
+
+
+def test_image_hw_consistency_passes_when_artefacts_match(tmp_path: Path):
+    ee = _end_effector()
+    doc = _base_doc(tmp_path, ee=ee)
+    path = tmp_path / "case_a_capture.json"
+    write_record(doc, path)
+    _write_depth(tmp_path, "data/d405/depth/case_a_depth.png", shape=(48, 64))
+    mask_path = tmp_path / "data" / "overlays" / "case_a_mask.png"
+    mask_path.parent.mkdir(parents=True, exist_ok=True)
+    Image.fromarray(np.zeros((48, 64), dtype=np.uint8)).save(mask_path)
+    paths_json_path = tmp_path / "data" / "paths" / "case_a_paths.json"
+    paths_json_path.parent.mkdir(parents=True, exist_ok=True)
+    paths_json_path.write_text(
+        json.dumps({"image_height": 48, "image_width": 64}), encoding="utf-8"
+    )
+    record = load_capture_record(path, root=tmp_path, end_effector=ee)
+    assert record.image_hw == (48, 64)
+
+
 # ---------------------------------------------------------------------------
 # Transform composition
 # ---------------------------------------------------------------------------

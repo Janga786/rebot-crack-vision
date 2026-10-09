@@ -19,7 +19,7 @@ from typing import Any
 import numpy as np
 from PIL import Image
 
-from crackvision import kinematics
+from crackvision import kinematics, naming
 from crackvision.config import Config, ConfigError, add_common_args, load_config
 from crackvision.geometry import Intrinsics
 from crackvision.kinematics import KinematicsError
@@ -91,6 +91,78 @@ def _color_intrinsics_from_flat(d: dict) -> Intrinsics:
         model=str(d["model"]),
         coeffs=coeffs,
     )
+
+
+def _png_size(path: Path) -> tuple[int, int]:
+    """`(height, width)` of a PNG, reading only the header (no pixel decode)."""
+    with Image.open(path) as img:
+        width, height = img.size
+    return (height, width)
+
+
+def _check_image_dimension_consistency(doc: dict, root: Path, image_hw: tuple[int, int]) -> None:
+    """§9.4/§0.5: `image.height`/`image.width` must match every sibling artefact that exists.
+
+    Each artefact is checked only when it is actually present for this case (a record may predate
+    some of them) — but any mismatch among the ones that do exist is a hard refusal.
+    """
+    case_id = doc.get("case_id")
+
+    depth_rel = doc.get("depth", {}).get("file")
+    if depth_rel:
+        depth_path = root / depth_rel
+        if depth_path.is_file():
+            actual = _png_size(depth_path)
+            if actual != image_hw:
+                raise CaptureRecordError(
+                    f"image_hw {image_hw} does not match the aligned depth PNG {depth_path} "
+                    f"dimensions {actual} (§0.5 frame invariant)"
+                )
+
+    source = doc.get("source", {}) or {}
+    if source.get("kind") == "d405_metadata":
+        ref_rel = source.get("ref")
+        if ref_rel:
+            ref_path = root / ref_rel
+            if ref_path.is_file():
+                try:
+                    meta = json.loads(ref_path.read_text(encoding="utf-8"))
+                except json.JSONDecodeError:
+                    meta = {}
+                color_rel = (meta.get("files") or {}).get("color")
+                if color_rel:
+                    color_path = root / color_rel
+                    if color_path.is_file():
+                        actual = _png_size(color_path)
+                        if actual != image_hw:
+                            raise CaptureRecordError(
+                                f"image_hw {image_hw} does not match the colour image "
+                                f"{color_path} dimensions {actual} (§0.5 frame invariant)"
+                            )
+
+    if case_id:
+        mask_path = root / naming.mask_path(case_id)
+        if mask_path.is_file():
+            actual = _png_size(mask_path)
+            if actual != image_hw:
+                raise CaptureRecordError(
+                    f"image_hw {image_hw} does not match the mask {mask_path} dimensions "
+                    f"{actual} (§0.5 frame invariant)"
+                )
+
+        paths_json_path = root / "data" / "paths" / f"{case_id}_paths.json"
+        if paths_json_path.is_file():
+            try:
+                paths_doc = json.loads(paths_json_path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                paths_doc = {}
+            if "image_height" in paths_doc and "image_width" in paths_doc:
+                actual = (int(paths_doc["image_height"]), int(paths_doc["image_width"]))
+                if actual != image_hw:
+                    raise CaptureRecordError(
+                        f"image_hw {image_hw} does not match {paths_json_path}'s "
+                        f"image_height/image_width {actual} (§0.5 frame invariant)"
+                    )
 
 
 def load_capture_record(
@@ -178,6 +250,9 @@ def load_capture_record(
             f"capture_stamp_ns and robot.stamp_ns differ by {skew_s:.3f}s, "
             f"exceeding max_skew_s={max_skew_s}s (the arm must be stationary at capture)"
         )
+
+    image_hw = (int(doc["image"]["height"]), int(doc["image"]["width"]))
+    _check_image_dimension_consistency(doc, root, image_hw)
 
     case_map_path = root / "data" / "case_map.json"
     if case_map_path.is_file():
