@@ -117,13 +117,13 @@ def _main_polyline(doc: dict) -> dict:
     return doc["components"][0]["polylines"][0]
 
 
-def _generate(tmp_path_factory, name: str, *, tilt_deg: float, holes: bool = False,
-              depth_noise: bool = False, seed: int = SEED, end_effector=None):
+def _generate(tmp_path_factory, name: str, *, tilt_deg: float = 0.0, view_tilt_deg: float = 0.0,
+              holes: bool = False, depth_noise: bool = False, seed: int = SEED, end_effector=None):
     root = tmp_path_factory.mktemp(name)
     _ensure_project_scaffold(root)
     gt = generate_case(
-        root, "synthetic_case", seed=seed, tilt_deg=tilt_deg, depth_noise=depth_noise,
-        holes=holes, end_effector=end_effector,
+        root, "synthetic_case", seed=seed, tilt_deg=tilt_deg, view_tilt_deg=view_tilt_deg,
+        depth_noise=depth_noise, holes=holes, end_effector=end_effector,
     )
     return root, gt
 
@@ -135,9 +135,12 @@ def _generate(tmp_path_factory, name: str, *, tilt_deg: float, holes: bool = Fal
 
 @pytest.fixture(scope="module", params=[0.0, 15.0], ids=["tilt0", "tilt15"])
 def flat_scene(tmp_path_factory, request):
-    """Noise-free, hole-free scene at the ADR-014 view pose, at 0 deg and 15 deg view tilt."""
-    tilt_deg = request.param
-    root, gt = _generate(tmp_path_factory, f"flat_{int(tilt_deg)}", tilt_deg=tilt_deg)
+    """Noise-free, hole-free scene at the ADR-014 view pose, at 0 deg and 15 deg *view* tilt --
+    i.e. the camera optical axis is genuinely offset from the surface anti-normal by
+    `request.param` degrees (the surface itself stays flat, `tilt_deg=0`); see
+    `tools/synth_scene3d.py::camera_target_pose`."""
+    view_tilt_deg = request.param
+    root, gt = _generate(tmp_path_factory, f"viewtilt_{int(view_tilt_deg)}", view_tilt_deg=view_tilt_deg)
     ee = kin.load_end_effector()
     doc = _run_pipeline(root, "synthetic_case", end_effector=ee)
     return root, gt, doc, ee
@@ -178,14 +181,21 @@ def test_ik_converges_within_tolerance_and_joint_limits(flat_scene):
 
 
 def test_capture_distance_and_anti_normal_angle(flat_scene):
-    """ADR-014 §2 view phase: camera_link 0.25 m from the surface, boresight along -normal."""
+    """ADR-014 §2 view phase: camera_link 0.25 m from the surface, boresight within
+    `gt.view_tilt_deg` of the anti-normal (0 deg and the 15 deg band edge are both exercised by
+    `flat_scene`'s params -- see `tools/synth_scene3d.py::camera_target_pose`)."""
     _root, gt, _doc, _ee = flat_scene
     cam_pos = gt.T_base_optical[:3, 3]
     dist = float(np.linalg.norm(cam_pos - gt.center_base))
     assert math.isclose(dist, 0.25, abs_tol=1e-9)
+
     boresight = gt.T_base_optical[:3, 2]
-    cos_angle = float(np.dot(boresight, -gt.normal_base))
-    assert cos_angle > 1.0 - 1e-9
+    # n_optical_z = dot(boresight, normal_base); the view angle is arccos(-n_optical_z) (the
+    # acceptance condition's "arccos of the optical-frame normal's z" phrasing, re-derived in
+    # tools/synth_scene3d.py::camera_target_pose's docstring).
+    n_optical_z = float(np.dot(boresight, gt.normal_base))
+    view_angle_deg = math.degrees(math.acos(np.clip(-n_optical_z, -1.0, 1.0)))
+    assert math.isclose(view_angle_deg, gt.view_tilt_deg, abs_tol=0.1)
 
 
 # ---------------------------------------------------------------------------

@@ -13,7 +13,8 @@ so a bug shared between the generator and the pipeline under test cannot hide it
 
 CLI:
     ./env.sh python tools/synth_scene3d.py --out ROOT --seed N [--tilt-deg 0|15]
-                                            [--depth-noise] [--holes] [--case-id ID]
+                                            [--view-tilt-deg 0|15] [--depth-noise] [--holes]
+                                            [--case-id ID]
 
 Verifies *software consistency* of the lifting pipeline under a nominal, noise-free-unless-asked
 chain — not physical accuracy of the real robot/camera (that is GEOM-05/07 and INT-04/05's job;
@@ -179,14 +180,29 @@ def _orthonormal_basis(z_axis: np.ndarray, roll_rad: float) -> tuple[np.ndarray,
     return x_axis, y_axis
 
 
-def camera_target_pose(center: np.ndarray, normal: np.ndarray, roll_rad: float) -> np.ndarray:
-    """`T_base_link_camera_color_optical_frame` for a view `VIEW_DISTANCE_M` from `center` along
-    `normal`, boresight (+Z) into the surface (ADR-014 §2: optical axis along the anti-normal)."""
-    z_axis = -normal
+def camera_target_pose(
+    center: np.ndarray, normal: np.ndarray, roll_rad: float, view_tilt_rad: float = 0.0
+) -> np.ndarray:
+    """`T_base_link_camera_color_optical_frame` for a view `VIEW_DISTANCE_M` from `center`,
+    boresight (+Z) tilted `view_tilt_rad` away from the surface anti-normal (ADR-014 §2: the view
+    phase bounds the angle between the optical axis and the anti-normal to <= 15 deg).
+
+    `view_tilt_rad` is independent of `normal`'s own tilt (`plane_normal`'s `tilt_deg`): the
+    camera is placed on the cone of half-angle `view_tilt_rad` around `normal`, at `VIEW_DISTANCE_M`
+    from `center`, and pointed back at `center` -- so the boresight-to-anti-normal angle is exactly
+    `view_tilt_rad` by construction (`cam_dir = cos(view_tilt_rad)*normal + sin(view_tilt_rad)*x0`,
+    `x0 ⟂ normal`; boresight `z_axis = -cam_dir` points from the camera straight at `center`, and
+    `dot(z_axis, -normal) = dot(cam_dir, normal) = cos(view_tilt_rad)`). At `view_tilt_rad=0` this
+    is exactly the previous fronto-parallel pose (`z_axis = -normal`).
+    """
+    x0, _y0 = _orthonormal_basis(-normal, 0.0)
+    cam_dir = math.cos(view_tilt_rad) * normal + math.sin(view_tilt_rad) * x0
+    cam_dir = cam_dir / np.linalg.norm(cam_dir)
+    z_axis = -cam_dir
     x_axis, y_axis = _orthonormal_basis(z_axis, roll_rad)
     T = np.eye(4)
     T[:3, :3] = np.column_stack([x_axis, y_axis, z_axis])
-    T[:3, 3] = center + VIEW_DISTANCE_M * normal
+    T[:3, 3] = center + VIEW_DISTANCE_M * cam_dir
     return T
 
 
@@ -227,7 +243,11 @@ def solve_view_ik(
 
 
 def solve_camera_pose(
-    chain: "kin.KinematicChain", end_effector: "kin.EndEffector", center: np.ndarray, normal: np.ndarray
+    chain: "kin.KinematicChain",
+    end_effector: "kin.EndEffector",
+    center: np.ndarray,
+    normal: np.ndarray,
+    view_tilt_rad: float = 0.0,
 ) -> tuple[np.ndarray, np.ndarray, float, float]:
     """Search `IK_ROLL_GRID_DEG` camera rolls for the best-converging IK solution.
 
@@ -237,7 +257,7 @@ def solve_camera_pose(
     """
     best = None
     for roll_deg in IK_ROLL_GRID_DEG:
-        T_target = camera_target_pose(center, normal, math.radians(roll_deg))
+        T_target = camera_target_pose(center, normal, math.radians(roll_deg), view_tilt_rad)
         q, resid = solve_view_ik(chain, end_effector, T_target)
         if best is None or resid < best[1]:
             best = (q, resid, T_target, roll_deg)
@@ -436,6 +456,7 @@ class SceneGroundTruth:
     case_id: str
     seed: int
     tilt_deg: float
+    view_tilt_deg: float
     depth_noise: bool
     holes: bool
     image_height: int
@@ -456,6 +477,7 @@ class SceneGroundTruth:
             "case_id": self.case_id,
             "seed": self.seed,
             "tilt_deg": self.tilt_deg,
+            "view_tilt_deg": self.view_tilt_deg,
             "depth_noise": self.depth_noise,
             "holes": self.holes,
             "image_height": self.image_height,
@@ -517,6 +539,7 @@ def generate_case(
     *,
     seed: int,
     tilt_deg: float = 0.0,
+    view_tilt_deg: float = 0.0,
     depth_noise: bool = False,
     holes: bool = False,
     end_effector: "kin.EndEffector | None" = None,
@@ -536,12 +559,14 @@ def generate_case(
 
     center, center_source = specimen_center(root)
     normal = plane_normal(tilt_deg)
+    view_tilt_rad = math.radians(view_tilt_deg)
 
-    q, T_target, resid, roll_deg = solve_camera_pose(chain, ee, center, normal)
+    q, T_target, resid, roll_deg = solve_camera_pose(chain, ee, center, normal, view_tilt_rad)
     if resid >= IK_RESIDUAL_TOL:
         raise RuntimeError(
             f"synth_scene3d: view-pose IK did not converge for case {case_id!r} "
-            f"(tilt_deg={tilt_deg}): best residual norm {resid} >= {IK_RESIDUAL_TOL}"
+            f"(tilt_deg={tilt_deg}, view_tilt_deg={view_tilt_deg}): "
+            f"best residual norm {resid} >= {IK_RESIDUAL_TOL}"
         )
     chain.fk(q)  # re-assert q is within the URDF's joint limits (raises KinematicsError otherwise)
 
@@ -641,6 +666,7 @@ def generate_case(
         case_id=case_id,
         seed=seed,
         tilt_deg=tilt_deg,
+        view_tilt_deg=view_tilt_deg,
         depth_noise=depth_noise,
         holes=holes,
         image_height=IMAGE_HEIGHT,
@@ -686,6 +712,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--case-id", default="synthetic_case", metavar="CASE_ID")
     parser.add_argument("--seed", type=int, required=True)
     parser.add_argument("--tilt-deg", type=float, choices=[0.0, 15.0], default=0.0)
+    parser.add_argument("--view-tilt-deg", type=float, choices=[0.0, 15.0], default=0.0)
     parser.add_argument("--depth-noise", action="store_true")
     parser.add_argument("--holes", action="store_true")
     return parser
@@ -696,12 +723,13 @@ def main(argv: list[str] | None = None) -> int:
     out = args.out.resolve()
     _ensure_project_scaffold(out)
     gt = generate_case(
-        out, args.case_id, seed=args.seed, tilt_deg=args.tilt_deg,
+        out, args.case_id, seed=args.seed, tilt_deg=args.tilt_deg, view_tilt_deg=args.view_tilt_deg,
         depth_noise=args.depth_noise, holes=args.holes,
     )
     print(
         f"synth_scene3d: wrote case {args.case_id!r} under {out} "
-        f"(tilt_deg={args.tilt_deg}, ik_residual_norm={gt.ik_residual_norm:.3e}, "
+        f"(tilt_deg={args.tilt_deg}, view_tilt_deg={args.view_tilt_deg}, "
+        f"ik_residual_norm={gt.ik_residual_norm:.3e}, "
         f"roll_deg={gt.roll_deg}, chain_px={len(gt.chain_pixels)})"
     )
     return 0
