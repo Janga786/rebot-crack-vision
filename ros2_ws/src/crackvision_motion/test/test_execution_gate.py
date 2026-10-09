@@ -34,6 +34,7 @@ from crackvision_motion.execution_gate import (  # noqa: E402
     GateCheck,
     GateConfigError,
     GateReport,
+    OUTCOMES,
     confirmation_ok,
     confirmation_phrase,
     evaluate_offline,
@@ -93,16 +94,16 @@ def test_repo_defaults_refuse_real_mode(tmp_path):
     assert not report.passed
     refusals = set(report.refusals)
     assert {G_ARM, G_SCENE, G_EE, G_COMMISSIONING, G_ESTOP}.issubset(refusals)
-    assert _get(report, G_ARM).status == "fail"
+    assert _get(report, G_ARM).outcome == "fail"
     assert "CRACKVISION_ARM_REAL" in _get(report, G_ARM).message
 
 
 def test_mock_and_dry_never_pass_real_only_gates_but_otherwise_pass(tmp_path):
     for mode in ("mock", "dry"):
         report = evaluate_offline(mode, TRAJECTORY_SMOKE, **_common_kwargs(tmp_path))
-        assert _get(report, G_ARM).status == "skip"
-        assert _get(report, G_COMMISSIONING).status == "skip"
-        assert _get(report, G_ESTOP).status == "skip"
+        assert _get(report, G_ARM).outcome == "skip"
+        assert _get(report, G_COMMISSIONING).outcome == "skip"
+        assert _get(report, G_ESTOP).outcome == "skip"
         assert report.passed, f"mode={mode} unexpectedly refused: {report.refusals}"
 
 
@@ -185,7 +186,7 @@ def test_measured_fixture_set_passes_real_mode_offline(tmp_path):
     report = evaluate_offline("real", traj_path, **kwargs)
     assert report.passed, report.refusals
     for check in report.checks:
-        assert check.status in ("pass",), f"{check.id}: {check.status}: {check.message}"
+        assert check.outcome in ("pass",), f"{check.id}: {check.outcome}: {check.message}"
 
 
 def test_limits_hash_mismatch_fails_only_limits_hash(tmp_path):
@@ -283,15 +284,18 @@ def test_upstream_scene_and_ee_exceptions_become_failed_checks_in_real(tmp_path)
     report = evaluate_offline("real", TRAJECTORY_SMOKE, **_common_kwargs(tmp_path))
     scene_check = _get(report, G_SCENE)
     ee_check = _get(report, G_EE)
-    assert scene_check.status == "fail" and "nominal" in scene_check.message
-    assert ee_check.status == "fail" and "nominal" in ee_check.message
+    assert scene_check.outcome == "fail" and "nominal" in scene_check.message
+    assert ee_check.outcome == "fail" and "nominal" in ee_check.message
 
 
-def test_upstream_scene_and_ee_exceptions_collapse_to_pass_outside_real(tmp_path):
+def test_upstream_scene_and_ee_not_commissioning_ready_warn_outside_real(tmp_path):
+    # Repo-shipped scene.yaml/end_effector.yaml are nominal, so they load fine but are not
+    # commissioning-ready -- §11.7 says that is `warn` in mock/dry (never refuses), `fail` in real.
     for mode in ("mock", "dry"):
         report = evaluate_offline(mode, TRAJECTORY_SMOKE, **_common_kwargs(tmp_path))
-        assert _get(report, G_SCENE).status == "pass"
-        assert _get(report, G_EE).status == "pass"
+        assert _get(report, G_SCENE).outcome == "warn"
+        assert _get(report, G_EE).outcome == "warn"
+        assert report.passed, f"mode={mode} unexpectedly refused: {report.refusals}"
 
 
 def test_malformed_scene_config_fails_scene_in_every_mode(tmp_path):
@@ -299,7 +303,137 @@ def test_malformed_scene_config_fails_scene_in_every_mode(tmp_path):
     bad_scene.write_text("schema: wrong\n")
     for mode in ("mock", "dry", "real"):
         report = evaluate_offline(mode, TRAJECTORY_SMOKE, **_common_kwargs(tmp_path, scene_config_path=bad_scene))
-        assert _get(report, G_SCENE).status == "fail"
+        assert _get(report, G_SCENE).outcome == "fail"
+
+
+# --------------------------------------------------------------------------------------
+# MOT-05.3.R1 finding 1: evaluate_offline never raises, whatever the inputs
+# --------------------------------------------------------------------------------------
+
+def _unparseable_yaml(tmp_path, name: str) -> Path:
+    path = tmp_path / name
+    path.write_text("key: [this is not valid yaml\n")
+    return path
+
+
+def test_missing_trajectory_does_not_raise(tmp_path):
+    report = evaluate_offline(
+        "real", tmp_path / "does_not_exist.json", **_common_kwargs(tmp_path)
+    )
+    assert not report.passed
+    assert _get(report, G_TRAJ).outcome in ("fail", "error")
+
+
+def test_missing_scene_config_does_not_raise(tmp_path):
+    report = evaluate_offline(
+        "real", TRAJECTORY_SMOKE, **_common_kwargs(tmp_path, scene_config_path=tmp_path / "no_such_scene.yaml")
+    )
+    assert not report.passed
+    assert _get(report, G_SCENE).outcome in ("fail", "error")
+
+
+def test_missing_end_effector_config_does_not_raise(tmp_path):
+    report = evaluate_offline(
+        "real", TRAJECTORY_SMOKE,
+        **_common_kwargs(tmp_path, end_effector_config_path=tmp_path / "no_such_ee.yaml"),
+    )
+    assert not report.passed
+    assert _get(report, G_EE).outcome in ("fail", "error")
+
+
+def test_unparseable_scene_yaml_does_not_raise(tmp_path):
+    bad_scene = _unparseable_yaml(tmp_path, "bad_scene.yaml")
+    report = evaluate_offline("real", TRAJECTORY_SMOKE, **_common_kwargs(tmp_path, scene_config_path=bad_scene))
+    assert not report.passed
+    assert _get(report, G_SCENE).outcome in ("fail", "error")
+
+
+def test_unparseable_end_effector_yaml_does_not_raise(tmp_path):
+    bad_ee = _unparseable_yaml(tmp_path, "bad_ee.yaml")
+    report = evaluate_offline(
+        "real", TRAJECTORY_SMOKE, **_common_kwargs(tmp_path, end_effector_config_path=bad_ee)
+    )
+    assert not report.passed
+    assert _get(report, G_EE).outcome in ("fail", "error")
+
+
+def test_unparseable_execution_config_yaml_does_not_raise(tmp_path):
+    bad_exec = _unparseable_yaml(tmp_path, "bad_execution.yaml")
+    report = evaluate_offline(
+        "real", TRAJECTORY_SMOKE, **_common_kwargs(tmp_path, execution_config_path=bad_exec)
+    )
+    assert not report.passed
+    assert _get(report, G_SPEED).outcome in ("fail", "error")
+    assert _get(report, G_LIMITS).outcome in ("fail", "error")
+
+
+def test_unparseable_commissioning_yaml_does_not_raise(tmp_path):
+    bad_commissioning = _unparseable_yaml(tmp_path, "bad_commissioning.yaml")
+    report = evaluate_offline(
+        "real", TRAJECTORY_SMOKE, **_common_kwargs(tmp_path, commissioning_path=bad_commissioning, env=_ARM_REAL)
+    )
+    assert not report.passed
+    assert _get(report, G_COMMISSIONING).outcome in ("fail", "error")
+    assert _get(report, G_ESTOP).outcome in ("fail", "error")
+    assert _get(report, G_SPEED).outcome in ("fail", "error")
+
+
+@pytest.mark.parametrize("bad_scale", [0.0, -1.0, 2.0])
+def test_out_of_range_speed_scale_does_not_raise(tmp_path, bad_scale):
+    for mode in ("mock", "dry", "real"):
+        kwargs = _common_kwargs(tmp_path, speed_scale=bad_scale, env=_ARM_REAL)
+        report = evaluate_offline(mode, TRAJECTORY_SMOKE, **kwargs)
+        assert not report.passed
+        assert _get(report, G_SPEED).outcome == "fail"
+        assert _get(report, G_LIMITS).outcome == "error"
+
+
+def test_load_execution_config_raises_gate_config_error_on_malformed_yaml(tmp_path):
+    bad = _unparseable_yaml(tmp_path, "bad_execution.yaml")
+    with pytest.raises(GateConfigError):
+        load_execution_config(bad)
+
+
+def test_load_commissioning_raises_gate_config_error_on_malformed_yaml(tmp_path):
+    bad = _unparseable_yaml(tmp_path, "bad_commissioning.yaml")
+    with pytest.raises(GateConfigError):
+        load_commissioning(bad)
+
+
+# --------------------------------------------------------------------------------------
+# MOT-05.3.R1 finding 2: §11.7 outcomes (warn/error) and the §11.9 gate_report shape
+# --------------------------------------------------------------------------------------
+
+def test_gate_check_to_dict_is_the_section_11_9_shape(tmp_path):
+    report = evaluate_offline("real", TRAJECTORY_SMOKE, **_common_kwargs(tmp_path))
+    for entry in report.to_dict()["gate_report"]:
+        assert set(entry) == {"gate", "category", "outcome", "detail"}
+        assert entry["outcome"] in OUTCOMES
+    arm_entry = next(e for e in report.to_dict()["gate_report"] if e["gate"] == G_ARM)
+    assert arm_entry["category"] == "confirmation"
+    scene_entry = next(e for e in report.to_dict()["gate_report"] if e["gate"] == G_SCENE)
+    assert scene_entry["category"] == "offline"
+
+
+def test_warn_never_refuses_and_never_appears_in_real(tmp_path):
+    for mode in ("mock", "dry"):
+        report = evaluate_offline(mode, TRAJECTORY_SMOKE, **_common_kwargs(tmp_path))
+        assert _get(report, G_APPROVAL).outcome == "warn"
+        assert _get(report, G_SCENE).outcome == "warn"
+        assert _get(report, G_EE).outcome == "warn"
+        assert report.passed
+
+    real_report = evaluate_offline("real", TRAJECTORY_SMOKE, **_common_kwargs(tmp_path, env=_ARM_REAL))
+    assert not any(c.outcome == "warn" for c in real_report.checks)
+
+
+def test_error_for_limits_when_traj_cannot_load(tmp_path):
+    report = evaluate_offline(
+        "real", tmp_path / "does_not_exist.json", **_common_kwargs(tmp_path, env=_ARM_REAL)
+    )
+    assert _get(report, G_LIMITS).outcome == "error"
+    assert _get(report, G_LIMITS_HASH).outcome == "error"
+    assert not report.passed
 
 
 # --------------------------------------------------------------------------------------
