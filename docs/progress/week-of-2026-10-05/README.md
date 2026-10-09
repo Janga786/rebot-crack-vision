@@ -1,6 +1,6 @@
 # Progress — week of Mon Oct 05 – Sun Oct 11, 2026
 
-**2 task(s) completed and independently audited this week** · project total **43/92** accepted
+**3 task(s) completed and independently audited this week** · project total **44/92** accepted
 
 ## Completed this week
 
@@ -8,10 +8,12 @@
 …[338 chars clipped]
 - **GEOM-08.5 — Lift ordered pixel polylines to base_link surface points with normals, gap policy and per-point covariance (crackvision.lift3d)** ([details](GEOM-08.5.md)): Added the crackvision.lift3d module, which converts a 2D crack-path pixel trace plus a depth image into 3D points on the robot's base frame, each with an outward-facing surface normal and an uncertain
 …[296 chars clipped]
+- **GEOM-08.6 — tool_tip trace/approach/retract waypoints from lifted segments (crackvision.tool_waypoints)** ([details](GEOM-08.6.md)): Added the module that turns a lifted 3D crack-surface segment into a sequence of robot tool-tip waypoints: evenly spaced trace points 1cm off the surface along the surface normal, bracketed by approac
+…[191 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 3 / 3
+- Implementation/review sessions run: 4 / 4
 - Audits that rejected work with evidence-backed findings: 1 (repairs created: 1)
 
 ## Progress by work package
@@ -22,7 +24,7 @@
 | Local coding model (L-LLM) | 1 | 6 |
 | D405 capture (L-CAM) | 4 | 9 |
 | Perception (L-PERC) | 13 | 16 |
-| Geometry & calibration (L-GEOM) | 10 | 24 |
+| Geometry & calibration (L-GEOM) | 11 | 24 |
 | Motion planning (L-MOTION) | 7 | 16 |
 | Integration & commissioning (L-INT) | 1 | 6 |
 | Operator workflow & handoff (L-OPS) | 1 | 4 |
