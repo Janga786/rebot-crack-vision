@@ -42,18 +42,24 @@ on the real robot/camera is GEOM-05/07 and INT-04/05's job.
   `dimensions_m.z/2=0.005`). `specimen_center()` logs/returns this fallback explicitly; see
   `center_source` in the `_gt.json` files and the measured table below.
 - **View pose:** ADR-014 §2's view phase — `camera_link` **0.25 m** from the centre, optical axis
-  along the surface's anti-normal, solved by 6-DOF numeric IK (`scipy.optimize.least_squares`,
-  bounded by the URDF joint limits) over a grid of camera rolls (free per ADR-014 §2) and several
-  seeds, keeping the globally best-converging solution.
-- **Interpretation of `--tilt-deg`:** this generator keeps the camera dead-on the anti-normal
-  (zero angular offset between the optical axis and the anti-normal) and tilts the **surface**
-  itself by `--tilt-deg` about `base_link` `+Y`. Projectively this is equivalent to the surface
-  staying flat and the camera's view direction being offset from straight-overhead by the same
-  angle, which is the quantity ADR-014 §2 actually bounds (≤ 15°) — so `--tilt-deg 15` exercises
-  the boundary of that allowed band. The card text's "camera at the requested tilt to the
-  anti-normal" and "surface normal tilt about Y" describe the same single rotation under this
-  choice; it is recorded here because the two phrasings could in principle refer to two
-  independent angles, and this generator implements only one.
+  within `--view-tilt-deg` of the surface's anti-normal, solved by 6-DOF numeric IK
+  (`scipy.optimize.least_squares`, bounded by the URDF joint limits) over a grid of camera rolls
+  (free per ADR-014 §2) and several seeds, keeping the globally best-converging solution.
+- **`--tilt-deg` vs. `--view-tilt-deg` (two independent angles):** `--tilt-deg` tilts the
+  **surface** itself about `base_link` `+Y` (`plane_normal`); `--view-tilt-deg` tilts the
+  **camera** away from the surface anti-normal, independently of the surface's own tilt
+  (`camera_target_pose`). The camera is placed on the cone of half-angle `--view-tilt-deg` around
+  the surface normal, `VIEW_DISTANCE_M` from the centre, and pointed back at the centre, so the
+  angle between the boresight (+Z) and the anti-normal is exactly `--view-tilt-deg` by
+  construction — this is the quantity ADR-014 §2 bounds (≤ 15°), genuinely exercised here rather
+  than approximated: `tests/test_path3d_synthetic.py::test_capture_distance_and_anti_normal_angle`
+  measures `arccos(-dot(boresight, normal_base))` directly off the solved `T_base_optical` and
+  asserts it equals the requested `--view-tilt-deg` to ±0.1°. (An earlier version of this card
+  conflated the two angles — tilting only the surface and claiming that was "projectively
+  equivalent" to an off-axis camera view; it is not, because a camera rigidly rotated together
+  with the plane sees an identical image, so no oblique-view geometry was ever actually exercised.
+  This has been fixed: `flat_scene`'s two parametrisations below are genuine 0° and 15° camera
+  view tilts, surface left flat.)
 - **Intrinsics:** 848x480, `fx = fy = 430.0`, `model: "none"` (no distortion), `depth_scale =
   1e-4 m/count` — matching the card body exactly.
 - **Crack:** a sine arc (`±30 mm` of in-plane arc-length, `5 mm` amplitude, one period —
@@ -85,27 +91,36 @@ sharp curvature without re-checking.
 ### Noise-free position/normal/waypoint accuracy (criterion: median ≤ 0.5 mm, max ≤ 1.5 mm,
 normal ≤ 1°, trace-waypoint `+X . n_true ≤ -cos(1°)`, clearance error ≤ 0.5 mm)
 
-| tilt | points (valid/total) | median error | max error | max normal angle | max `+X . n_true` | max clearance error | IK residual norm | roll used |
-|---|---|---|---|---|---|---|---|---|
-| 0° | 105 / 105 | 0.184 mm | 0.539 mm | 0.000° | -1.0000 | 8.7e-12 mm | 1.38e-17 | 270° |
-| 15° | 99 / 99 | 0.162 mm | 0.531 mm | 0.000° | -1.0000 | 3.8e-11 mm | 3.97e-17 | 240° |
+`view tilt` is the angle between the camera boresight and the surface anti-normal (`--view-tilt-deg`,
+measured by `test_capture_distance_and_anti_normal_angle`); the surface itself stays flat
+(`tilt_deg=0`) in both rows below.
 
-All four thresholds pass with comfortable margin at both tilts. The residual position error
-(≈0.2-0.5 mm) is consistent with the ≤1 px rounding of the forward-projected curve into integer
-pixel coordinates before it is handed to the real pipeline as a skeleton raster (at `fx/z ≈
-1720 px/m` here, 1 px ≈ 0.58 mm) — i.e. it is rasterisation quantisation, not a lifting-pipeline
-error. The normal angle is exactly 0° because the annulus-sampled surface is noise-free and
-perfectly flat, so `geometry.fit_plane`'s SVD recovers the analytic plane normal to floating-point
-precision. The waypoint clearance error (1e-11-1e-10 mm) is floating-point noise, as expected:
-§10.5 places a waypoint at exactly `surface_point + clearance_m * n_out`, and `n_out` here equals
-the true normal to float precision.
+| view tilt | points (valid/total) | median error | max error | max normal angle | max `+X . n_true` | max clearance error | IK residual norm | roll used | measured view angle |
+|---|---|---|---|---|---|---|---|---|---|
+| 0° | 105 / 105 | 0.184 mm | 0.539 mm | 0.000° | -1.0000 | 8.7e-12 mm | 1.38e-17 | 270° | 0.0000° |
+| 15° | 98 / 98 | 0.161 mm | 0.438 mm | 0.130° | -1.0000 | 0.257 mm | 4.50e-17 | 120° | 15.0000° |
+
+All four thresholds pass with comfortable margin at both view tilts, including the genuine 15°
+oblique-view case (camera boresight 15° off the surface anti-normal, verified against the
+`±0.1°` tolerance). The residual position error (≈0.2-0.5 mm) is consistent with the ≤1 px
+rounding of the forward-projected curve into integer pixel coordinates before it is handed to the
+real pipeline as a skeleton raster (at `fx/z ≈ 1720 px/m` here, 1 px ≈ 0.58 mm) — i.e. it is
+rasterisation quantisation, not a lifting-pipeline error. At 0° view tilt the normal angle is
+exactly 0° because the annulus-sampled surface is noise-free, perfectly flat and viewed head-on,
+so `geometry.fit_plane`'s SVD recovers the analytic plane normal to floating-point precision; at
+15° the annulus samples now span a depth gradient across the oblique view and the plane fit still
+recovers the normal to 0.130°, comfortably inside the 1° bound. The waypoint clearance error is
+floating-point noise at 0° (§10.5 places a waypoint at exactly `surface_point + clearance_m *
+n_out`, and `n_out` there equals the true normal to float precision) and grows to 0.257 mm at 15°
+(still well under the 0.5 mm bound) because `n_out` there carries the same ≈0.13° plane-fit
+residual as the normal-angle column above, which couples into the waypoint's standoff offset.
 
 ### Crack-cavity bias (criterion: the +3 mm cavity must not bias recovered surface points beyond
 the noise-free bounds above)
 
 Every valid point's `depth_m` (annulus-sampled surface depth) matches the exact noise-free
 ray/plane depth at that pixel to within the same bound used above (≤ 1.5 mm; in practice every
-point's `depth_m` was found exactly equal to the true surface depth at both tilts — the annulus
+point's `depth_m` was found exactly equal to the true surface depth at both view tilts — the annulus
 sampler, by construction, excludes mask/cavity pixels, and GEOM-08.5's own test suite already
 pins this behaviour at the unit level). Confirms §10.3's annulus method is immune to the cavity
 by design, not by accident of this particular curve.
@@ -154,8 +169,9 @@ zero-depth run (radius `annulus_outer_px=8`, well past `max_gap_px`).
 
 Every generated scene asserts (`tools/synth_scene3d.py:generate_case`, re-checked by
 `tests/test_path3d_synthetic.py::test_ik_converges_within_tolerance_and_joint_limits`) that the
-best-of-grid IK solution's residual norm is `< 1e-6` (observed: `1.38e-17` at 0°, `3.97e-17` at
-15°) and that `chain.fk(q)` does not raise (i.e. every joint stays within its URDF limits).
+best-of-grid IK solution's residual norm is `< 1e-6` (observed: `1.38e-17` at 0° view tilt,
+`4.50e-17` at 15° view tilt) and that `chain.fk(q)` does not raise (i.e. every joint stays within
+its URDF limits).
 
 ### Refusal rules (docs/INTERFACES.md §9.4/§10.6)
 
@@ -170,10 +186,10 @@ best-of-grid IK solution's residual norm is `< 1e-6` (observed: `1.38e-17` at 0�
 ## Seeds and commands
 
 ```
-./env.sh python tools/synth_scene3d.py --out /tmp/demo --seed 1 --tilt-deg 0
-./env.sh python tools/synth_scene3d.py --out /tmp/demo --seed 1 --tilt-deg 15
-./env.sh python tools/synth_scene3d.py --out /tmp/demo --seed 1 --tilt-deg 0 --holes
-./env.sh python tools/synth_scene3d.py --out /tmp/demo --seed 42 --tilt-deg 0 --depth-noise
+./env.sh python tools/synth_scene3d.py --out /tmp/demo --seed 1 --view-tilt-deg 0
+./env.sh python tools/synth_scene3d.py --out /tmp/demo --seed 1 --view-tilt-deg 15
+./env.sh python tools/synth_scene3d.py --out /tmp/demo --seed 1 --view-tilt-deg 0 --holes
+./env.sh python tools/synth_scene3d.py --out /tmp/demo --seed 42 --view-tilt-deg 0 --depth-noise
 
 ./env.sh pytest tests/test_path3d_synthetic.py -q -p no:cacheprovider
 ./env.sh pytest tests/ -q -p no:cacheprovider
@@ -196,7 +212,7 @@ randomness in the generator is `numpy.random.default_rng(seed)` for the optional
   `pyrealsense2` parity tests (`tests/test_geometry.py`) are what cover the Brown-Conrady path.
 - **No real depth-sensor bias.** The injected noise is textbook Gaussian at the GEOM-02 stereo
   model's nominal sigma; the real D405's bias/non-Gaussian error modes are not modelled.
-- **Synthetic, perfectly flat surfaces only.** One geometry (flat plane, two tilts, one sine
+- **Synthetic, perfectly flat surfaces only.** One geometry (flat plane, two view tilts, one sine
   crack) is checked. It is not a claim that every curvature/crack-shape combination rasterises
   this cleanly — see the "Rasterisation note" above.
 - **This is not GEOM-05/07 or INT-04/05.** It verifies that `crackvision.path3d`'s arithmetic

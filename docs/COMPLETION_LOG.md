@@ -1786,3 +1786,50 @@ ISSUES:
 NEXT CARD: GEOM-09 (full first-order uncertainty budget) or GEOM-05/07 (real wrist-camera/tool
 calibration), which this card's docs/geometry/PATH3D_VERIFICATION.md feeds.
 ```
+
+## GEOM-08.8.R1 — Repair: exercise a genuine 15 deg camera-view tilt (review finding 1)
+
+```
+TASK: GEOM-08.8.R1
+STATUS: COMPLETE
+CHANGES:
+  - tools/synth_scene3d.py — `camera_target_pose` (and `solve_camera_pose`/`generate_case`/the CLI)
+    gained an independent `view_tilt_deg`/`--view-tilt-deg` parameter. Previously `--tilt-deg` only
+    tilted the *surface* (`plane_normal`) while the camera stayed rigidly dead-on the anti-normal
+    (`z_axis = -normal`), so the camera-frame image was fronto-parallel regardless of `--tilt-deg` --
+    the review's finding 1. Now the camera is placed on the cone of half-angle `view_tilt_deg` around
+    the surface normal, `VIEW_DISTANCE_M` from the centre, and pointed back at the centre, so the
+    angle between the boresight (+Z) and the anti-normal is exactly `view_tilt_deg` by construction,
+    independent of the surface's own `--tilt-deg`. `SceneGroundTruth`/`_gt.json` gained a
+    `view_tilt_deg` field recording the requested angle.
+  - tests/test_path3d_synthetic.py — `flat_scene`'s `[0.0, 15.0]` parametrisation now drives
+    `view_tilt_deg` (surface left flat, `tilt_deg=0`) instead of the surface tilt, so the `tilt15`
+    case is a genuine 15 deg oblique view. `test_capture_distance_and_anti_normal_angle` now computes
+    the measured view angle (`arccos(-dot(boresight, normal_base))`) and asserts it equals the
+    requested `view_tilt_deg` to +/-0.1 deg, instead of hard-coding "angle is always ~0".
+  - docs/geometry/PATH3D_VERIFICATION.md — removed the false "projectively equivalent" claim;
+    replaced the "Interpretation of --tilt-deg" paragraph with a "--tilt-deg vs. --view-tilt-deg"
+    explanation of the two independent angles and what changed; updated the noise-free
+    accuracy table with the genuine-15-deg-view-tilt measured numbers (replacing the old
+    surface-tilt-15 numbers, which exercised no oblique geometry); updated every other `tilt`
+    reference (cavity-bias, IK self-check, limitations, seeds/commands) to `view tilt` /
+    `--view-tilt-deg` for consistency.
+  - docs/COMPLETION_LOG.md — this entry.
+TESTS:
+  - `./env.sh pytest tests/test_path3d_synthetic.py -q -p no:cacheprovider` -> `17 passed`, exit 0.
+  - `./env.sh pytest tests/ -q -p no:cacheprovider` -> `358 passed, 3 skipped`, exit 0 (same 3
+    pre-existing, unrelated skips as GEOM-08.8).
+  - `test -s docs/geometry/PATH3D_VERIFICATION.md` -> exit 0.
+  - Measured (seed 1, surface flat, view tilt 0 deg vs. 15 deg): 0 deg -> 105/105 valid, median
+    0.184 mm, max 0.539 mm, normal angle 0.000 deg, max `+X . n_true` -1.0000, max clearance error
+    8.7e-12 mm, IK residual 1.38e-17, measured view angle 0.0000 deg; 15 deg -> 98/98 valid, median
+    0.161 mm, max 0.438 mm, normal angle 0.130 deg, max `+X . n_true` -1.0000, max clearance error
+    0.257 mm, IK residual 4.50e-17, measured view angle 15.0000 deg (+/-0.1 deg tolerance). All
+    comfortably inside the required bounds (median <= 0.5 mm, max <= 1.5 mm, normal <= 1 deg,
+    `+X . n_true <= -cos(1 deg)`, clearance error <= 0.5 mm).
+ISSUES:
+  - None found beyond the review's finding 1; no other code path needed to change to make the
+    15 deg view-tilt scene pass every noise-free tolerance.
+NEXT CARD: GEOM-09 (full first-order uncertainty budget) or GEOM-05/07 (real wrist-camera/tool
+calibration), unchanged from GEOM-08.8.
+```
