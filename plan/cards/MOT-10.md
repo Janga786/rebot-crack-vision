@@ -2,14 +2,13 @@
 
 ```json card
 {
-  "kind": "hardware",
+  "kind": "branch",
   "depends_on": [
     "MOT-03"
   ],
   "requirements": [
     "REQ-MOT-1"
   ],
-  "spec_state": "draft",
   "refine_after": [
     "MOT-03"
   ],
@@ -31,3 +30,6 @@ Draft.
 - Measure the table (top face should be the base_link z=0 plane), the specimen pose/height and the workcell
   clearances; the camera pose is measured by hand-eye calibration (GEOM-05), not by tape. Replace the nominal
   specimen/table entries in config/scene/scene.yaml with measured values and re-run MOT-04.5's checks.
+
+## Decomposed 2026-10-09T06:09:26Z by L-MOTION (claude-opus-5-5, medium)
+Children: MOT-10.1, MOT-10.2, MOT-10.3, MOT-10.4, MOT-10.5
