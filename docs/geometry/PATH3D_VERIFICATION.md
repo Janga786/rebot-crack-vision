@@ -33,14 +33,23 @@ on the real robot/camera is GEOM-05/07 and INT-04/05's job.
 - **Surface:** a flat plane in `base_link` through the specimen placement centre, with outward
   normal tilted about `base_link` `+Y` by the requested `--tilt-deg`.
 - **Specimen centre:** `config/motion/specimen_placement.yaml`'s `placement.center_xy_m`/
-  `surface_z_m`, when present and feasible. As of this card that file is a nominal
-  "no feasible placement found" result (`value_status: nominal`, `feasible: false`,
-  `placement: null` — MOT-04.3's `recommend_placement`, not yet re-run since an earlier
-  upstream change), so every run in this card instead falls back to the ADR-014 §3 nominal
-  placement **(0.29, 0)** on the table, with `table_z = -0.01 m` taken from
-  `config/scene/scene.yaml`'s specimen collision box top face (`position_m.z=-0.015` +
-  `dimensions_m.z/2=0.005`). `specimen_center()` logs/returns this fallback explicitly; see
-  `center_source` in the `_gt.json` files and the measured table below.
+  `surface_z_m`, when present and feasible, is the intended source. As of this card the *live*
+  repo file is feasible (`value_status: nominal`, `feasible: true`, centre
+  `(0.26, 0.0, 0.0)` — MOT-04.5's `recommend_placement` run). Despite that, every run this card
+  exercises (the test suite's scaffolded `tmp_path` root and the doc's own `--out` examples
+  below) still falls back to the ADR-014 §3 nominal placement **(0.29, 0)** on the table, with
+  `table_z = -0.01 m` taken from `config/scene/scene.yaml`'s specimen collision box top face
+  (`position_m.z=-0.015` + `dimensions_m.z/2=0.005`). The reason is **not** that the live file is
+  infeasible: `specimen_center(root)` (`tools/synth_scene3d.py`) resolves
+  `config/motion/specimen_placement.yaml` against `root`, and every invocation in this card
+  passes the generator's `--out`/scaffolded root as `root` — `_ensure_project_scaffold` copies
+  only `config/project.yaml` into that root, never `config/motion/specimen_placement.yaml`, so
+  `specimen_center()` always finds that path missing there and takes the fallback branch,
+  regardless of what the live repo's copy says. Re-running `recommend_placement` again would not
+  change this; the generator would need to be changed to also copy/read the live
+  `specimen_placement.yaml` for `specimen_center()` to ever pick it up.
+  `specimen_center()` logs/returns the fallback explicitly; see `center_source` in the
+  `_gt.json` files and the measured table below.
 - **View pose:** ADR-014 §2's view phase — `camera_link` **0.25 m** from the centre, optical axis
   within `--view-tilt-deg` of the surface's anti-normal, solved by 6-DOF numeric IK
   (`scipy.optimize.least_squares`, bounded by the URDF joint limits) over a grid of camera rolls
