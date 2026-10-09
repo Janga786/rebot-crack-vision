@@ -82,8 +82,26 @@ def test_load_config_valid(tmp_path):
 
 def test_load_config_production_scene_is_valid():
     config = load_config(PRODUCTION_CONFIG)
-    assert {o["id"] for o in config["objects"]} == {"table", "specimen", "camera_mount"}
+    assert {o["id"] for o in config["objects"]} == {"table", "specimen"}
     assert len(config["allowed_collisions"]) >= 1
+
+
+def test_load_config_production_scene_has_no_world_camera_object():
+    # ADR-014: the D405 and its mount are eye-in-hand robot geometry (config/robot/end_effector.yaml,
+    # GEOM-10), attached to gripper_link, not a static world object -- a world-fixed camera/mount
+    # CollisionObject here would be a second, wrong model of the same hardware.
+    config = load_config(PRODUCTION_CONFIG)
+    ids = {o["id"] for o in config["objects"]}
+    assert "camera_mount" not in ids
+    assert "camera" not in ids
+
+
+def test_load_config_production_table_top_face_at_base_link_origin():
+    # The robot base stands on the table: table top face must be exactly z=0 in base_link.
+    config = load_config(PRODUCTION_CONFIG)
+    table = next(o for o in config["objects"] if o["id"] == "table")
+    top_z = table["pose"]["position_m"][2] + table["dimensions_m"][2] / 2.0
+    assert top_z == pytest.approx(0.0, abs=1e-9)
 
 
 def test_load_config_collider_fixture_is_valid():

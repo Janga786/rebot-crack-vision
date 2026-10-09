@@ -6,8 +6,8 @@ B601-DM model. Builds on `docs/motion/ROS_WORKSPACE.md` (MOT-02) and `docs/motio
 
 ## 0. What this is
 
-`config/scene/scene.yaml` describes the workcell's static collision objects (table, specimen,
-camera mount) and the allowed-collision-matrix (ACM) pairs between them and the robot's own links.
+`config/scene/scene.yaml` describes the workcell's static collision objects (table, specimen) and
+the allowed-collision-matrix (ACM) pairs between them and the robot's own links.
 `ros2_ws/src/crackvision_motion/crackvision_motion/scene_core.py` validates that file (pure
 Python, no ROS import, same style as `reachability_core.py`) and exposes
 `assert_commissioning_ready`, the function MOT-05's commissioning-gated executor calls before any
@@ -18,6 +18,18 @@ side: it builds one box `moveit_msgs/CollisionObject` per configured object, ext
 `assert_scene_objects`) confirms a set of object ids are present in the live planning scene via
 `/get_planning_scene`. Neither script uses an action client or touches `/move_action`,
 `ExecuteTrajectory` or `FollowJointTrajectory` — nothing here can move the mock (let alone real) arm.
+
+**This scene models the WORKCELL only — there is deliberately no world camera object.** ADR-014
+(`docs/adr/014-end-effector-frames-and-task-phases.md`) makes the wrist D405 and its mount
+eye-in-hand: `config/robot/end_effector.yaml` (GEOM-10) already places `camera_housing_link` and
+`camera_mount_link` as fixed links on `gripper_link`, so they move with every joint state and are
+already part of every planning request's robot model (see
+`crackvision_motion/launch/mock_planning.launch.py`). A static, `base_link`-relative
+`CollisionObject` for the camera here would be a second, wrong (world-fixed) model of hardware
+that already has a correct, moving one in the robot model itself. An earlier revision of this
+scene did add such a `camera_mount` world object, modelling a fixed eye-to-hand mount; ADR-014
+superseded that assumption and this revision removes it (object and its `camera_mount~link1` ACM
+entry both deleted).
 
 ## 1. `crackvision.scene_config/1` schema
 
@@ -52,7 +64,7 @@ every `pose` a well-formed `{frame, position_m, rpy_rad}` triple, `value_status`
 non-empty `source` string for each — mirroring `reachability_core.py`'s "never invent a value"
 convention, but tagged per-value here (object-by-object) rather than with one file-wide
 `value_status`, since a real commissioning survey will plausibly measure some objects (e.g. the
-table) before others (e.g. a not-yet-decided camera mount). `config_sha256(path)` hashes the raw
+table) before others (e.g. the as-placed specimen). `config_sha256(path)` hashes the raw
 file bytes, for provenance in future consumers (mirrors `reachability_core.config_sha256`).
 
 ## 2. The commissioning gate
@@ -63,8 +75,8 @@ from crackvision_motion.scene_core import assert_commissioning_ready, SceneNotCo
 assert_commissioning_ready(config)  # raises SceneNotCommissionedError if ANY value is nominal
 ```
 
-`nominal_items(config)` returns a sorted list like `["allowed_collision:camera_mount~link1",
-"object:camera_mount", "object:specimen", "object:table"]`; `all_measured(config)` is
+`nominal_items(config)` returns a sorted list like `["allowed_collision:specimen~table",
+"allowed_collision:table~base_link", "object:specimen", "object:table"]`; `all_measured(config)` is
 `not nominal_items(config)`; `assert_commissioning_ready` raises `SceneNotCommissionedError`
 (listing every pending item) unless `all_measured(config)` is `True`. **This is the function
 MOT-05's commissioning-gated executor must call before any real-hardware run** — today,
@@ -101,57 +113,42 @@ ros2 run crackvision_motion apply_scene [--config PATH] [--root PATH]
 
 | object | dims (m) | pose (base_link) | allowed to touch | why |
 |---|---|---|---|---|
-| `table` | 1.00 × 0.80 × 0.05 | (0.40, 0.00, −0.045) | `base_link` | the surface the robot is bolted to; top face at z=−0.02, 2 cm below the robot's own origin, so it cannot intersect the arm's own links for any on-workspace joint state while still plausibly carrying the specimen |
-| `specimen` | 0.20 × 0.20 × 0.01 | (0.30, 0.00, −0.015) | `table` | rests on the table top; x/y and footprint reuse `config/motion/specimen_placement.yaml`'s nominal footprint (itself nominal, MOT-04.3) |
-| `camera_mount` | 0.05 × 0.05 × 0.08 | (−0.12, −0.12, 0.05) | `link1` | placeholder bracket volume near the base, diagonally behind the shoulder |
+| `table` | 1.20 × 1.00 × 0.05 | (0.35, 0.00, −0.025) | `base_link` | the bench the robot is bolted to; top face exactly at z=0 (base_link's own origin = the bottom face of base_link.STL), so the robot stands directly on it; footprint is wide enough for the base plus `config/motion/reachability.yaml`'s grid (x [0.11,0.50], \|y\|<=0.39) plus margin |
+| `specimen` | 0.20 × 0.20 × 0.01 | (0.30, 0.00, 0.005) | `table` | rests on the table top (bottom face at z=0); footprint reuses `config/motion/specimen_placement.yaml`'s nominal footprint_m, but that file's own placement search is currently infeasible (`feasible: false`, `placement: null`), so the (0.30, 0.00) centre and 0.01 m thickness here are an explicitly labelled placeholder, not a value taken from that file |
 
-Every value's `source` field in the YAML spells out its provenance; nothing here was invented. Two
-things are worth calling out beyond the file itself:
+There is deliberately **no `camera_mount` (or any camera) world object** — see §0. An earlier
+revision of this scene did add one, modelling a fixed eye-to-hand mount; ADR-014 made the wrist
+D405 eye-in-hand instead, and this revision removes that object together with its
+`camera_mount~link1` ACM entry. Every remaining value's `source` field in the YAML spells out its
+provenance; nothing here was invented.
 
-- **`camera_mount`'s parent frame/mounting is itself an open decision.**
-  `docs/adr/013-calibration-method.md` (GEOM-03) is **proposed, blocked on operator confirmation**
-  and *recommends* eye-in-hand (wrist-mounted, moving with the arm) over a fixed world mount. A
-  static `base_link`-relative `CollisionObject` — what this card models, consistent with `table`
-  and `specimen` — matches an eye-to-hand mount, not the recommended eye-in-hand one. This entry
-  is therefore a conservative placeholder for whichever mounting is eventually confirmed; if
-  eye-in-hand is confirmed, a future card must replace it with an attached collision object on the
-  wrist link (`RobotState.attached_collision_objects`), which is a materially different mechanism
-  (it moves with the joint state) that this card does not implement.
-- **`camera_mount`'s pose was chosen from a live FK probe, not guessed blind.** `/compute_fk` for
-  every link at `plan_joint_goal.py`'s `DEFAULT_JOINT_GOAL` (the same goal `scripts/ros/test_mock_plan.sh`
-  already exercises) gave `link2` at `x=0.010 y=0.036 z=0.140` in `base_link` — about 0.21 m from
-  `camera_mount`'s centre, comfortably clear given the object's own 0.05–0.08 m extents. This was
-  necessary in practice: an earlier placement (`(-0.08, 0.0, 0.15)`, closer to the shoulder) made
-  `move_group` report `Found a contact between 'camera_mount' ... and 'link2'` and a start-state-in-collision
-  planning failure for that same default goal, which is exactly the class of accidental,
-  unintended collision this scene must not introduce for ordinary operation. The final placement
-  was re-verified to plan successfully (see §5, step 4).
+**The specimen pose is a placeholder, not a recommendation.** `config/motion/specimen_placement.yaml`
+(MOT-04.3's `recommend_placement` output) is the intended source for the specimen's x/y/yaw, but its
+current `feasible` flag is `false` (`placement: null`) — there is no feasible nominal recommendation
+to read yet. `(0.30, 0.0)` here is simply a centre that sits inside both the table footprint and the
+reachability grid, used only so the production scene is a well-formed, plannable box; MOT-04.5 (once
+a feasible placement exists) or MOT-10 (once the real as-placed pose is measured) replace it. Nothing
+downstream should treat this pose as a placement recommendation.
 
 ## 5. `assert_scene_objects` (console script) and the smoke test
 
 ```bash
-ros2 run crackvision_motion assert_scene_objects --object-id table --object-id specimen --object-id camera_mount
+ros2 run crackvision_motion assert_scene_objects --object-id table --object-id specimen
 ```
 
 Calls `/get_planning_scene` (`WORLD_OBJECT_GEOMETRY` component), exits 0 iff every `--object-id`
 is present in `scene.world.collision_objects`, 1 otherwise (with the missing ids and what *is*
 present printed to stderr).
 
-### `scripts/ros/test_scene.sh` — **not written by this card** (scope note)
-
-This card's `scope.write` is `config/scene/**`, `ros2_ws/src/crackvision_motion/**` and this file
-only — it does not include `scripts/ros/**`, so the wrapper script the acceptance harness invokes
-(`bash scripts/ros/test_scene.sh`) could not be committed from here (writing it would be an
-out-of-scope change). It was staged locally, run to completion, and then removed before finishing,
-exactly reproducing `scripts/ros/test_reachability.sh`'s (MOT-04.4, accepted) launch/pgid/cleanup
-pattern via the existing, unmodified `scripts/ros/_mock_stack.sh`:
+### `scripts/ros/test_scene.sh`
 
 1. `python3 -m pytest ros2_ws/src/crackvision_motion/test/test_scene_core.py` (pure Python, no ROS).
-2. Start the MOT-02 headless mock stack.
+2. Start the MOT-02 headless mock stack (`mock_planning.launch.py`, which already carries the
+   ADR-014/GEOM-10 wrist camera collision proxies as robot links).
 3. `ros2 run crackvision_motion plan_joint_goal` with **no** crackvision scene applied — baseline,
    expect exit 0.
 4. `ros2 run crackvision_motion apply_scene --config config/scene/scene.yaml` — expect exit 0.
-5. `ros2 run crackvision_motion assert_scene_objects --object-id table --object-id specimen --object-id camera_mount` — expect exit 0.
+5. `ros2 run crackvision_motion assert_scene_objects --object-id table --object-id specimen` — expect exit 0.
 6. `ros2 run crackvision_motion plan_joint_goal` again — the nominal production scene must not
    block the same default goal — expect exit 0.
 7. `ros2 run crackvision_motion apply_scene --config ros2_ws/src/crackvision_motion/test/fixtures/scene_collision_smoke.yaml`
@@ -167,38 +164,29 @@ Verified locally (clean `ros2_ws/build|install|log`):
 $ bash scripts/ros/build_ws.sh                          # exit 0
 $ bash scripts/ros/test_scene.sh
 == unit tests: scene_core (pure python, no ROS) ==
-...................                                      [100%]
-19 passed in 0.12s
-_mock_stack.sh: launch pid=1179 pgid=1179 up
+.....................                                    [100%]
+21 passed in 0.14s
+_mock_stack.sh: launch pid=259 pgid=259 up
 == baseline: default goal with no crackvision scene applied ==
 [INFO] [...] [plan_joint_goal]: plan succeeded for group 'arm' (error_code=1)
 == apply config/scene/scene.yaml ==
-[INFO] [...] [apply_scene]: applied scene from .../config/scene/scene.yaml: objects=[table, specimen, camera_mount]
-== assert table/specimen/camera_mount appear in the planning scene ==
-[INFO] [...] [assert_scene_objects]: all requested object ids present in the planning scene: ['table', 'specimen', 'camera_mount']
+[INFO] [...] [apply_scene]: applied scene from .../config/scene/scene.yaml: objects=[table, specimen]
+== assert table/specimen appear in the planning scene ==
+[INFO] [...] [assert_scene_objects]: all requested object ids present in the planning scene: ['table', 'specimen']
 == default goal still plans with the nominal production scene applied ==
 [INFO] [...] [plan_joint_goal]: plan succeeded for group 'arm' (error_code=1)
 == apply the oversized collider fixture on top ==
 [INFO] [...] [apply_scene]: applied scene from .../scene_collision_smoke.yaml: objects=[collider]
 == same goal must now be rejected ==
 [ERROR] [...] [plan_joint_goal]: plan failed for group 'arm' (error_code=99999)
-test_scene.sh: colliding goal correctly rejected (plan_joint_goal exit=1)
+test_scene.sh: colliding goal correctly rejected
 test_scene.sh: OK
 (exit 0)
 ```
 
 After the run, `ps aux` showed no leftover `move_group` / `ros2_control_node` /
-`robot_state_publisher` / `static_transform_publisher` process. The move_group log for step 8
-confirms the rejection is a genuine collision, not an unrelated failure:
-`Found a contact between 'collider' (type 'Object') and 'link2' (type 'Robot link')` /
-`Start state appears to be in collision with respect to group arm`. The full existing pytest suite
-under `ros2_ws/src/crackvision_motion/test/` (111 tests: 92 pre-existing + 19 new in
-`test_scene_core.py`), `scripts/ros/test_mock_plan.sh` (MOT-02) and `scripts/ros/test_reachability.sh`
-(MOT-04.4) were all re-run after this card's changes and still pass unchanged.
-
-**For whoever adds `scripts/ros/test_scene.sh`:** its content is exactly steps 1–9 above,
-byte-for-byte reproducible from this section plus `scripts/ros/test_reachability.sh`'s existing
-launch/pgid/cleanup boilerplate — no new design decision is needed, only the file.
+`robot_state_publisher` / `static_transform_publisher` process. The full pytest suite under
+`ros2_ws/src/crackvision_motion/test/` (126 tests, including 21 in `test_scene_core.py`) passes.
 
 ## 6. `scene_collision_smoke.yaml` — test-only collider fixture
 
