@@ -15,6 +15,16 @@
 #   side faces (+/-y): y = +/-0.100 m
 # CONFIRM FIRST that these are the flat faces on the real casting/plate you can square a tape
 # against (docs/motion/WORKCELL_SURVEY.md §1); note any deviation in survey.notes below.
+#
+# Sign conventions (docs/INTERFACES.md §12.7 gives the exact base_link formulas):
+#   x_from_front_face, front_face_to_far_edge: positive distance in the +x direction from x=+0.070.
+#   front_face_to_near_edge: positive distance from the SAME front face (x=+0.070), but in the -x
+#     direction, to the table's near (behind-the-base) edge -- there is no separate "-x face".
+#   pos_y_side_face_to_edge: positive distance in the +y direction from y=+0.100.
+#   neg_y_side_face_to_edge: positive distance in the -y direction from y=-0.100.
+#   y_from_centerline: positive = toward the +y side face (same direction as pos_y_side_face_to_edge).
+#   z_from_table_top (obstacles): positive = above the table's top face (z = -(adapter plate
+#     thickness), or exactly 0 when bolted_directly_to_table is true).
 
 schema: crackvision.workcell_survey/1
 
@@ -30,7 +40,11 @@ derivation_params:
 # (a) Base mounting -----------------------------------------------------------------------------
 base_mounting:
   bolted_directly_to_table: null      # true/false
-  adapter_plate_thickness:            # required (fill in) iff bolted_directly_to_table is false; else leave all null
+  # adapter_plate_thickness is required (fill in all 4 keys) iff bolted_directly_to_table is false.
+  # If bolted_directly_to_table is true, REPLACE THE WHOLE MAP BELOW WITH A BARE `null`
+  # (not this 4-key map of nulls) -- docs/INTERFACES.md §12.7 rule 6 exempts a bare `null` here
+  # (treated as thickness 0) but still refuses any OTHER reading field left null.
+  adapter_plate_thickness:
     value_m: null
     instrument: null
     resolution_m: null
@@ -38,22 +52,27 @@ base_mounting:
 
 # (b) Table extents from the base reference faces, and top-face flatness near the specimen ------
 table:
-  front_face_to_far_edge:             # table edge beyond the base's +x front face (x = +0.070)
+  front_face_to_far_edge:             # distance from front face (x=+0.070), +x direction, to the far (specimen-side) edge
     value_m: null
     instrument: null
     resolution_m: null
     uncertainty_1sigma_m: null
-  front_face_to_near_edge:            # table edge behind the base, opposite side
+  front_face_to_near_edge:            # distance from the SAME front face (x=+0.070), -x direction, to the near (behind-the-base) edge
     value_m: null
     instrument: null
     resolution_m: null
     uncertainty_1sigma_m: null
-  pos_y_side_face_to_edge:            # table edge beyond the +y side face (y = +0.100)
+  pos_y_side_face_to_edge:            # distance from the +y side face (y=+0.100), +y direction, to that edge
     value_m: null
     instrument: null
     resolution_m: null
     uncertainty_1sigma_m: null
-  neg_y_side_face_to_edge:            # table edge beyond the -y side face (y = -0.100)
+  neg_y_side_face_to_edge:            # distance from the -y side face (y=-0.100), -y direction, to that edge
+    value_m: null
+    instrument: null
+    resolution_m: null
+    uncertainty_1sigma_m: null
+  thickness:                         # table top thickness (top face to underside) -- sets the collision box's z extent
     value_m: null
     instrument: null
     resolution_m: null
