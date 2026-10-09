@@ -1,0 +1,71 @@
+# workcell_survey_example.yaml — SYNTHETIC / EXAMPLE FIXTURE for survey_core unit tests only
+# (MOT-10.2). This is NOT a real workcell survey: every reading below is a hand-picked, exact
+# number chosen so test_survey_core.py can hand-compute the expected crackvision.scene_config/1
+# poses to 1e-9. Never copy this into data/workcell_survey/ as if it were a real measurement.
+#
+# Schema: crackvision.workcell_survey/1 (docs/INTERFACES.md §12).
+#
+# Corner winding order (survey.notes): P0 -> P1 -> P2 -> P3 clockwise, starting at the corner
+# nearest the robot on the -y side. The specimen is a 0.20 x 0.15 m rectangle centred at
+# (0.30, 0.0) in base_link, yawed by atan2(0.28, 0.96) rad (a 7:24:25 triangle, chosen so every
+# corner coordinate below is an exact decimal).
+schema: crackvision.workcell_survey/1
+
+survey:
+  operator: "Jane Doe (synthetic/example fixture -- not a real survey, MOT-10.2 unit test only)"
+  date: "2026-10-09"
+  photos: []
+  notes: "SYNTHETIC EXAMPLE FIXTURE for survey_core unit tests. Corner winding order: P0 -> P1 -> P2 -> P3, clockwise, starting at the near/-y corner."
+
+derivation_params:
+  rectangularity_tolerance_m: 0.003
+
+base_mounting:
+  bolted_directly_to_table: true
+  adapter_plate_thickness: null
+
+table:
+  front_face_to_far_edge: {value_m: 0.800, instrument: "tape measure", resolution_m: 0.001, uncertainty_1sigma_m: 0.001}
+  front_face_to_near_edge: {value_m: 0.300, instrument: "tape measure", resolution_m: 0.001, uncertainty_1sigma_m: 0.001}
+  pos_y_side_face_to_edge: {value_m: 0.400, instrument: "tape measure", resolution_m: 0.001, uncertainty_1sigma_m: 0.001}
+  neg_y_side_face_to_edge: {value_m: 0.400, instrument: "tape measure", resolution_m: 0.001, uncertainty_1sigma_m: 0.001}
+  thickness: {value_m: 0.045, instrument: "caliper", resolution_m: 0.0005, uncertainty_1sigma_m: 0.0005}
+  flatness_deviation: {value_m: 0.0008, instrument: "straightedge + feeler gauge", resolution_m: 0.0001, uncertainty_1sigma_m: 0.0002}
+  flatness_note: "checked with a straightedge laid across the specimen footprint"
+
+specimen:
+  corners:
+    - x_from_front_face: {value_m: 0.155, instrument: "caliper", resolution_m: 0.0005, uncertainty_1sigma_m: 0.0005}
+      y_from_centerline: {value_m: -0.100, instrument: "caliper", resolution_m: 0.0005, uncertainty_1sigma_m: 0.0005}
+    - x_from_front_face: {value_m: 0.347, instrument: "caliper", resolution_m: 0.0005, uncertainty_1sigma_m: 0.0005}
+      y_from_centerline: {value_m: -0.044, instrument: "caliper", resolution_m: 0.0005, uncertainty_1sigma_m: 0.0005}
+    - x_from_front_face: {value_m: 0.305, instrument: "caliper", resolution_m: 0.0005, uncertainty_1sigma_m: 0.0005}
+      y_from_centerline: {value_m: 0.100, instrument: "caliper", resolution_m: 0.0005, uncertainty_1sigma_m: 0.0005}
+    - x_from_front_face: {value_m: 0.113, instrument: "caliper", resolution_m: 0.0005, uncertainty_1sigma_m: 0.0005}
+      y_from_centerline: {value_m: 0.044, instrument: "caliper", resolution_m: 0.0005, uncertainty_1sigma_m: 0.0005}
+  thickness_readings:
+    - {value_m: 0.0098, instrument: "caliper", resolution_m: 0.0001, uncertainty_1sigma_m: 0.0002}
+    - {value_m: 0.0101, instrument: "caliper", resolution_m: 0.0001, uncertainty_1sigma_m: 0.0002}
+    - {value_m: 0.0100, instrument: "caliper", resolution_m: 0.0001, uncertainty_1sigma_m: 0.0002}
+    - {value_m: 0.0102, instrument: "caliper", resolution_m: 0.0001, uncertainty_1sigma_m: 0.0002}
+  resting_on_table: true
+
+obstacles:
+  radius_m: 1.0
+  items:
+    - id: wall_east
+      description: "synthetic example obstacle box, well clear of the base keep-out"
+      x_from_front_face:
+        min: {value_m: 0.500, instrument: "tape measure", resolution_m: 0.001, uncertainty_1sigma_m: 0.001}
+        max: {value_m: 0.600, instrument: "tape measure", resolution_m: 0.001, uncertainty_1sigma_m: 0.001}
+      y_from_centerline:
+        min: {value_m: 0.450, instrument: "tape measure", resolution_m: 0.001, uncertainty_1sigma_m: 0.001}
+        max: {value_m: 0.550, instrument: "tape measure", resolution_m: 0.001, uncertainty_1sigma_m: 0.001}
+      z_from_table_top:
+        min: {value_m: 0.000, instrument: "tape measure", resolution_m: 0.001, uncertainty_1sigma_m: 0.001}
+        max: {value_m: 0.300, instrument: "tape measure", resolution_m: 0.001, uncertainty_1sigma_m: 0.001}
+
+acm_observations:
+  base_bolted_to_table: true
+  specimen_resting_on_table: true
+  notes: "synthetic example fixture"
