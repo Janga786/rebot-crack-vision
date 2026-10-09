@@ -7,6 +7,10 @@
 # observation. Every "reading" is the 4-key map {value_m, instrument, resolution_m,
 # uncertainty_1sigma_m} -- fill in ALL FOUR, not just value_m. MOT-10.3's `survey_to_scene`
 # refuses a file with any field still null.
+# Validate the filled-in copy (via scripts/ros/env_ros.sh; --dry-run does NOT validate):
+#   ros2 run crackvision_motion survey_to_scene --validate-survey data/workcell_survey/survey_<date>.yaml
+# Convert (no default --out; docs/motion/SCENE.md §8):
+#   ros2 run crackvision_motion survey_to_scene --survey data/workcell_survey/survey_<date>.yaml --out config/scene/scene.yaml
 #
 # All x/y offsets below are measured from the three FIXED base_link reference faces
 # (docs/INTERFACES.md §12.1 -- these numbers are fixed by the robot model, do not re-measure them):
