@@ -2,7 +2,7 @@
 
 ```json card
 {
-  "kind": "integration",
+  "kind": "branch",
   "depends_on": [
     "HOST-01",
     "HOST-02",
@@ -13,7 +13,6 @@
     "REQ-HOST-1",
     "REQ-OPS-2"
   ],
-  "spec_state": "draft",
   "refine_after": [
     "HOST-01",
     "HOST-02",
@@ -33,3 +32,6 @@
 ```
 
 Draft: specify after the manifest, lock and llama.cpp build exist.
+
+## Decomposed 2026-10-09T05:13:46Z by L-HOST (claude-sonnet-5, high)
+Children: HOST-06.1
