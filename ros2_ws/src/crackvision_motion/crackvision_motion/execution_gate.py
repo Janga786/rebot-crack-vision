@@ -138,7 +138,7 @@ def _load_yaml_mapping(path: Union[str, Path], ctx: str) -> Dict[str, Any]:
         raise GateConfigError(f"{ctx} not found: {path}")
     try:
         text = path.read_text(encoding="utf-8")
-    except OSError as exc:
+    except (OSError, UnicodeDecodeError) as exc:
         raise GateConfigError(f"{ctx} unreadable: {exc}") from exc
     try:
         raw = yaml.safe_load(text)
@@ -149,7 +149,9 @@ def _load_yaml_mapping(path: Union[str, Path], ctx: str) -> Dict[str, Any]:
     return raw
 
 
-def _require_keys(raw: dict, required: frozenset, optional: frozenset, ctx: str) -> None:
+def _require_keys(raw: Any, required: frozenset, optional: frozenset, ctx: str) -> None:
+    if not isinstance(raw, dict):
+        raise GateConfigError(f"{ctx} must be a mapping, got {type(raw).__name__}")
     allowed = required | optional
     unknown = set(raw) - allowed
     if unknown:
@@ -298,7 +300,11 @@ def load_approval(path: Union[str, Path]) -> Dict[str, Any]:
     if not path.is_file():
         raise GateConfigError(f"approval file not found: {path}")
     try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        raise GateConfigError(f"approval file unreadable: {exc}") from exc
+    try:
+        raw = json.loads(text)
     except json.JSONDecodeError as exc:
         raise GateConfigError(f"invalid JSON in approval file {path}: {exc}") from exc
     if not isinstance(raw, dict):
@@ -400,7 +406,7 @@ def evaluate_offline(
     traj: Optional[dict] = None
     try:
         traj = load_trajectory(trajectory_path)
-    except OSError as exc:
+    except (OSError, UnicodeDecodeError) as exc:
         checks.append(GateCheck(G_TRAJ, "error", f"trajectory file unreadable: {exc}"))
     except TrajectoryError as exc:
         checks.append(GateCheck(G_TRAJ, "fail", str(exc)))
@@ -515,17 +521,50 @@ def evaluate_offline(
             except GateConfigError as exc:
                 checks.append(GateCheck(G_SPEED, "error", f"cannot read commissioning speed_scale_cap: {exc}"))
                 cap = None
-        else:
-            cap = exec_cfg["speed_scale"]["cap"]
 
-        if cap is not None:
-            if 0.0 < effective_scale <= cap:
-                checks.append(GateCheck(G_SPEED, "pass", f"effective speed_scale {effective_scale} within (0, {cap}]"))
-            else:
+            if cap is not None:
+                if 0.0 < effective_scale <= cap:
+                    checks.append(GateCheck(
+                        G_SPEED, "pass", f"effective speed_scale {effective_scale} within (0, {cap}]"
+                    ))
+                else:
+                    checks.append(GateCheck(
+                        G_SPEED, "fail",
+                        f"effective speed_scale {effective_scale} outside (0, {cap}] for mode {mode}",
+                    ))
+        else:
+            # mock/dry: the primary refusing cap is always execution.yaml.speed_scale.cap. `dry`
+            # additionally previews `real`'s commissioning-cap rule as `warn` (§11.7 G-SPEED row);
+            # `mock` never consults the commissioning record at all.
+            cap = exec_cfg["speed_scale"]["cap"]
+            if not (0.0 < effective_scale <= cap):
                 checks.append(GateCheck(
                     G_SPEED, "fail",
                     f"effective speed_scale {effective_scale} outside (0, {cap}] for mode {mode}",
                 ))
+            elif mode == "dry":
+                try:
+                    commissioning_for_cap = load_commissioning(commissioning_path)
+                    real_cap = commissioning_for_cap["speed_scale_cap"]
+                except GateConfigError as exc:
+                    checks.append(GateCheck(
+                        G_SPEED, "warn",
+                        f"within (0, {cap}]; commissioning record unreadable, real cap unknown "
+                        f"(warn outside real): {exc}",
+                    ))
+                else:
+                    if effective_scale > real_cap:
+                        checks.append(GateCheck(
+                            G_SPEED, "warn",
+                            f"within (0, {cap}] but exceeds commissioning speed_scale_cap {real_cap} "
+                            f"(warn outside real; real would refuse)",
+                        ))
+                    else:
+                        checks.append(GateCheck(
+                            G_SPEED, "pass", f"effective speed_scale {effective_scale} within (0, {cap}]"
+                        ))
+            else:
+                checks.append(GateCheck(G_SPEED, "pass", f"effective speed_scale {effective_scale} within (0, {cap}]"))
 
     # G-SCENE. `scene_core.load_config` only raises `SceneError` for a file it could read and
     # parse but that fails schema validation (an evaluated `fail`); a missing file or unparseable
@@ -534,7 +573,7 @@ def evaluate_offline(
         scene_cfg = scene_load_config(scene_config_path)
     except SceneError as exc:
         checks.append(GateCheck(G_SCENE, "fail", str(exc)))
-    except (OSError, yaml.YAMLError) as exc:
+    except (OSError, UnicodeDecodeError, yaml.YAMLError) as exc:
         checks.append(GateCheck(G_SCENE, "error", f"scene config unreadable: {exc}"))
     else:
         try:
@@ -552,7 +591,7 @@ def evaluate_offline(
         ee_cfg = ee_load_config(end_effector_config_path)
     except EndEffectorError as exc:
         checks.append(GateCheck(G_EE, "fail", str(exc)))
-    except (OSError, yaml.YAMLError) as exc:
+    except (OSError, UnicodeDecodeError, yaml.YAMLError) as exc:
         checks.append(GateCheck(G_EE, "error", f"end-effector config unreadable: {exc}"))
     else:
         try:
