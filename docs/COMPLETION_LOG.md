@@ -1677,3 +1677,43 @@ ISSUES:
     exercised beyond the prose/schema itself.
 NEXT CARD: GEOM-08.2 (or whichever GEOM-08.x decomposition card implements §9/§10 next)
 ```
+
+---
+
+## CAM-05.1 — Decision: scope of ROS 2 camera integration (ADR-015)
+
+```
+TASK: CAM-05.1
+STATUS: COMPLETE
+CHANGES:
+  - docs/adr/015-camera-ros-integration-scope.md — new ADR, Status: accepted, Supersedes: —.
+    Decides that a continuously-running `realsense2_camera` driver/topic set is not needed for
+    routine capture; `crackvision.realsense_capture`/`crackvision.recording` (pyrealsense2, non-ROS,
+    CAM-01/CAM-02) remain the sole live-capture path for REQ-CAM-2. Names the exactly two narrow
+    ROS 2 touchpoints CAM-05.2 implements: (1) a one-time-per-mount `capture_optical_tf` script
+    reading `realsense2_camera`'s published static TF for `camera_link -> camera_color_optical_frame`
+    (ADR-012 §6.2 forbids hand-building this from per-frame extrinsics metadata) and writing
+    `TF.json {xyz_m, quat_xyzw}`; (2) a `capture_joint_state` script bridging `/joint_states` at the
+    capture instant, writing `JS.json {joint_names, positions_rad, stamp_ns, stamp_source}` — required
+    because `docs/calibration/PLAN.md#0` confirms the D405 mount is eye-in-hand (a fixed eye-to-hand
+    mount would not need per-capture joint state). Both output formats match the `--optical-tf` /
+    `--joint-state` inputs already specified by GEOM-08.4's `crackvision.capture_record` CLI, so no
+    code under `src/crackvision` depends on ROS. Reconciles ADR-012 §6.2 ("never hand-built from the
+    metadata") with INTERFACES §8.4 ("driver's TF ... or the device record"): "device record" means a
+    previously-captured `driver_tf` value recorded into a capture, not a second, metadata-derived
+    method. States that until an operator runs `capture_optical_tf` on hardware, INTERFACES §9's
+    default optical source stays `nominal_d405` and `execution_eligible` is `false` — the intended
+    safe default, not a gap.
+  - docs/COMPLETION_LOG.md — this entry.
+VERIFICATION:
+  - `test -f docs/adr/015-camera-ros-integration-scope.md` -> exit 0.
+  - `grep -q 'nominal_d405' docs/adr/015-camera-ros-integration-scope.md && grep -q 'driver_tf'
+    docs/adr/015-camera-ros-integration-scope.md && grep -q 'camera_color_optical_frame'
+    docs/adr/015-camera-ros-integration-scope.md && grep -q 'CAM-05.2'
+    docs/adr/015-camera-ros-integration-scope.md` -> exit 0.
+  - `grep -q 'CAM-05.1' docs/COMPLETION_LOG.md` -> exit 0 (this entry).
+ISSUES:
+  - None. Documentation-only decision card: no code written, `docs/INTERFACES.md`,
+    `docs/adr/012-frames-and-conventions.md` and GEOM-08 cards left untouched as instructed.
+NEXT CARD: CAM-05.2 (implements capture_optical_tf and capture_joint_state per this ADR)
+```
