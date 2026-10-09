@@ -1,0 +1,56 @@
+# execution_test_real_refusal.yaml — test-only crackvision.execution_config/1 for every
+# `--mode real` invocation in scripts/ros/test_execution.sh (MOT-05.5). Those invocations are all
+# expected to be refused (exit 3); this config only makes an *unexpected* gate pass as harmless as
+# the schema allows. driver_profiles must restate docs/INTERFACES.md §11.1 exactly (the executor
+# refuses an edited table with exit 2 and takes routing from its hard-coded copy), so the safety
+# margin comes from the numbers: 1% real speed scale, a short stuck-goal timeout and a short
+# approval window. Never use this file for an actual commissioning run.
+schema: crackvision.execution_config/1
+
+default_mode: dry
+
+driver_profiles:
+  moveit_mock:
+    action: /rebotarm_controller/follow_joint_trajectory
+    joint_states_topic: /joint_states
+    expected_node: ros2_control mock hardware (MOT-02)
+    modes: [mock, dry]
+  vendor_mock:
+    action: /rebotarm/follow_joint_trajectory
+    joint_states_topic: /rebotarm/joint_states
+    expected_node: mock_rebotarm_driver
+    modes: [mock, dry]
+  vendor:
+    action: /rebotarm/follow_joint_trajectory
+    joint_states_topic: /rebotarm/joint_states
+    expected_node: reBotArmController
+    arm_status_topic: /rebotarm/arm_status
+    modes: [dry, real]
+
+default_driver_profile: moveit_mock
+
+speed_scale:
+  default: 1.0
+  cap: 1.0
+  # 10x below the shipped real default (0.10).
+  real_default: 0.01
+
+tolerances:
+  start_state_rad: 0.02
+  tracking_rad: 0.15
+
+timeouts:
+  joint_state_s: 0.5
+  goal_s: 1.0
+  cancel_settle_s: 2.0
+
+densify_step_m: 0.01
+
+position_margin_rad: 0.03
+
+# The script writes its approval seconds before the run.
+approval_max_age_s: 600
+
+estop_topics:
+  - /crackvision/estop
+  - /rebot_motion/estop

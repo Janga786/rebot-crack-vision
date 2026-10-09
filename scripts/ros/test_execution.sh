@@ -37,6 +37,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 FIXTURES="$REPO_ROOT/ros2_ws/src/crackvision_motion/test/fixtures"
 GATE_FIXTURES="$FIXTURES/execution_gate"
+# Every --mode real invocation uses this test-only execution config (1% real speed scale, short
+# goal timeout), on top of setsid -w </dev/null: defence in depth should a gate ever pass by mistake.
+TEST_EXEC_CFG="$FIXTURES/execution_test_real_refusal.yaml"
 
 # -- guard: never run anywhere near a real vendor driver process. `ps`/`pgrep -x` match against
 # /proc/<pid>/comm, which the kernel truncates to 15 bytes -- "reBotArmController" (18 chars)
@@ -93,6 +96,14 @@ stop_mock_driver() {
 fail() {
     echo "test_execution.sh: FAIL: $*" >&2
     exit 1
+}
+
+# soft_fail MSG -- record a failure but keep going so the remaining cases (and the final
+# stray-process assertion) still produce evidence; the script then exits 1 at the end.
+DEFERRED_FAILURES=()
+soft_fail() {
+    echo "test_execution.sh: FAIL: $*" >&2
+    DEFERRED_FAILURES+=("$*")
 }
 
 # run_exec CMD... -- runs an execute_trajectory invocation detached from the controlling
@@ -216,7 +227,8 @@ echo "== phase 1: offline refusals, no ROS graph =="
 
 echo "-- real mode, repo defaults: must refuse offline before any rclpy.init --"
 run_exec ros2 run crackvision_motion execute_trajectory \
-    --mode real --trajectory "$FIXTURES/trajectory_smoke.json" --record-dir "$RECORD_DIR"
+    --mode real --trajectory "$FIXTURES/trajectory_smoke.json" \
+    --execution-config "$TEST_EXEC_CFG" --record-dir "$RECORD_DIR"
 RC=$?
 [ "$RC" -eq 3 ] || fail "real-mode-defaults: expected exit 3, got $RC"
 REC="$(latest_record)"
@@ -399,13 +411,27 @@ run_exec ros2 run crackvision_motion execute_trajectory \
     --mode mock --profile vendor_mock --trajectory "$FIXTURES/trajectory_smoke.json" \
     --record-dir "$RECORD_DIR" --service-timeout-s 10
 RC=$?
-[ "$RC" -eq 0 ] || fail "vendor_mock smoke: expected exit 0, got $RC (see header note: execute_trajectory's joint_states subscriptions use RELIABLE QoS, incompatible with mock_driver's BEST_EFFORT joint_states -- a known bug outside this card's scope)"
-REC="$(latest_record)"
-assert_outcome "$REC" completed || fail "vendor_mock smoke: outcome assertion failed"
-LIVE="$(read_joint_state /rebotarm/joint_states 5)" || fail "vendor_mock smoke: could not read /rebotarm/joint_states"
-DELTA="$(max_delta_to_point "$LIVE" "0.1,-0.6,-0.9,0.1,0.1,0.1")"
-assert_lt "$DELTA" "0.06" || fail "vendor_mock smoke: did not arrive at P (max|dq|=$DELTA)"
-echo "   OK: exit 0, arrived at P (max|dq|=$DELTA)"
+# The steps depend on each other, so after the first failure the rest are skipped and the
+# failure is recorded once (soft_fail); the vendor real-mode refusal below still runs.
+VM_ERR=""
+if [ "$RC" -ne 0 ]; then
+    VM_ERR="expected exit 0, got $RC (see header note: execute_trajectory subscribes to joint_states with RELIABLE QoS, incompatible with mock_driver's BEST_EFFORT publisher; this is an executor bug outside this card's scope)"
+else
+    REC="$(latest_record)"
+    if ! assert_outcome "$REC" completed; then
+        VM_ERR="outcome assertion failed"
+    elif ! LIVE="$(read_joint_state /rebotarm/joint_states 5)"; then
+        VM_ERR="could not read /rebotarm/joint_states"
+    else
+        DELTA="$(max_delta_to_point "$LIVE" "0.1,-0.6,-0.9,0.1,0.1,0.1")"
+        assert_lt "$DELTA" "0.06" || VM_ERR="did not arrive at P (max|dq|=$DELTA)"
+    fi
+fi
+if [ -n "$VM_ERR" ]; then
+    soft_fail "vendor_mock smoke: $VM_ERR"
+else
+    echo "   OK: exit 0, arrived at P (max|dq|=$DELTA)"
+fi
 
 echo "-- real mode (vendor profile), armed, measured fixture set: refused by G-GRAPH (mock driver visible), no motion --"
 VENDOR_REAL_DIR="$(mktemp -d -t mot055_vendor_real.XXXXXX)"
@@ -473,7 +499,7 @@ CRACKVISION_ARM_REAL=1 run_exec ros2 run crackvision_motion execute_trajectory \
     --mode real --profile vendor \
     --root "$VENDOR_REAL_DIR" \
     --trajectory "$VENDOR_REAL_DIR/trajectory.json" \
-    --execution-config "$REPO_ROOT/config/motion/execution.yaml" \
+    --execution-config "$TEST_EXEC_CFG" \
     --commissioning "$GATE_FIXTURES/commissioning_ready.yaml" \
     --limits "$REPO_ROOT/config/robot/b601_dm_limits.yaml" \
     --scene-config "$GATE_FIXTURES/scene_measured.yaml" \
@@ -508,5 +534,10 @@ if [ -n "$STRAY" ]; then
 fi
 echo "test_execution.sh: no stray processes after teardown"
 
+if [ "${#DEFERRED_FAILURES[@]}" -gt 0 ]; then
+    echo "test_execution.sh: FAILED (${#DEFERRED_FAILURES[@]} deferred failure(s)):" >&2
+    printf '  - %s\n' "${DEFERRED_FAILURES[@]}" >&2
+    exit 1
+fi
 echo "test_execution.sh: OK"
 exit 0
