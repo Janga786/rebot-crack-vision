@@ -1,0 +1,17 @@
+{
+  "schema": "crackvision.joint_trajectory/1",
+  "created_utc": "2026-01-01T00:00:00Z",
+  "producer": "MOT-05.2 fixture",
+  "purpose": "test",
+  "planning_frame": "base_link",
+  "joint_names": ["joint1", "joint2", "joint3", "joint4", "joint5", "joint6"],
+  "notes": "joint2 moves to 0.5 rad, above its upper=0.0 bound; velocity (0.1667 rad/s) stays within limits so only the position check fires.",
+  "points": [
+    {"t_s": 0.0, "positions": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]},
+    {"t_s": 3.0, "positions": [0.0, 0.5, -0.9, 0.0, 0.0, 0.0]}
+  ],
+  "limits_file": {"path": "config/robot/b601_dm_limits.yaml", "sha256": null},
+  "end_effector_config_sha256": null,
+  "scene_config_sha256": null,
+  "source": {"paths3d": null}
+}
