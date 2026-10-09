@@ -1,6 +1,6 @@
 # Progress — week of Mon Oct 05 – Sun Oct 11, 2026
 
-**14 task(s) completed and independently audited this week** · project total **58/104** accepted
+**15 task(s) completed and independently audited this week** · project total **58/104** accepted
 
 ## Completed this week
 
@@ -32,11 +32,13 @@
 …[367 chars clipped]
 - **MOT-10.1 — Decision + contract: workcell survey procedure and survey record (INTERFACES §12, crackvision.workcell_survey/1)** ([details](MOT-10.1.md)): Defined the step-by-step procedure and file format for physically surveying the workcell (table, specimen, nearby obstacles) with a tape measure, calipers and a level, with no robot motion. The base's
 …[282 chars clipped]
+- **MOT-05.3 — Offline execution gate: commissioning/approval/execution-config loaders + full gate report (pure Python)** ([details](MOT-05.3.md)): Built the offline safety gate that must pass before the robot arm's trajectory executor is allowed to run in real mode: it checks trajectory validity, joint-limit compliance, speed caps, scene/end-eff
+…[521 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 19 / 89
-- Audits that rejected work with evidence-backed findings: 4 (repairs created: 4)
+- Implementation/review sessions run: 23 / 94
+- Audits that rejected work with evidence-backed findings: 7 (repairs created: 5)
 - Re-verified after an upstream change: CAM-02, CAM-05.1, GEOM-01, GEOM-01.R1, GEOM-08.1, GEOM-08.2, GEOM-08.2.R1, GEOM-08.5, GEOM-08.5.R1, GEOM-08.6, GEOM-08.7, GEOM-08.8, GEOM-08.8.R1, GEOM-10, MOT-02, MOT-03, MOT-04.2, MOT-04.3, MOT-04.3.R1, MOT-04.6, MOT-05.1, MOT-05.1.R1, MOT-05.2, PERC-03, PERC-03.R1, TC-011, TC-016
 
 ## Planning changes
