@@ -590,6 +590,24 @@ def test_non_utf8_approval_file_does_not_raise(tmp_path):
     assert _get(report, G_APPROVAL).outcome == "fail"
 
 
+@pytest.mark.parametrize("mode", ["mock", "dry", "real"])
+def test_non_utf8_paths3d_does_not_raise(tmp_path, mode):
+    traj_path, traj, _approval, _approval_path, kwargs = _passing_fixture_set(tmp_path)
+    bad_p3d = tmp_path / "p3d.bin"
+    bad_p3d.write_bytes(b"\x89PNG\r\n\x1a\n\xff\xff\xfe\x00")
+    traj = copy.deepcopy(traj)
+    traj["source"]["paths3d"] = {"path": "p3d.bin", "sha256": file_sha256(bad_p3d), "execution_eligible": True}
+    traj_path = _write_json(tmp_path / "trajectory_bad_p3d.json", traj)
+    approval = json.loads((tmp_path / "approval.json").read_text())
+    approval["trajectory_sha256"] = file_sha256(traj_path)
+    _write_json(tmp_path / "approval.json", approval)
+
+    report = evaluate_offline(mode, traj_path, **kwargs)
+    assert not report.passed
+    assert _get(report, G_ELIGIBLE).outcome == "fail"
+    assert G_ELIGIBLE in report.refusals
+
+
 # --------------------------------------------------------------------------------------
 # confirmation helpers (pure)
 # --------------------------------------------------------------------------------------

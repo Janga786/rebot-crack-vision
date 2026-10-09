@@ -687,7 +687,14 @@ def _evaluate_eligible(traj: dict, root: Path, mode: str) -> GateCheck:
             f"source.paths3d.sha256 {source['sha256']} does not match file's actual sha256 {actual_sha}",
         )
     try:
-        p3d = json.loads(p3d_path.read_text(encoding="utf-8"))
+        p3d_text = p3d_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        return GateCheck(G_ELIGIBLE, "error", f"source.paths3d.path unreadable: {exc}")
+    except UnicodeDecodeError as exc:
+        # sha matched, so this is the bound file -- it is just not a paths3d document (integrity fail).
+        return GateCheck(G_ELIGIBLE, "fail", f"source.paths3d.path is not UTF-8 text, not a {PATHS3D_SCHEMA!r} file: {exc}")
+    try:
+        p3d = json.loads(p3d_text)
     except json.JSONDecodeError as exc:
         return GateCheck(G_ELIGIBLE, "fail", f"source.paths3d.path does not parse as JSON: {exc}")
     if not isinstance(p3d, dict) or p3d.get("schema") != PATHS3D_SCHEMA:
