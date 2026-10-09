@@ -1,6 +1,6 @@
 # Progress — week of Mon Oct 05 – Sun Oct 11, 2026
 
-**17 task(s) completed and independently audited this week** · project total **61/104** accepted
+**18 task(s) completed and independently audited this week** · project total **60/104** accepted
 
 ## Completed this week
 
@@ -38,10 +38,12 @@
 …[367 chars clipped]
 - **MOT-04.5 — Run the full reachability sweep, recommend + independently verify the specimen placement, document** ([details](MOT-04.5.md)): Ran the full-resolution MoveIt reachability sweep (3,780 poses, ~27 minutes) for the B601-DM using the corrected tool-tip/specimen-block model and found a feasible specimen placement at x=0.26 m, y=0.
 …[526 chars clipped]
+- **MOT-05.4 — execute_trajectory ROS node/CLI: online read-only checks, mock/dry/real execution, typed confirmation, e-stop + tracking monitor, execution record** ([details](MOT-05.4.md)): Implemented execute_trajectory, the ADR-016/§11 commissioning-gated-execution ROS node/CLI for crackvision_motion. It runs the MOT-05.3 offline gate before any rclpy.init() call, then online read-only
+…[571 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 27 / 112
+- Implementation/review sessions run: 28 / 113
 - Audits that rejected work with evidence-backed findings: 9 (repairs created: 7)
 - Re-verified after an upstream change: CAM-02, CAM-05.1, CAM-05.2, GEOM-01, GEOM-01.R1, GEOM-08.1, GEOM-08.2, GEOM-08.2.R1, GEOM-08.5, GEOM-08.5.R1, GEOM-08.6, GEOM-08.7, GEOM-08.8, GEOM-08.8.R1, GEOM-10, MOT-02, MOT-03, MOT-04.1, MOT-04.1.R1, MOT-04.2, MOT-04.3, MOT-04.3.R1, MOT-04.4, MOT-04.4.R1, MOT-04.6, MOT-05.1, MOT-05.1.R1, MOT-05.2, MOT-10.1, MOT-10.1.R1, PERC-03, PERC-03.R1, TC-011, TC-016
 
@@ -57,10 +59,10 @@
 |---|---|---|
 | Host platform & reproducibility (L-HOST) | 7 | 10 |
 | Local coding model (L-LLM) | 2 | 6 |
-| D405 capture (L-CAM) | 7 | 9 |
+| D405 capture (L-CAM) | 6 | 9 |
 | Perception (L-PERC) | 13 | 16 |
-| Geometry & calibration (L-GEOM) | 15 | 24 |
-| Motion planning (L-MOTION) | 14 | 27 |
+| Geometry & calibration (L-GEOM) | 14 | 24 |
+| Motion planning (L-MOTION) | 15 | 27 |
 | Integration & commissioning (L-INT) | 1 | 6 |
 | Operator workflow & handoff (L-OPS) | 1 | 4 |
 | Imitation learning (later phase) (L-IL) | 0 | 1 |
