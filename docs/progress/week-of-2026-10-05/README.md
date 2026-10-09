@@ -1,6 +1,6 @@
 # Progress — week of Mon Oct 05 – Sun Oct 11, 2026
 
-**10 task(s) completed and independently audited this week** · project total **54/93** accepted
+**11 task(s) completed and independently audited this week** · project total **54/93** accepted
 
 ## Completed this week
 
@@ -24,10 +24,12 @@
 …[156 chars clipped]
 - **HOST-06.1 — Fresh-clone + from-lock reproducibility audit, with RUNBOOK conformance fixes** ([details](HOST-06.1.md)): Added an automated audit script that proves this project's environment setup is truly portable: it spins up a full copy of the repo in a scratch location and a brand-new throwaway Python environment b
 …[449 chars clipped]
+- **MOT-03 — Planning scene from config (nominal until measured)** ([details](MOT-03.md)): Corrected the MOT-03 collision scene per the 2026-09-30 re-spec: removed the world-fixed camera_mount object/ACM entry (the D405 and mount are eye-in-hand robot links from GEOM-10, already in every pl
+…[378 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 13 / 22
+- Implementation/review sessions run: 14 / 23
 - Audits that rejected work with evidence-backed findings: 2 (repairs created: 2)
 - Re-verified after an upstream change: CAM-05.1, GEOM-08.1, GEOM-10, MOT-02, TC-011, TC-016
 
