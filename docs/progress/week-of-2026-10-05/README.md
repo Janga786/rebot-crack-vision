@@ -1,6 +1,6 @@
 # Progress — week of Mon Oct 05 – Sun Oct 11, 2026
 
-**9 task(s) completed and independently audited this week** · project total **52/92** accepted
+**10 task(s) completed and independently audited this week** · project total **50/93** accepted
 
 ## Completed this week
 
@@ -22,25 +22,31 @@
 …[633 chars clipped]
 - **LLM-02 — Build pinned llama.cpp (CUDA, sm_86) in user space** ([details](LLM-02.md)): The pinned llama.cpp build (CUDA, RTX 3090 target) is now fully set up at ~/opt/llama.cpp with no sudo involved, and the project's runtime docs/config were regenerated from that real build rather than
 …[156 chars clipped]
+- **HOST-06.1 — Fresh-clone + from-lock reproducibility audit, with RUNBOOK conformance fixes** ([details](HOST-06.1.md)): Added an automated audit script that proves this project's environment setup is truly portable: it spins up a full copy of the repo in a scratch location and a brand-new throwaway Python environment b
+…[449 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 12 / 18
+- Implementation/review sessions run: 13 / 19
 - Audits that rejected work with evidence-backed findings: 2 (repairs created: 2)
 - Re-verified after an upstream change: CAM-05.1, GEOM-08.1, MOT-02
+
+## Planning changes
+
+- decomposed: HOST-06 → HOST-06.1
 
 ## Progress by work package
 
 | Work package | Accepted | Total |
 |---|---|---|
-| Host platform & reproducibility (L-HOST) | 5 | 9 |
+| Host platform & reproducibility (L-HOST) | 6 | 10 |
 | Local coding model (L-LLM) | 2 | 6 |
 | D405 capture (L-CAM) | 7 | 9 |
-| Perception (L-PERC) | 13 | 16 |
-| Geometry & calibration (L-GEOM) | 15 | 24 |
+| Perception (L-PERC) | 12 | 16 |
+| Geometry & calibration (L-GEOM) | 14 | 24 |
 | Motion planning (L-MOTION) | 7 | 16 |
 | Integration & commissioning (L-INT) | 1 | 6 |
-| Operator workflow & handoff (L-OPS) | 1 | 4 |
+| Operator workflow & handoff (L-OPS) | 0 | 4 |
 | Imitation learning (later phase) (L-IL) | 0 | 1 |
 
 ## Waiting on the operator / hardware (snapshot)
