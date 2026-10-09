@@ -135,12 +135,22 @@ def test_p_base_matches_known_transform():
 # --- 4. Gap interpolation / splitting / trimming / drop ---------------------------------
 
 
-def _island_depth_image(n_points, spacing=30, patch=12, valid_depth=0.2, invalid_indices=()):
+def _island_depth_image(n_points, spacing=30, patch=12, valid_depth=0.2, invalid_indices=(), depths=None):
+    """`depths`, if given, is a per-point depth (m), letting neighbouring islands differ so a
+    gap's bounding neighbours have genuinely different covariance traces. Column boundaries
+    between islands sit at the midpoints, far outside any point's annulus (outer_px=8 << half
+    the 30px spacing), so each point's own annulus stays within its own uniform depth."""
     height = 100
     width = spacing * (n_points + 2)
-    depth_u16 = _flat_depth_image((height, width), valid_depth)
+    if depths is None:
+        depths = [valid_depth] * n_points
     row = height // 2
     cols = [spacing * (i + 1) for i in range(n_points)]
+    boundaries = [0] + [(cols[i] + cols[i + 1]) // 2 for i in range(n_points - 1)] + [width]
+    depth_u16 = np.zeros((height, width), dtype=np.uint16)
+    for i in range(n_points):
+        c0, c1 = boundaries[i], boundaries[i + 1]
+        depth_u16[:, c0:c1] = int(round(depths[i] / SCALE))
     for idx, col in enumerate(cols):
         if idx in invalid_indices:
             r0, r1 = max(0, row - patch), min(height, row + patch + 1)
@@ -156,10 +166,17 @@ def test_gap_policy_interpolate_split_trim_and_drop():
     # 15-22: 8px gap (splits); 23,24: valid but too short (dropped); 25,26: trailing trim.
     invalid = set(range(0, 2)) | set(range(7, 10)) | set(range(15, 23)) | set(range(25, 27))
     n_points = 27
-    depth_u16, mask, points_rc = _island_depth_image(n_points, invalid_indices=invalid)
+    # point 6 and point 10 bound the 3px gap (7-9); give them different depths so their
+    # covariance traces differ and the "conservative (larger-trace) neighbour" choice is
+    # actually distinguishable (sigma_z is quadratic in depth).
+    depths = [0.2] * n_points
+    depths[6] = 0.12
+    depths[10] = 0.45
+    depth_u16, mask, points_rc = _island_depth_image(n_points, invalid_indices=invalid, depths=depths)
 
     calib = CalibSigmas(cam_pos_m=0.0, cam_rot_rad=0.0)
-    lifted = lift_polyline(points_rc, depth_u16, mask, make_intrinsics(), SCALE, np.eye(4), calib, LiftParams())
+    T = np.eye(4)
+    lifted = lift_polyline(points_rc, depth_u16, mask, make_intrinsics(), SCALE, T, calib, LiftParams())
 
     # leading/trailing trims stay invalid, never interpolated/extrapolated
     for i in (0, 1, 25, 26):
@@ -167,11 +184,44 @@ def test_gap_policy_interpolate_split_trim_and_drop():
         assert not lifted.interpolated[i]
 
     # the 3px interior gap is bridged
+    left, right = 6, 10
+    assert not np.isclose(np.trace(lifted.cov_base[left]), np.trace(lifted.cov_base[right]))
+    conservative = left if np.trace(lifted.cov_base[left]) >= np.trace(lifted.cov_base[right]) else right
+    span = right - left
+    T_optical_base = np.linalg.inv(T)
     for i in (7, 8, 9):
         assert lifted.valid[i]
         assert lifted.interpolated[i]
         assert lifted.reason[i].startswith("interpolated:")
-        assert not np.any(np.isnan(lifted.p_base[i]))
+
+        t = (i - left) / span
+        expected_p_base = (1 - t) * lifted.p_base[left] + t * lifted.p_base[right]
+        assert np.allclose(lifted.p_base[i], expected_p_base, atol=1e-9)
+
+        nlerp = (1 - t) * lifted.n_base[left] + t * lifted.n_base[right]
+        expected_n_base = nlerp / np.linalg.norm(nlerp)
+        assert np.allclose(lifted.n_base[i], expected_n_base, atol=1e-9)
+        assert np.isclose(np.linalg.norm(lifted.n_base[i]), 1.0, atol=1e-9)
+
+        assert np.allclose(lifted.cov_base[i], lifted.cov_base[conservative], atol=1e-12)
+        assert np.isclose(lifted.normal_rms_m[i], lifted.normal_rms_m[conservative], atol=1e-12)
+        assert np.isclose(lifted.sigma_normal_rad[i], lifted.sigma_normal_rad[conservative], atol=1e-12)
+
+        expected_p_opt = (T_optical_base @ np.array([*lifted.p_base[i], 1.0]))[:3]
+        assert np.allclose(lifted.p_optical[i], expected_p_opt, atol=1e-9)
+        assert np.isclose(lifted.depth_m[i], lifted.p_optical[i][2], atol=1e-9)
+
+    # every valid point, including interpolated ones, carries fully finite geometry (no NaN leak)
+    for i in range(n_points):
+        if not lifted.valid[i]:
+            continue
+        assert np.isfinite(lifted.depth_m[i])
+        assert np.all(np.isfinite(lifted.p_optical[i]))
+        assert np.all(np.isfinite(lifted.p_base[i]))
+        assert np.all(np.isfinite(lifted.n_base[i]))
+        assert np.isfinite(lifted.normal_rms_m[i])
+        assert np.isfinite(lifted.sigma_normal_rad[i])
+        assert np.all(np.isfinite(lifted.cov_base[i]))
 
     # the 8px interior gap is not bridged and splits the polyline
     for i in range(15, 23):
@@ -211,10 +261,14 @@ def _finite_diff_sigma_opt(intr: Intrinsics, row, col, z, sigma_px, sigma_z, h=1
 
 
 def test_covariance_matches_finite_difference_jacobian():
-    intr = make_intrinsics()
+    # ppx/ppy placed at the exact centre of the 100x100 image, so (row=ppy, col=ppx)=(50,50) is
+    # the true principal-point pixel (x=y=0, where J's off-diagonal z-terms vanish) -- not just
+    # an arbitrarily-named "centre" pixel far off-axis.
+    intr = make_intrinsics(ppx=50.0, ppy=50.0)
     depth_u16 = _flat_depth_image((100, 100), 0.3)
     mask = np.zeros((100, 100), dtype=bool)
-    # centre pixel + an off-axis pixel, far enough apart to avoid annulus overlap at this size.
+    # principal-point pixel + a genuinely off-axis pixel, far enough apart to avoid annulus
+    # overlap at this size.
     points_rc = [(50, 50), (50, 50), (50, 50), (80, 20), (80, 20), (80, 20)]
     calib = CalibSigmas(cam_pos_m=0.0, cam_rot_rad=0.0)
     params = LiftParams()
