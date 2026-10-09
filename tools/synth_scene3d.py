@@ -97,9 +97,14 @@ HOLE_LONG_ZERO_RADIUS_PX = float(ANNULUS_OUTER_PX_DEFAULT)
 HOLE_EDGE_MARGIN = 20
 HOLE_GAP = 25
 
-# ADR-014 §3 nominal placement fallback, used when config/motion/specimen_placement.yaml carries
-# no feasible placement (as of this card: schema value_status nominal, feasible: false,
-# placement: null) -- see `specimen_center()`.
+# ADR-014 §3 nominal placement fallback, used by `specimen_center()` whenever
+# config/motion/specimen_placement.yaml is missing, unreadable or carries no feasible placement
+# under the given `root`. As of this card the *live* repo file (config/motion/specimen_placement.yaml)
+# is feasible with centre (0.26, 0.0, 0.0) -- but every invocation this card exercises (the test
+# suite's scaffolded tmp_path root, and the doc's own `--out` examples) resolves `root` to a
+# scaffolded scratch directory that never contains a copy of that file (`_ensure_project_scaffold`
+# only copies `config/project.yaml`), so this fallback is still what actually gets used here. See
+# `specimen_center()` and docs/geometry/PATH3D_VERIFICATION.md's "Specimen centre" section.
 FALLBACK_SPECIMEN_CENTER_XY_M = (0.29, 0.0)
 # config/scene/scene.yaml's specimen box: position_m [0.30, 0.0, -0.015], dimensions_m
 # [..,..,0.01] -> top face z = -0.015 + 0.01/2 = -0.01 (base_link). Used as "table z" since
@@ -118,12 +123,18 @@ Pixel = tuple[int, int]
 def specimen_center(root: Path) -> tuple[np.ndarray, str]:
     """`(center_xyz_base, source)`.
 
-    Reads `config/motion/specimen_placement.yaml`'s `placement.center_xy_m` (MOT-04.3 schema) when
-    it is feasible. As of this card that file is `feasible: false, placement: null` (a nominal
-    "no feasible placement found" result, not a measurement) -- in that case, and whenever the
-    expected keys are missing/differently shaped, this falls back to the ADR-014 §3 nominal
-    placement `(0.29, 0, table_z)` with `table_z` taken from `config/scene/scene.yaml`'s specimen
-    box top face (`FALLBACK_SPECIMEN_TOP_Z_M`), and says so in the returned source string.
+    Reads `{root}/config/motion/specimen_placement.yaml`'s `placement.center_xy_m` (MOT-04.3
+    schema) when that file is present under `root` and has a `placement` with `center_xy_m`.
+    Whenever the file is missing/unreadable under `root`, or the expected keys are missing or
+    differently shaped, this falls back to the ADR-014 §3 nominal placement `(0.29, 0, table_z)`
+    with `table_z` taken from `config/scene/scene.yaml`'s specimen box top face
+    (`FALLBACK_SPECIMEN_TOP_Z_M`), and says so in the returned source string.
+
+    Note this reads `root`'s copy of the file, not necessarily the live repo's: every call this
+    card's generator (`generate_case`/`main`) makes passes the generator's `--out`/scaffolded
+    root, and `_ensure_project_scaffold` never copies `config/motion/specimen_placement.yaml`
+    into that root -- so those calls always take the fallback branch below, regardless of
+    whether the live repo's `config/motion/specimen_placement.yaml` is feasible.
     """
     path = Path(root) / "config" / "motion" / "specimen_placement.yaml"
     try:
@@ -148,10 +159,10 @@ def specimen_center(root: Path) -> tuple[np.ndarray, str]:
             [FALLBACK_SPECIMEN_CENTER_XY_M[0], FALLBACK_SPECIMEN_CENTER_XY_M[1], FALLBACK_SPECIMEN_TOP_Z_M],
             dtype=np.float64,
         ),
-        f"fallback: {path} has no feasible placement (value_status nominal, feasible: false, "
-        "placement: null as of this card) -- using the ADR-014 §3 nominal placement (0.29, 0) "
-        f"on the table, with table_z={FALLBACK_SPECIMEN_TOP_Z_M} from config/scene/scene.yaml's "
-        "specimen box top face",
+        f"fallback: {path} has no usable placement.center_xy_m under this root (file missing, "
+        "unreadable, or placement/center_xy_m absent or malformed) -- using the ADR-014 §3 "
+        f"nominal placement (0.29, 0) on the table, with table_z={FALLBACK_SPECIMEN_TOP_Z_M} "
+        "from config/scene/scene.yaml's specimen box top face",
     )
 
 
