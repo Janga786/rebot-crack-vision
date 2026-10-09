@@ -1,6 +1,6 @@
 # Progress — week of Mon Oct 05 – Sun Oct 11, 2026
 
-**6 task(s) completed and independently audited this week** · project total **46/92** accepted
+**6 task(s) completed and independently audited this week** · project total **48/92** accepted
 
 ## Completed this week
 
@@ -19,9 +19,9 @@
 
 ## Quality loop
 
-- Implementation/review sessions run: 7 / 8
+- Implementation/review sessions run: 7 / 9
 - Audits that rejected work with evidence-backed findings: 1 (repairs created: 1)
-- Re-verified after an upstream change: GEOM-08.1
+- Re-verified after an upstream change: GEOM-08.1, MOT-02
 
 ## Progress by work package
 
@@ -29,10 +29,10 @@
 |---|---|---|
 | Host platform & reproducibility (L-HOST) | 5 | 9 |
 | Local coding model (L-LLM) | 1 | 6 |
-| D405 capture (L-CAM) | 6 | 9 |
+| D405 capture (L-CAM) | 7 | 9 |
 | Perception (L-PERC) | 13 | 16 |
 | Geometry & calibration (L-GEOM) | 12 | 24 |
-| Motion planning (L-MOTION) | 6 | 16 |
+| Motion planning (L-MOTION) | 7 | 16 |
 | Integration & commissioning (L-INT) | 1 | 6 |
 | Operator workflow & handoff (L-OPS) | 1 | 4 |
 | Imitation learning (later phase) (L-IL) | 0 | 1 |
