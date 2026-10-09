@@ -1,6 +1,6 @@
 # Progress — week of Mon Oct 05 – Sun Oct 11, 2026
 
-**3 task(s) completed and independently audited this week** · project total **44/92** accepted
+**4 task(s) completed and independently audited this week** · project total **44/92** accepted
 
 ## Completed this week
 
@@ -10,10 +10,12 @@
 …[296 chars clipped]
 - **GEOM-08.6 — tool_tip trace/approach/retract waypoints from lifted segments (crackvision.tool_waypoints)** ([details](GEOM-08.6.md)): Added the module that turns a lifted 3D crack-surface segment into a sequence of robot tool-tip waypoints: evenly spaced trace points 1cm off the surface along the surface normal, bracketed by approac
 …[191 chars clipped]
+- **CAM-05.1 — Decision: scope of ROS 2 camera integration (ADR-015)** ([details](CAM-05.1.md)): Wrote a short design decision (ADR-015) clarifying that the camera integration work does not need a full ROS camera driver running at all times; instead it needs only two small one-off ROS tools to gr
+…[268 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 4 / 4
+- Implementation/review sessions run: 5 / 5
 - Audits that rejected work with evidence-backed findings: 1 (repairs created: 1)
 
 ## Progress by work package
@@ -22,9 +24,9 @@
 |---|---|---|
 | Host platform & reproducibility (L-HOST) | 5 | 9 |
 | Local coding model (L-LLM) | 1 | 6 |
-| D405 capture (L-CAM) | 4 | 9 |
+| D405 capture (L-CAM) | 5 | 9 |
 | Perception (L-PERC) | 13 | 16 |
-| Geometry & calibration (L-GEOM) | 11 | 24 |
+| Geometry & calibration (L-GEOM) | 10 | 24 |
 | Motion planning (L-MOTION) | 7 | 16 |
 | Integration & commissioning (L-INT) | 1 | 6 |
 | Operator workflow & handoff (L-OPS) | 1 | 4 |
