@@ -1631,3 +1631,137 @@ state explicitly; the oracle contributes only its collision/self-collision geome
 | `approval_max_age_s` | 3600 s (1 h) | Long enough for an operator to review a MOT-08 preview and walk to the workstation without re-approving; short enough that a stale approval can't silently authorize a run on a physically-rearranged cell later the same day (sha-bindings catch *file* changes; this bounds the *time* window for unrecorded physical changes). |
 
 ---
+
+## 12. Workcell survey record (`crackvision.workcell_survey/1`)
+
+**Normative source:** `docs/motion/WORKCELL_SURVEY.md` (MOT-10.1). That document is the operator-facing
+procedure (tools, checklist, re-measure triggers); this section is the normative schema for the file the
+procedure produces — the **raw** instrument readings, never operator-computed `base_link` coordinates.
+Nothing here edits §0–§11. MOT-10.3 (`survey_to_scene`, not yet implemented) is the only consumer that
+turns a validated survey record into `config/scene/scene.yaml` entries (§3) with `value_status: measured`.
+
+### 12.1 Datum (fixed, not a survey field)
+
+Every offset in a survey record is along the same `base_link` reference faces MOT-10.1 establishes from
+the canonical URDF's `base_link.STL` bounding box (`~/rebot_ws/install/rebotarm_bringup/share/rebotarm_bringup/description/meshes_b601_gripper/base_link.STL`,
+mesh origin identity in the URDF, so STL vertex coordinates equal `base_link` frame coordinates directly):
+
+| Reference face | `base_link` coordinate | STL bbox axis |
+|---|---|---|
+| bottom face (table contact) | `z = 0` | `z ∈ [0.000, 0.08265]` m |
+| front face (arm reach / `+x`) | `x = +0.070` m | `x ∈ [-0.070, 0.070]` m |
+| side faces (`±y`) | `y = ±0.100` m | `y ∈ [-0.100, 0.100]` m |
+
+These three numbers are fixed by the robot model, not re-measured per survey; a survey record does not
+repeat them, it only states offsets *from* them.
+
+### 12.2 Top-level keys (exact set; unknown keys are a config error)
+
+| Key | Type | Meaning |
+|---|---|---|
+| `schema` | str | `"crackvision.workcell_survey/1"` |
+| `survey` | map | `{operator, date, photos[], notes}` — §12.3 |
+| `derivation_params` | map | `{rectangularity_tolerance_m}` — §12.6 |
+| `base_mounting` | map | §12.4(a) |
+| `table` | map | §12.4(b) |
+| `specimen` | map | §12.4(c) |
+| `obstacles` | map | §12.4(d) |
+| `acm_observations` | map | §12.4(e) |
+
+A **reading** (used throughout) is always the 4-key map `{value_m, instrument, resolution_m,
+uncertainty_1sigma_m}` — `value_m` a float (metres or radians per field name), `instrument` and
+`resolution_m` naming the tool and its smallest graduation, `uncertainty_1sigma_m` the operator's stated
+1-sigma uncertainty for that specific reading. A reading with any of the four `null` is incomplete and
+blocks every derived value that depends on it (§12.7).
+
+### 12.3 `survey` (file-level provenance)
+
+| Field | Type | Meaning |
+|---|---|---|
+| `operator` | str | who took the measurements |
+| `date` | str | ISO-8601 date |
+| `photos` | list[str] | repo-relative paths under `data/workcell_survey/` (git-ignored, §12 never commits these) |
+| `notes` | str | free text |
+
+### 12.4 Measurement blocks (raw readings only)
+
+**(a) `base_mounting`**
+
+| Field | Type | Meaning |
+|---|---|---|
+| `bolted_directly_to_table` | bool | `true` if the base casting/plate sits directly on the table with no adapter |
+| `adapter_plate_thickness` | reading\|null | required iff `bolted_directly_to_table` is `false`; else `null` |
+
+**(b) `table`** — all distances measured from the §12.1 reference faces, along the base's own axes
+
+| Field | Type | Meaning |
+|---|---|---|
+| `front_face_to_far_edge` | reading | table edge distance beyond the base's `+x` front face |
+| `front_face_to_near_edge` | reading | table edge distance behind the base's `-x` side (may be a small or negative offset if the table edge is behind the base) |
+| `pos_y_side_face_to_edge` | reading | table edge distance beyond the `+y` side face |
+| `neg_y_side_face_to_edge` | reading | table edge distance beyond the `-y` side face |
+| `flatness_deviation` | reading | spirit-level bubble deviation / straightedge gap near the specimen location |
+| `flatness_note` | str | where on the table this was checked |
+
+**(c) `specimen`**
+
+| Field | Type | Meaning |
+|---|---|---|
+| `corners` | list[4 maps] | each `{x_from_front_face, y_from_centerline}` (both readings), one per physical top corner, in a consistent winding order stated in `survey.notes` |
+| `thickness_readings` | list[≥3 readings] | caliper thickness at ≥3 distinct points on the specimen |
+| `resting_on_table` | bool | observed, not derived |
+
+**(d) `obstacles`**
+
+| Field | Type | Meaning |
+|---|---|---|
+| `radius_m` | float | the stated clearance radius around `base_link`'s origin that was surveyed |
+| `items` | list[map] | each `{id, description, x_from_front_face: {min, max} readings, y_from_centerline: {min, max} readings, z_from_table_top: {min, max} readings}` — one axis-aligned box per obstacle (wall, fixture, cable run, camera USB lead routing, etc.) inside `radius_m` |
+
+**(e) `acm_observations`**
+
+| Field | Type | Meaning |
+|---|---|---|
+| `base_bolted_to_table` | bool | mirrors `base_mounting.bolted_directly_to_table`, stated here as the explicit ACM-facing observation |
+| `specimen_resting_on_table` | bool | mirrors `specimen.resting_on_table` |
+| `notes` | str | free text |
+
+### 12.5 Explicitly out of scope (not in this schema)
+
+Camera and mount poses are **not** tape-measured here — they come from hand-eye calibration
+(GEOM-05, ADR-013/014). The eye-in-hand wrist mount is robot geometry (GEOM-10,
+`config/robot/end_effector.yaml`). This procedure is `motion: false`: the arm stays powered off or at
+rest throughout and nothing is jogged.
+
+### 12.6 `derivation_params`
+
+| Field | Type | Meaning |
+|---|---|---|
+| `rectangularity_tolerance_m` | float | max allowed deviation (any corner, after fitting the best rectangle) before the specimen corners are refused as non-rectangular (§12.7); normative default `0.003` (3 mm) |
+
+### 12.7 Derived-value rules (normative, deterministic — implemented by MOT-10.3's `survey_to_scene`)
+
+1. **Specimen centre/yaw/footprint**: fit the minimum-area rectangle through the 4 `corners` (in the
+   base-face coordinates of §12.1, i.e. `x = front_face_offset`, `y = centerline_offset`). Centre =
+   rectangle centroid, `yaw_rad` = rectangle's long-axis angle from `base_link` `+x`, `footprint_m` = the
+   fitted rectangle's side lengths. **Refuse** if any corner lies more than `rectangularity_tolerance_m`
+   from the fitted rectangle.
+2. **Specimen top z**: `z_top = adapter_plate_thickness.value_m (or 0 if bolted_directly_to_table) +
+   mean(thickness_readings[*].value_m)`.
+3. **Table box**: footprint from `front_face_to_far_edge` + `front_face_to_near_edge` (x-extent, both
+   relative to the `base_link` `x = +0.070` front face) and `pos_y_side_face_to_edge` +
+   `neg_y_side_face_to_edge` (y-extent, relative to `x = ±0.100` side faces); top face placed at
+   `z = -(adapter_plate_thickness.value_m or 0)` — exactly `0` when `bolted_directly_to_table` is `true`.
+4. **Obstacle boxes**: each `items[i]` becomes one axis-aligned box directly from its `min`/`max` readings
+   on the same `base_link` references as the table.
+5. **Provenance**: every derived scene object (table, specimen, each obstacle) written to
+   `config/scene/scene.yaml` by MOT-10.3 gets `value_status: measured` and `source` naming this survey
+   file's path and `sha256`.
+6. **Refusal conditions** (any one refuses the whole conversion, exit 2/3 per §0.2, no partial scene
+   write): a corner-rectangularity violation (rule 1); `specimen.resting_on_table` is `false`;
+   `acm_observations.base_bolted_to_table` disagrees with `base_mounting.bolted_directly_to_table`; any
+   derived obstacle box overlaps the robot's base keep-out (`base_keepout_m`, §8.3); fewer than 3
+   `thickness_readings`; and any reading anywhere in the file with a `null` `value_m`, `instrument`,
+   `resolution_m` or `uncertainty_1sigma_m`.
+
+---
