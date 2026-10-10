@@ -2,3 +2,4 @@
 - 2026-10-10T23:09:31Z `bringup_2026-10-10_facts.yaml` — operator-sourced (added via claude-auto evidence add). Machine-readable transcription of the same evidence with per-value provenance (raw file or 'operator statement'); input for the MOT-11 vendor-driver readiness check. Not configuration.
 - 2026-10-10T23:09:38Z `SETUP_LOG.md` — operator-sourced (added via claude-auto evidence add). Raw operator session log 2026-10-10 (sessions 1-3), unmodified from ~/rebot_setup (sha256 c697d9e2...).
 - 2026-10-10T23:09:38Z `scan_phase2.txt` — operator-sourced (added via claude-auto evidence add). Session 1 read-only scan: one hit at 0x01 / MST 0x00 (factory-default ID collision, before the DMTool ID writes).
+- 2026-10-10T23:09:38Z `scan_s2_phase2.txt` — operator-sourced (added via claude-auto evidence add). Session 2 read-only scan after DMTool ID writes (15:54): 7/7 at ESC 0x01-0x07 / MST 0x11-0x17; none at 0x08-0x20.
