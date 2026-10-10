@@ -1,0 +1,1 @@
+- 2026-10-10T23:09:47Z `arm_adapter_usb_ids_2026-10-10.md` — operator-sourced (added via claude-auto evidence add). Cited source for the arm adapter VID:PID 2e88:4603 (HDSC CDC Device, SN 00000000050C): journalctl -k excerpts from SETUP_LOG.md plus the operator's lsusb statement. Not guessed.
