@@ -4,7 +4,8 @@
 {
   "kind": "impl",
   "depends_on": [
-    "MOT-05.5"
+    "MOT-05.5",
+    "MOT-11"
   ],
   "requirements": [
     "REQ-MOT-1",
@@ -24,7 +25,8 @@
     "config/motion/execution.yaml",
     "config/robot/commissioning.yaml",
     "scripts/ros/test_execution.sh",
-    "docs/motion/ROS_WORKSPACE.md"
+    "docs/motion/ROS_WORKSPACE.md",
+    "docs/motion/VENDOR_DRIVER.md"
   ],
   "acceptance": {
     "checks": [
@@ -67,3 +69,25 @@
 ```
 
 Write for the operator who will run MOT-09 and later INT-04/INT-05. Derive every statement from ADR-016, §11 and the implemented code and config; do not invent behaviour. Cite exact commands (scripts/ros/env_ros.sh, sourcing the overlay, ros2 run crackvision_motion execute_trajectory …), file paths and record locations (logs/execution/). Include the GEOM-05/GEOM-07/MOT-09 ordering note from ADR-016 verbatim or by reference, so the operator knows that calibration motion does not go through this executor unless the technical lead approves an exception. Append to ROS_WORKSPACE.md; do not rewrite it.
+
+## 2026-10-10 operator note (overnight session): vendor-driver facts the runbook must state
+A read-only survey of `~/rebot_ws` found the following; MOT-11 turns it into `docs/motion/VENDOR_DRIVER.md`
+plus a checker. The runbook's "real-driver bring-up" section must say these things plainly and point to that
+note.
+- **Launching `reBotArmController` energises the arm.** `HardwareManager.connect()`
+  (`hardware_manager.py:190-197`) runs the SDK's `ArmEndPos.start()`, which switches the arm motors to POS_VEL
+  (a CTRL_MODE register write to RAM, plus POS_VEL gain registers), calls `enable_all()` and starts a
+  position-hold loop. `init_gripper()` (`:572-600`) calls `enable_all()` again. No `/enable` call is needed.
+  A dry rehearsal against the live driver therefore means an energised, holding arm, even though the
+  executor sends nothing.
+- **safe_park.** The default `safe_park.yaml` holds `safe_park_q` with joint2 = +0.011 and joint3 = +0.136 rad,
+  above the URDF limit and, on this unit, into the folded contact. The driver seeds that target at connect
+  and parks to it on shutdown. Until the operator fixes the vendor file, launch with safe_park disabled.
+- **After a vendor-driver session**, power-cycle the arm so the flash-stored MIT mode returns.
+  `first_move_j1.py` and the read-only bring-up scripts refuse to work unless CTRL_MODE is 1.
+- **ROS domain.** Run the driver and the executor from `scripts/ros/env_ros.sh` shells, with the same domain and
+  localhost-only setting. The vendor deploy kit's own scripts use `ROS_DOMAIN_ID=42` and a localhost DDS
+  profile (`docs/WORKSTATION_DEPLOY.md`), so an executor in this repo's environment would not see that
+  driver.
+- **Device naming.** Keep `channel` a `/dev/tty*` path such as `/dev/ttyACM0` or HOST-04's `/dev/ttyREBOT_ARM`.
+  Never use `/dev/rebot_arm`, which switches the SDK to SocketCAN.
