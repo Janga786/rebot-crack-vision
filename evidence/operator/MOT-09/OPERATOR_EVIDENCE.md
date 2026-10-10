@@ -10,3 +10,4 @@
 - 2026-10-10T23:09:46Z `p1_live_positions.log` — operator-sourced (added via claude-auto evidence add). Console log of the sign check, with per-joint min/max summary.
 - 2026-10-10T23:09:47Z `readonly_bus.py` — operator-sourced (added via claude-auto evidence add). Read-only motor wrapper used by the session scripts (whitelist: request_feedback, get_state, get_register_*; close_bus, never shutdown).
 - 2026-10-10T23:09:47Z `p1_registers.py` — operator-sourced (added via claude-auto evidence add). Script that produced p1_registers.txt (read-only).
+- 2026-10-10T23:09:47Z `p1_live_positions.py` — operator-sourced (added via claude-auto evidence add). Script that produced p1_live_positions.csv/.log (read-only).
