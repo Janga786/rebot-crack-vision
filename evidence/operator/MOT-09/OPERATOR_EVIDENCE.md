@@ -5,3 +5,4 @@
 - 2026-10-10T23:09:38Z `scan_s2_phase2.txt` — operator-sourced (added via claude-auto evidence add). Session 2 read-only scan after DMTool ID writes (15:54): 7/7 at ESC 0x01-0x07 / MST 0x11-0x17; none at 0x08-0x20.
 - 2026-10-10T23:09:39Z `scan_s2_phase3_post_zero.txt` — operator-sourced (added via claude-auto evidence add). Post-zero read-only scan (16:20): 7/7, IDs unchanged. Byte-identical to scan_s2_phase2.txt (the CLI prints no timestamps).
 - 2026-10-10T23:09:39Z `gateway_phase3.log` — operator-sourced (added via claude-auto evidence add). ws_gateway log while the operator zeroed in MotorBridge Studio (the gateway logs no successful sessions or commands).
+- 2026-10-10T23:09:39Z `p1_registers.txt` — operator-sourced (added via claude-auto evidence add). Read-only register/state dump: CTRL_MODE=1 (MIT) and TIMEOUT=0 on all 7, PMAX/VMAX/TMAX match 4340P/4310, all DISABLED near 0.
