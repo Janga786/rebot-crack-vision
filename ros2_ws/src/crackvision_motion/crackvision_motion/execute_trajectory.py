@@ -35,7 +35,7 @@ from moveit_msgs.msg import PlanningSceneComponents
 from moveit_msgs.srv import GetPlanningScene, GetStateValidity
 from rclpy.action import ActionClient
 from rclpy.node import Node
-from rclpy.qos import QoSDurabilityPolicy, QoSProfile, QoSReliabilityPolicy
+from rclpy.qos import QoSDurabilityPolicy, QoSProfile, QoSReliabilityPolicy, qos_profile_sensor_data
 from rebotarm_msgs.msg import ArmStatus
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Bool
@@ -63,6 +63,9 @@ DEFAULT_LIMITS = "config/robot/b601_dm_limits.yaml"
 DEFAULT_SCENE_CONFIG = "config/scene/scene.yaml"
 DEFAULT_END_EFFECTOR_CONFIG = "config/robot/end_effector.yaml"
 DEFAULT_RECORD_DIR = "logs/execution"
+# --service-timeout-s (default below) is also the DDS-discovery bound G-START-STATE allows for
+# the FIRST joint_states/arm_status message on a freshly constructed node, independent of
+# timeouts.joint_state_s, which stays a staleness window applied only to a message's own age.
 DEFAULT_SERVICE_TIMEOUT_S = 30.0
 
 VALIDITY_GROUP = "arm"
@@ -208,13 +211,16 @@ def check_start_state(
     first_point: Sequence[float],
     start_tol_rad: float,
     joint_state_timeout_s: float,
+    discovery_bound_s: float,
     arm_status: Optional[Mapping[str, Any]],
 ) -> Dict[str, str]:
     """§11.7 G-START-STATE: fresh joint_states, current position within tolerance of point 0, and
     (vendor profile only) a healthy latched arm status. Refuses in every mode except the vendor
-    arm-status sub-check, which is warn outside real."""
+    arm-status sub-check, which is warn outside real. `discovery_bound_s` (DDS discovery, e.g. a
+    fresh node's first message) is separate from `joint_state_timeout_s` (staleness of the
+    message actually received) -- a missing message names the former, a too-old one the latter."""
     if positions is None or age_s is None:
-        return _gate_dict(G_START_STATE, "online read-only", "fail", f"no joint_states received within {joint_state_timeout_s}s")
+        return _gate_dict(G_START_STATE, "online read-only", "fail", f"no joint_states received within {discovery_bound_s}s")
     if age_s > joint_state_timeout_s:
         return _gate_dict(G_START_STATE, "online read-only", "fail", f"joint_states stale: age={age_s:.3f}s > {joint_state_timeout_s}s")
     if any(j not in positions for j in JOINT_NAMES):
@@ -331,7 +337,11 @@ def _wait_for_message(node: Node, topic: str, msg_type, timeout_s: float, latche
         qos.durability = QoSDurabilityPolicy.TRANSIENT_LOCAL
         qos.reliability = QoSReliabilityPolicy.RELIABLE
     else:
-        qos = 10
+        # BEST_EFFORT to match the vendor driver and rebot_motion's mock_driver, both of which
+        # publish joint_states with qos_profile_sensor_data; a RELIABLE reader never receives
+        # anything from either (and from ros2_control's joint_state_broadcaster, RELIABLE still
+        # matches, since sensor-data QoS readers are compatible with RELIABLE writers).
+        qos = qos_profile_sensor_data
     box: Dict[str, Any] = {}
     sub = node.create_subscription(msg_type, topic, lambda m: box.setdefault("msg", m), qos)
     deadline = time.monotonic() + timeout_s
@@ -389,7 +399,11 @@ class OnlineChecks:
         start_tol_rad: float,
         joint_state_timeout_s: float,
     ) -> Tuple[Dict[str, str], Optional[Dict[str, float]]]:
-        msg = _wait_for_message(self.node, joint_states_topic, JointState, joint_state_timeout_s)
+        # self.timeout_s (--service-timeout-s) is the DDS-discovery bound for the FIRST message on
+        # this freshly constructed node; joint_state_timeout_s only bounds that message's own age,
+        # applied below in check_start_state.
+        discovery_bound_s = self.timeout_s
+        msg = _wait_for_message(self.node, joint_states_topic, JointState, discovery_bound_s)
         positions: Optional[Dict[str, float]] = None
         age_s: Optional[float] = None
         if msg is not None:
@@ -400,7 +414,7 @@ class OnlineChecks:
 
         arm_status: Optional[Dict[str, Any]] = None
         if profile == "vendor" and arm_status_topic:
-            status_msg = _wait_for_message(self.node, arm_status_topic, ArmStatus, min(joint_state_timeout_s, 5.0), latched=True)
+            status_msg = _wait_for_message(self.node, arm_status_topic, ArmStatus, discovery_bound_s, latched=True)
             if status_msg is not None:
                 arm_status = {
                     "enabled": bool(status_msg.enabled),
@@ -408,7 +422,9 @@ class OnlineChecks:
                     "error_codes": list(status_msg.error_codes),
                 }
 
-        result = check_start_state(mode, profile, positions, age_s, first_point, start_tol_rad, joint_state_timeout_s, arm_status)
+        result = check_start_state(
+            mode, profile, positions, age_s, first_point, start_tol_rad, joint_state_timeout_s, discovery_bound_s, arm_status
+        )
         return result, positions
 
     def collision(self, configs: Sequence[Sequence[float]], expected_object_ids: Sequence[str]) -> Dict[str, str]:
@@ -550,7 +566,7 @@ def execute(
         joint_state_box["positions"] = dict(zip(msg.name, msg.position))
         joint_state_box["monotonic"] = _now()
 
-    js_sub = node.create_subscription(JointState, joint_states_topic, _on_joint_state, 10)
+    js_sub = node.create_subscription(JointState, joint_states_topic, _on_joint_state, qos_profile_sensor_data)
 
     def _signal_handler(signum, frame):  # noqa: ANN001 - signal handler signature
         _trip("aborted", f"received signal {signum}")

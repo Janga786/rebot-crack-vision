@@ -368,41 +368,188 @@ def test_check_graph_vendor_passes_clean():
 
 
 def test_check_start_state_fails_with_no_joint_states():
-    result = et.check_start_state("mock", "moveit_mock", None, None, [0.0] * 6, 0.02, 0.5, None)
+    result = et.check_start_state("mock", "moveit_mock", None, None, [0.0] * 6, 0.02, 0.5, 5.0, None)
     assert result["outcome"] == "fail"
+    assert "5.0" in result["detail"]
 
 
 def test_check_start_state_fails_when_stale():
     positions = {j: 0.0 for j in JOINT_NAMES}
-    result = et.check_start_state("mock", "moveit_mock", positions, 5.0, [0.0] * 6, 0.02, 0.5, None)
+    result = et.check_start_state("mock", "moveit_mock", positions, 5.0, [0.0] * 6, 0.02, 0.5, 5.0, None)
     assert result["outcome"] == "fail"
+    assert "stale" in result["detail"]
 
 
 def test_check_start_state_fails_outside_tolerance():
     positions = {j: 0.0 for j in JOINT_NAMES}
     first_point = [1.0] + [0.0] * 5
-    result = et.check_start_state("mock", "moveit_mock", positions, 0.1, first_point, 0.02, 0.5, None)
+    result = et.check_start_state("mock", "moveit_mock", positions, 0.1, first_point, 0.02, 0.5, 5.0, None)
     assert result["outcome"] == "fail"
 
 
 def test_check_start_state_passes_fresh_and_within_tolerance():
     positions = {j: 0.0 for j in JOINT_NAMES}
-    result = et.check_start_state("mock", "moveit_mock", positions, 0.1, [0.0] * 6, 0.02, 0.5, None)
+    result = et.check_start_state("mock", "moveit_mock", positions, 0.1, [0.0] * 6, 0.02, 0.5, 5.0, None)
     assert result["outcome"] == "pass"
 
 
 def test_check_start_state_vendor_arm_status_warn_in_dry():
     positions = {j: 0.0 for j in JOINT_NAMES}
     arm_status = {"enabled": False, "state_machine": "IDLE", "error_codes": []}
-    result = et.check_start_state("dry", "vendor", positions, 0.1, [0.0] * 6, 0.02, 0.5, arm_status)
+    result = et.check_start_state("dry", "vendor", positions, 0.1, [0.0] * 6, 0.02, 0.5, 5.0, arm_status)
     assert result["outcome"] == "warn"
 
 
 def test_check_start_state_vendor_arm_status_fails_in_real():
     positions = {j: 0.0 for j in JOINT_NAMES}
     arm_status = {"enabled": False, "state_machine": "IDLE", "error_codes": []}
-    result = et.check_start_state("real", "vendor", positions, 0.1, [0.0] * 6, 0.02, 0.5, arm_status)
+    result = et.check_start_state("real", "vendor", positions, 0.1, [0.0] * 6, 0.02, 0.5, 5.0, arm_status)
     assert result["outcome"] == "fail"
+
+
+# --------------------------------------------------------------------------------------
+# joint_states QoS (MOT-05.7): BEST_EFFORT sensor-data for the non-latched subscriptions,
+# unchanged RELIABLE+TRANSIENT_LOCAL for the latched arm_status wait.
+# --------------------------------------------------------------------------------------
+
+def test_wait_for_message_joint_states_uses_best_effort_sensor_qos(monkeypatch):
+    node = _FakeNode()
+    monkeypatch.setattr(et.rclpy, "spin_once", lambda n, timeout_sec=0.0: None)
+    et._wait_for_message(node, "/rebotarm/joint_states", et.JointState, 0.01)
+    assert len(node.created) == 1
+    qos = node.created[0].qos
+    assert qos.reliability == et.QoSReliabilityPolicy.BEST_EFFORT
+
+
+def test_wait_for_message_latched_arm_status_stays_reliable_transient_local(monkeypatch):
+    node = _FakeNode()
+    monkeypatch.setattr(et.rclpy, "spin_once", lambda n, timeout_sec=0.0: None)
+    et._wait_for_message(node, "/rebotarm/arm_status", et.ArmStatus, 0.01, latched=True)
+    assert len(node.created) == 1
+    qos = node.created[0].qos
+    assert qos.reliability == et.QoSReliabilityPolicy.RELIABLE
+    assert qos.durability == et.QoSDurabilityPolicy.TRANSIENT_LOCAL
+
+
+def test_execute_js_sub_uses_best_effort_sensor_qos(monkeypatch):
+    goal_handle = _FakeGoalHandle(_FakeFuture(result=RESULT_SUCCESSFUL, done=True))
+    node = _FakeNode()
+
+    def _fake_spin_once(n, timeout_sec=0.0):
+        n.publish(JS_TOPIC, _js([0.0] * 6))
+
+    monkeypatch.setattr(et, "ActionClient", _fake_action_client(_FakeFuture(result=goal_handle, done=True)))
+    monkeypatch.setattr(et.rclpy, "spin_once", _fake_spin_once)
+    et.execute(node, ACTION, EXEC_CFG_FAST, SHORT_TRAJ, JS_TOPIC)
+
+    js_subs = [s for s in node.created if s.topic == JS_TOPIC]
+    assert js_subs
+    assert js_subs[0].qos.reliability == et.QoSReliabilityPolicy.BEST_EFFORT
+
+
+# --------------------------------------------------------------------------------------
+# G-START-STATE discovery bound vs. staleness (MOT-05.7)
+# --------------------------------------------------------------------------------------
+
+class _TimedFakeNode:
+    """A joint_states subscription that only delivers its first message after `delay_s` of
+    simulated spin_once calls, with a header stamp `stamp_age_s` old at delivery time -- proves
+    the discovery wait (how long the first message took to arrive) is independent of
+    `joint_state_timeout_s` (how old that message's own stamp is)."""
+
+    def __init__(self, delay_s: float, stamp_age_s: float):
+        self.delay_s = delay_s
+        self.stamp_age_s = stamp_age_s
+        self.subs: List[Any] = []
+
+    def create_subscription(self, msg_type, topic, callback, qos):
+        sub = SimpleNamespace(topic=topic, callback=callback, qos=qos)
+        self.subs.append(sub)
+        return sub
+
+    def destroy_subscription(self, sub):
+        if sub in self.subs:
+            self.subs.remove(sub)
+
+    def get_clock(self):
+        return SimpleNamespace(now=lambda: SimpleNamespace(nanoseconds=int(100.0 * 1e9)))
+
+    def maybe_deliver(self, elapsed_s: float) -> None:
+        if elapsed_s < self.delay_s:
+            return
+        stamp_s = 100.0 - self.stamp_age_s
+        sec = int(stamp_s)
+        nanosec = int(round((stamp_s - sec) * 1e9))
+        msg = SimpleNamespace(
+            name=list(JOINT_NAMES), position=[0.0] * 6,
+            header=SimpleNamespace(stamp=SimpleNamespace(sec=sec, nanosec=nanosec)),
+        )
+        for sub in list(self.subs):
+            sub.callback(msg)
+
+
+def _drive_timed_node(monkeypatch, node: "_TimedFakeNode"):
+    fake_clock = {"t": 0.0}
+
+    def _fake_monotonic():
+        return fake_clock["t"]
+
+    def _fake_spin_once(n, timeout_sec=0.0):
+        fake_clock["t"] += 0.1
+        node.maybe_deliver(fake_clock["t"])
+
+    monkeypatch.setattr(et.time, "monotonic", _fake_monotonic)
+    monkeypatch.setattr(et.rclpy, "spin_once", _fake_spin_once)
+
+
+def test_start_state_passes_when_first_message_arrives_within_discovery_bound(monkeypatch):
+    # Discovery takes a simulated 1.5s -- longer than the shipped joint_state_s=0.5 -- but the
+    # message itself is fresh, so G-START-STATE must still pass.
+    node = _TimedFakeNode(delay_s=1.5, stamp_age_s=0.01)
+    _drive_timed_node(monkeypatch, node)
+    fake_self = SimpleNamespace(node=node, timeout_s=5.0)
+    result, positions = et.OnlineChecks.start_state(
+        fake_self, "mock", "moveit_mock", "/rebotarm/joint_states", None, [0.0] * 6, 0.02, 0.5,
+    )
+    assert result["outcome"] == "pass", result
+    assert positions is not None
+
+
+def test_start_state_refuses_naming_discovery_bound_when_no_message_arrives(monkeypatch):
+    node = _TimedFakeNode(delay_s=999.0, stamp_age_s=0.0)
+    _drive_timed_node(monkeypatch, node)
+    fake_self = SimpleNamespace(node=node, timeout_s=0.5)
+    result, positions = et.OnlineChecks.start_state(
+        fake_self, "mock", "moveit_mock", "/rebotarm/joint_states", None, [0.0] * 6, 0.02, 0.5,
+    )
+    assert result["outcome"] == "fail"
+    assert "0.5" in result["detail"]
+    assert positions is None
+
+
+def test_start_state_vendor_arm_status_wait_uses_discovery_bound_not_joint_state_timeout(monkeypatch):
+    calls = []
+
+    def _fake_wait_for_message(node, topic, msg_type, timeout_s, latched=False):
+        calls.append((topic, timeout_s, latched))
+        if topic == "/rebotarm/joint_states":
+            return SimpleNamespace(
+                name=list(JOINT_NAMES), position=[0.0] * 6,
+                header=SimpleNamespace(stamp=SimpleNamespace(sec=0, nanosec=0)),
+            )
+        return None
+
+    monkeypatch.setattr(et, "_wait_for_message", _fake_wait_for_message)
+    fake_node = SimpleNamespace(get_clock=lambda: SimpleNamespace(now=lambda: SimpleNamespace(nanoseconds=0)))
+    fake_self = SimpleNamespace(node=fake_node, timeout_s=7.0)
+    et.OnlineChecks.start_state(
+        fake_self, "dry", "vendor", "/rebotarm/joint_states", "/rebotarm/arm_status", [0.0] * 6, 0.02, 0.05,
+    )
+    arm_status_calls = [c for c in calls if c[0] == "/rebotarm/arm_status"]
+    assert len(arm_status_calls) == 1
+    _topic, timeout_s, latched = arm_status_calls[0]
+    assert timeout_s == 7.0
+    assert latched is True
 
 
 def test_check_collision_fails_on_missing_scene_object():
@@ -510,18 +657,21 @@ class _FakeGoalHandle:
 
 
 class _FakeSub:
-    def __init__(self, topic, callback):
+    def __init__(self, topic, callback, qos=None):
         self.topic = topic
         self.callback = callback
+        self.qos = qos
 
 
 class _FakeNode:
     def __init__(self):
         self.subs: List[_FakeSub] = []
+        self.created: List[_FakeSub] = []  # never pruned by destroy_subscription, for QoS assertions
 
     def create_subscription(self, msg_type, topic, callback, qos):
-        sub = _FakeSub(topic, callback)
+        sub = _FakeSub(topic, callback, qos)
         self.subs.append(sub)
+        self.created.append(sub)
         return sub
 
     def destroy_subscription(self, sub):
