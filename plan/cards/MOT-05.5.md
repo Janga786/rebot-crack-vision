@@ -4,7 +4,8 @@
 {
   "kind": "integration",
   "depends_on": [
-    "MOT-05.4"
+    "MOT-05.4",
+    "MOT-05.7"
   ],
   "requirements": [
     "REQ-MOT-1",
@@ -77,3 +78,12 @@
 ```
 
 Model the script on scripts/ros/test_scene.sh and test_reachability.sh: source env_ros.sh, source the overlay (exit 3 with a hint if it is not built), use _mock_stack.sh start/stop with traps, and write logs under ros2_ws/log/ and records to a temp --record-dir under logs/. Do not modify accepted scripts or the executor; if the executor has a bug, fail loudly and report it rather than working around it. Sequence the trajectories so each start state matches: home→P (smoke), P→Q (e-stop, slow), then a short collision trajectory from wherever the e-stop left the arm. Generate that last one at runtime from the live joint_states with a small inline python3 snippet that writes a temp crackvision.joint_trajectory/1 file. Read joint states for the assertions with a short rclpy helper (inline python3 heredoc), not by parsing `ros2 topic echo` text. Tear down the MoveIt mock stack before starting mock_driver, so /joint_states and /rebotarm/joint_states cannot be confused. The vendor_mock real-mode refusal still needs the online services. Either keep the mock stack up for that sub-case or assert that the refusal happens at G-GRAPH before any service wait; pick whichever matches ADR-016's check order and document the choice in the script header. Keep ROS_LOCALHOST_ONLY=1 and the inherited ROS_DOMAIN_ID.
+
+## 2026-10-10 operator note (overnight session): dependency block resolved by MOT-05.7
+Attempt 00393 blocked this card on two `execute_trajectory.py` defects outside its scope: RELIABLE joint_states
+QoS versus the BEST_EFFORT vendor publishers, and a 0.5 s first-message wait that was shorter than DDS discovery.
+MOT-05.7 fixes both in MOT-05.4's code, and this card now depends on it. Keep the attempt-00393 script, which
+should pass unchanged once MOT-05.7 is accepted. If the moveit_mock G-COLLISION refusal at waypoint 0 recurs,
+report it rather than retrying around it. The real reBotArmController also publishes joint_states BEST_EFFORT
+(`rebotarm_controller.py:9,24`; `ros_publishers.py:22-27`), so the same fix is what makes MOT-09's
+`--mode dry --profile vendor` rehearsal possible.
