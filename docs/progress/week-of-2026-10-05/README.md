@@ -1,6 +1,6 @@
 # Progress — week of Mon Oct 05 – Sun Oct 11, 2026
 
-**23 task(s) completed and independently audited this week** · project total **66/108** accepted
+**24 task(s) completed and independently audited this week** · project total **65/108** accepted
 
 ## Notes
 
@@ -53,10 +53,12 @@
 …[234 chars clipped]
 - **HOST-05 — Storage decision for the unmounted 1.9 TB NVMe (K1_Storage)** ([details](HOST-05.md)): Documented the storage decision for the unmounted 1.9 TB second NVMe drive (labelled K1_Storage, likely belonging to another project): per the operator's decision, it stays completely untouched - no m
 …[221 chars clipped]
+- **MOT-05.7 — execute_trajectory: subscribe to joint_states with sensor-data (BEST_EFFORT) QoS and separate the DDS-discovery wait from the staleness window** ([details](MOT-05.7.md)): Fixed execute_trajectory's joint_states subscriptions to use BEST_EFFORT (qos_profile_sensor_data) instead of RELIABLE depth-10, matching the real reBotArmController and rebot_motion's mock_driver pub
+…[553 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 49 / 179
+- Implementation/review sessions run: 50 / 180
 - Audits that rejected work with evidence-backed findings: 13 (repairs created: 10)
 - Re-verified after an upstream change: CAM-02, CAM-05.1, CAM-05.2, GEOM-01, GEOM-01.R1, GEOM-08.1, GEOM-08.2, GEOM-08.2.R1, GEOM-08.5, GEOM-08.5.R1, GEOM-08.6, GEOM-08.7, GEOM-08.8, GEOM-08.8.R1, GEOM-10, MOT-02, MOT-03, MOT-04.1, MOT-04.1.R1, MOT-04.2, MOT-04.3, MOT-04.3.R1, MOT-04.4, MOT-04.4.R1, MOT-04.6, MOT-05.1, MOT-05.1.R1, MOT-05.2, MOT-05.4, MOT-05.4.R1, MOT-10.1, MOT-10.1.R1, MOT-10.2, MOT-10.3, PERC-03, PERC-03.R1, TC-011, TC-016
 
@@ -76,7 +78,7 @@
 | D405 capture (L-CAM) | 7 | 9 |
 | Perception (L-PERC) | 13 | 16 |
 | Geometry & calibration (L-GEOM) | 15 | 24 |
-| Motion planning (L-MOTION) | 15 | 29 |
+| Motion planning (L-MOTION) | 14 | 29 |
 | Integration & commissioning (L-INT) | 1 | 6 |
 | Operator workflow & handoff (L-OPS) | 1 | 4 |
 | Imitation learning (later phase) (L-IL) | 0 | 1 |
