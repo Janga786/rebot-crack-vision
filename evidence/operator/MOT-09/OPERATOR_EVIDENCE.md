@@ -8,3 +8,4 @@
 - 2026-10-10T23:09:39Z `p1_registers.txt` — operator-sourced (added via claude-auto evidence add). Read-only register/state dump: CTRL_MODE=1 (MIT) and TIMEOUT=0 on all 7, PMAX/VMAX/TMAX match 4340P/4310, all DISABLED near 0.
 - 2026-10-10T23:09:46Z `p1_live_positions.csv` — operator-sourced (added via claude-auto evidence add). Readback-only sign check: 2766 samples at 5 Hz over 553 s, status DISABLED in every sample; operator moved one joint at a time by hand.
 - 2026-10-10T23:09:46Z `p1_live_positions.log` — operator-sourced (added via claude-auto evidence add). Console log of the sign check, with per-joint min/max summary.
+- 2026-10-10T23:09:47Z `readonly_bus.py` — operator-sourced (added via claude-auto evidence add). Read-only motor wrapper used by the session scripts (whitelist: request_feedback, get_state, get_register_*; close_bus, never shutdown).
