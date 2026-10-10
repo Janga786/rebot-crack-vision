@@ -1,0 +1,20 @@
+command=scan vendor=damiao transport=dm-serial serial_port=/dev/ttyACM0 serial_baud=921600 model=4340 id_range=[0x1,0x10] timeout_ms=80
+[scan:damiao] serial_port=/dev/ttyACM0 serial_baud=921600 model=4340 id_range=[0x1,0x10] timeout_ms=80
+[hit] vendor=damiao probe=0x01 esc_id=0x1 mst_id=0x0
+[.. ] vendor=damiao probe=0x02 no reply
+[.. ] vendor=damiao probe=0x03 no reply
+[.. ] vendor=damiao probe=0x04 no reply
+[.. ] vendor=damiao probe=0x05 no reply
+[.. ] vendor=damiao probe=0x06 no reply
+[.. ] vendor=damiao probe=0x07 no reply
+[.. ] vendor=damiao probe=0x08 no reply
+[.. ] vendor=damiao probe=0x09 no reply
+[.. ] vendor=damiao probe=0x0A no reply
+[.. ] vendor=damiao probe=0x0B no reply
+[.. ] vendor=damiao probe=0x0C no reply
+[.. ] vendor=damiao probe=0x0D no reply
+[.. ] vendor=damiao probe=0x0E no reply
+[.. ] vendor=damiao probe=0x0F no reply
+[.. ] vendor=damiao probe=0x10 no reply
+scan done: 1 motor(s) found
+  probe=0x01 vendor=damiao esc_id=0x1 mst_id=0x0
