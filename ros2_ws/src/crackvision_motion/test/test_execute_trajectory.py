@@ -16,7 +16,7 @@ import sys
 import time
 from types import SimpleNamespace
 from pathlib import Path
-from typing import Dict, List
+from typing import Any, Dict, List
 
 import pytest
 
@@ -552,6 +552,19 @@ def test_start_state_vendor_arm_status_wait_uses_discovery_bound_not_joint_state
     assert latched is True
 
 
+def test_start_state_fails_when_only_message_is_stale_relative_to_joint_state_timeout(monkeypatch):
+    # Discovery is fast (0.1s, well under the 5.0s bound), but the message's own header stamp is
+    # 1.0s old against a joint_state_timeout_s of 0.5s -- must refuse as stale, not as "missing".
+    node = _TimedFakeNode(delay_s=0.1, stamp_age_s=1.0)
+    _drive_timed_node(monkeypatch, node)
+    fake_self = SimpleNamespace(node=node, timeout_s=5.0)
+    result, positions = et.OnlineChecks.start_state(
+        fake_self, "mock", "moveit_mock", "/rebotarm/joint_states", None, [0.0] * 6, 0.02, 0.5,
+    )
+    assert result["outcome"] == "fail"
+    assert "stale" in result["detail"]
+
+
 def test_check_collision_fails_on_missing_scene_object():
     result = et.check_collision([], ["table"])
     assert result["outcome"] == "fail"
@@ -836,6 +849,40 @@ def test_execute_acked_cancel_but_arm_keeps_moving_prints_estop(monkeypatch, cap
     assert outcome == "estopped"
     assert goal_handle.cancel_calls == 1
     assert "PRESS THE HARDWARE E-STOP" in capsys.readouterr().out
+
+
+def test_execute_joint_states_gap_mid_goal_trips_about_joint_state_s_after_last_message(monkeypatch):
+    """§11.8 in-goal monitor: a live goal (result not done) whose joint_states stop arriving must
+    trip 'aborted' and cancel exactly once, about timeouts.joint_state_s after the last message --
+    not only after the goal's overall duration/goal_s bound. Frozen positions stay within
+    tolerances.tracking_rad of the commanded trajectory throughout, so only the staleness check
+    (never the tracking-error check) can be what trips it."""
+    clock = _FakeClock()
+    t_start = clock.t
+    goal_handle = _FakeGoalHandle(_FakeFuture(done=False))  # goal never reports a result
+    node = _FakeNode()
+    state: Dict[str, Any] = {"n": 0, "last_publish_elapsed": None}
+    publish_until = 10  # spins 0..9 publish fresh joint_states; spin 10+ go silent
+
+    def _fake_spin_once(n, timeout_sec=0.0):
+        clock.t += 0.01
+        if state["n"] < publish_until:
+            n.publish(JS_TOPIC, _js([0.0] * 6))
+            state["last_publish_elapsed"] = clock.t - t_start
+        state["n"] += 1
+
+    monkeypatch.setattr(et, "_now", clock)
+    monkeypatch.setattr(et, "ActionClient", _fake_action_client(_FakeFuture(result=goal_handle, done=True)))
+    monkeypatch.setattr(et.rclpy, "spin_once", _fake_spin_once)
+
+    outcome, trace = et.execute(node, ACTION, EXEC_CFG_FAST, SHORT_TRAJ, JS_TOPIC)
+
+    assert outcome == "aborted"
+    assert goal_handle.cancel_calls == 1
+    assert state["last_publish_elapsed"] is not None
+    trip_elapsed = trace[-1]["t_s"] + 0.01
+    joint_state_timeout = EXEC_CFG_FAST["timeouts"]["joint_state_s"]
+    assert trip_elapsed - state["last_publish_elapsed"] == pytest.approx(joint_state_timeout, abs=0.03)
 
 
 class _FakeClock:
