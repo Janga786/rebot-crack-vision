@@ -1,0 +1,171 @@
+# Machine-readable transcription of the 2026-10-10 B601-DM bring-up evidence.
+#
+# Every value is read from a raw file in this directory (evidence/operator/MOT-09/), named in its `src`, or
+# marked `src: operator statement`. Operator statements come from the operator's written instructions for the
+# overnight session of 2026-10-10/11 and are not in the raw logs. The overnight Claude Code session filed this
+# transcription. Human-readable version: bringup_2026-10-10_summary.md.
+#
+# This file is evidence, not configuration. Nothing reads it to enable motion. It records what was observed,
+# and it explicitly records what was NOT established (see `not_established`). The vendor-driver readiness check
+# (MOT-11) compares the vendor configuration in ~/rebot_ws against it.
+kind: b601dm_bringup_facts
+version: 1
+date: "2026-10-10"
+filed_by: "overnight Claude Code session on the operator's instruction (transcription only)"
+
+bus:
+  adapter:
+    description: "Damiao USB2CAN serial bridge"
+    usb_vid: "2e88"
+    usb_pid: "4603"
+    usb_manufacturer: "HDSC"
+    usb_product: "CDC Device"
+    usb_serial: "00000000050C"
+    src: "SETUP_LOG.md §1.3 and S2 Phase 1 (journalctl -k: 'New USB device found, idVendor=2e88, idProduct=4603' at 14:06:10 and 15:51:48)"
+  port: "/dev/ttyACM0"
+  port_default_perms: "crw-rw---- root dialout (reset by every replug)"
+  port_src: "SETUP_LOG.md §1.3, S2 Phase 1 (ls -l /dev/ttyACM*; /dev/serial/by-id/usb-HDSC_CDC_Device_00000000050C-if00)"
+  transport: "dm-serial"
+  serial_baud: 921600
+  serial_src: "scan_s2_phase2.txt header line (transport=dm-serial serial_baud=921600)"
+  can_bitrate_bps: 1000000
+  can_bitrate_src: "operator statement"
+  supply_v: 24
+  supply_src: "operator statement"
+  sdk: "motorbridge 0.5.6 (conda env 'rebot', Python 3.12; run with env -u PYTHONPATH)"
+  sdk_src: "SETUP_LOG.md §1.2 and §1.4"
+
+# Joint order is the URDF/arm order joint1..joint6, then the gripper motor.
+# `sign_check` comes from p1_live_positions.csv (5 Hz, 2766 samples, status 0 = DISABLED in every sample).
+# `expected_sign` is the URDF-FK prediction at q = 0 recorded in SETUP_LOG.md §1.3 (S3).
+joints:
+  joint1:
+    motor_id: 0x01
+    feedback_id: 0x11
+    model: "4340P"
+    motor_type: "J4340P"
+    gear_ratio: 40
+    pmax: 12.5
+    vmax: 10.0
+    tmax: 28.0
+    ctrl_mode: 1
+    timeout_raw: 0
+    sign_check: {hand_motion: "arm swung to the robot's left", peak_rad: 0.41218, peak_t_s: 130.068, expected_sign: "+", verdict: "match"}
+    rest_rad: 0.01698
+  joint2:
+    motor_id: 0x02
+    feedback_id: 0x12
+    model: "4340P"
+    motor_type: "J4340P"
+    gear_ratio: 40
+    pmax: 12.5
+    vmax: 10.0
+    tmax: 28.0
+    ctrl_mode: 1
+    timeout_raw: 0
+    sign_check: {hand_motion: "upper arm lifted out of the fold", peak_rad: -0.62886, peak_t_s: 231.322, expected_sign: "-", verdict: "match", max_in_fold_rad: 0.00172}
+    rest_rad: 0.00172
+  joint3:
+    motor_id: 0x03
+    feedback_id: 0x13
+    model: "4340P"
+    motor_type: "J4340P"
+    gear_ratio: 40
+    pmax: 12.5
+    vmax: 10.0
+    tmax: 28.0
+    ctrl_mode: 1
+    timeout_raw: 0
+    sign_check: {hand_motion: "forearm lifted off the upper arm", peak_rad: -0.36717, peak_t_s: 247.931, expected_sign: "-", verdict: "match", max_in_fold_rad: -0.00019}
+    rest_rad: -0.00134
+  joint4:
+    motor_id: 0x04
+    feedback_id: 0x14
+    model: "4310"
+    motor_type: "J4310"
+    gear_ratio: 10
+    pmax: 12.5
+    vmax: 30.0
+    tmax: 10.0
+    ctrl_mode: 1
+    timeout_raw: 0
+    sign_check: {hand_motion: "gripper nose tipped up", peak_rad: -0.94587, peak_t_s: 272.342, expected_sign: "-", verdict: "match"}
+    rest_rad: -0.00210
+  joint5:
+    motor_id: 0x05
+    feedback_id: 0x15
+    model: "4310"
+    motor_type: "J4310"
+    gear_ratio: 10
+    pmax: 12.5
+    vmax: 30.0
+    tmax: 10.0
+    ctrl_mode: 1
+    timeout_raw: 0
+    sign_check: {hand_motion: "gripper turned to the robot's right", peak_rad: 1.09007, peak_t_s: 343.580, expected_sign: "+", verdict: "match"}
+    rest_rad: 0.03147
+  joint6:
+    motor_id: 0x06
+    feedback_id: 0x16
+    model: "4310"
+    motor_type: "J4310"
+    gear_ratio: 10
+    pmax: 12.5
+    vmax: 30.0
+    tmax: 10.0
+    ctrl_mode: 1
+    timeout_raw: 0
+    sign_check: {hand_motion: "top of the gripper rolled to the robot's right", peak_rad: 1.29568, peak_t_s: 368.795, expected_sign: "+", verdict: "match"}
+    rest_rad: 0.00019
+  gripper:
+    motor_id: 0x07
+    feedback_id: 0x17
+    model: "4310"
+    motor_type: "J4310"
+    gear_ratio: 10
+    pmax: 12.5
+    vmax: 30.0
+    tmax: 10.0
+    ctrl_mode: 1
+    timeout_raw: 0
+    firmware_sub_version: "06"
+    firmware_src: "operator statement (DMTool); motors 1-6 report 09"
+    open_sign: "negative"
+    sign_check: {hand_motion: "gripper opened (partly)", peak_rad: -1.77596, peak_t_s: 383.203, expected_sign: "none (no URDF joint; URDF fingers are prismatic 0..0.0715 m)", verdict: "opening = negative motor angle"}
+    full_open_rad: null
+    full_open_src: "not measured (only a partial opening was observed)"
+    rest_rad: 0.00782
+
+registers_src: "p1_registers.txt (read-only 0x33 register reads; CTRL_MODE rid 10, TIMEOUT rid 9, PMAX/VMAX/TMAX rid 21/22/23)"
+ids_src: "scan_s2_phase2.txt (15:54) and scan_s2_phase3_post_zero.txt (16:20): ESC_ID 0x01..0x07 / MST_ID 0x11..0x17, no replies 0x08..0x20"
+ids_written_by: "operator, DMTool on Windows over the 3-pin cable, one motor at a time (SETUP_LOG.md session 2 preamble)"
+motor_types_src: "operator statement (J4340P Gr 40 for motors 1-3, J4310 Gr 10 for motors 4-7); register PMAX/VMAX/TMAX match motorbridge models 4340P / 4310"
+
+zero:
+  method: "MotorBridge Studio: Enable -> Zero+Save -> Disable, per motor (operator, via ws_gateway on 127.0.0.1:9002)"
+  method_src: "operator statement; SETUP_LOG.md §3.2-3.3"
+  pose: "Seeed folded 'sit-down' pose: base slot on the robot's left, gripper pointing forward, gripper fully closed"
+  pose_src: "operator statement (SETUP_LOG.md paraphrase: 'folded sit-down, base forward, gripper closed')"
+  verified_after_power_cycle: true
+  verified_src: "operator statement (SETUP_LOG.md §3.3); not re-read by software at the time"
+  consistent_with_urdf_home: "joint2/joint3 rest in the fold at ~0 = their URDF upper limit 0.0, matching the SRDF all-zero home"
+
+rest_pose_end_of_day:
+  window: "last 10 s of p1_live_positions.csv (50 samples, zero spread, all DISABLED)"
+  max_abs_rad: 0.03147
+  all_within_0p05_rad: true
+
+software_commands_sent_on_2026_10_10:
+  - "motorbridge-cli scan (register reads 7/8)"
+  - "0xCC refresh-status requests and 0x33 register reads only (readonly_bus.py whitelist)"
+  - "motors enabled ONLY inside MotorBridge Studio by the operator for Zero+Save; no script enabled a motor"
+  - "no register written from Linux; no powered motion; Phase 2 (first_move_j1.py) skipped"
+
+not_established:
+  - "hardware e-stop: none exists or was tested; the 24 V supply switch is the only power cut (operator statement)"
+  - "powered motion of any joint; disable behaviour (ADR-016 §7 possible-fall assumption stands)"
+  - "joint range / limit verification (sign check covered partial ranges only)"
+  - "vendor driver (reBotArmController) or any ROS node against the arm"
+  - "commissioning: config/robot/commissioning.yaml unchanged (commissioned: false)"
+  - "gripper full-open motor angle"
+  - "behavioural impact of motor 7 firmware sub-version 06 vs 09"
