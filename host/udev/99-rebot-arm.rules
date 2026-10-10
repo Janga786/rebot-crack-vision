@@ -1,0 +1,30 @@
+# Provenance: VID:PID cited from evidence/operator/HOST-04/arm_adapter_usb_ids_2026-10-10.md,
+# which excerpts journalctl -k entries at 2026-10-10 14:06:10 and 15:51:48
+# (idVendor=2e88, idProduct=4603, HDSC "CDC Device", serial 00000000050C) and the
+# operator's lsusb statement ("HDSC VID:PID 2e88:4603"). This is the Damiao
+# USB2CAN serial bridge (dm-serial, 921600 baud) for the B601-DM arm's CAN bus.
+# No upstream rule exists for this device; the VID:PID is never guessed.
+#
+# Narrowed per REQ-HOST-3 (least privilege): only this one VID:PID, with
+# MODE:="0660"/GROUP:="plugdev" (not world-writable 0666, not root:dialout),
+# no RUN hook, no OWNER, no dialout. The operator (boosterk1) already belongs
+# to plugdev, so this grants access without widening any group.
+#
+# SYMLINK+="ttyREBOT_ARM": the name must start with "tty". The vendor SDK
+# (third_party/reBotArm_control_py/reBotArm_control_py/actuator/rebotarm.py:485-487,
+# actuator/arm.py:119-121 @ SDK commit 8427281) picks the dm-serial transport
+# only when the channel string starts with "/dev/tty"; otherwise it falls back
+# to SocketCAN. The vendor deploy scripts (~/rebot_ws/deploy/_env.sh:59,
+# deploy/run_real_demo.sh:120, deploy/preflight.sh:114) and runbook
+# (docs/WORKSTATION_DEPLOY.md §1a) prefer a symlink named /dev/rebot_arm if one
+# exists, which would silently switch the driver to the wrong transport.
+# ttyREBOT_ARM avoids that name and keeps the dm-serial path; _env.sh does not
+# look for it and still falls back to /dev/ttyACM0.
+#
+# ENV{ID_MM_DEVICE_IGNORE}="1": ModemManager is active on this host and probed
+# this adapter's port (1-7) at every plug-in on 2026-10-10 ("couldn't check
+# support for device ... not supported by any plugin", per journalctl -u
+# ModemManager at 14:06:13, 14:32:17, 15:51:51). Marking the port ignored stops
+# ModemManager from opening it or sending AT probes into the USB-to-CAN bridge.
+# This property grants no access by itself.
+SUBSYSTEM=="tty", ATTRS{idVendor}=="2e88", ATTRS{idProduct}=="4603", MODE:="0660", GROUP:="plugdev", SYMLINK+="ttyREBOT_ARM", ENV{ID_MM_DEVICE_IGNORE}="1"
