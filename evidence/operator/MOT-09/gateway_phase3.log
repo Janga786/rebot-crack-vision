@@ -1,0 +1,2 @@
+ws_gateway listening on ws://127.0.0.1:9002 (router_mode=standby, dynamic_target=true, dt_ms=20)
+[ws_gateway] session closed: WebSocket protocol error: Handshake not finished
