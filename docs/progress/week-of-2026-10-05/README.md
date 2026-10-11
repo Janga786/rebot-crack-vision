@@ -1,6 +1,6 @@
 # Progress — week of Mon Oct 05 – Sun Oct 11, 2026
 
-**29 task(s) completed and independently audited this week** · project total **65/122** accepted
+**29 task(s) completed and independently audited this week** · project total **66/122** accepted
 
 ## Notes
 
@@ -68,7 +68,7 @@
 
 ## Quality loop
 
-- Implementation/review sessions run: 60 / 208
+- Implementation/review sessions run: 60 / 209
 - Audits that rejected work with evidence-backed findings: 17 (repairs created: 13)
 - Re-verified after an upstream change: CAM-02, CAM-05.1, CAM-05.2, GEOM-01, GEOM-01.R1, GEOM-08.1, GEOM-08.2, GEOM-08.2.R1, GEOM-08.5, GEOM-08.5.R1, GEOM-08.6, GEOM-08.7, GEOM-08.8, GEOM-08.8.R1, GEOM-10, MOT-02, MOT-03, MOT-04.1, MOT-04.1.R1, MOT-04.2, MOT-04.3, MOT-04.3.R1, MOT-04.4, MOT-04.4.R1, MOT-04.6, MOT-04.6.R1, MOT-05.1, MOT-05.1.R1, MOT-05.2, MOT-05.4, MOT-05.4.R1, MOT-10.1, MOT-10.1.R1, MOT-10.1.R2, MOT-10.2, MOT-10.3, PERC-03, PERC-03.R1, TC-011, TC-016
 
@@ -89,7 +89,7 @@
 | Local coding model (L-LLM) | 5 | 8 |
 | D405 capture (L-CAM) | 7 | 9 |
 | Perception (L-PERC) | 13 | 16 |
-| Geometry & calibration (L-GEOM) | 13 | 28 |
+| Geometry & calibration (L-GEOM) | 14 | 28 |
 | Motion planning (L-MOTION) | 14 | 39 |
 | Integration & commissioning (L-INT) | 1 | 6 |
 | Operator workflow & handoff (L-OPS) | 1 | 4 |
