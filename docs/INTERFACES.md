@@ -2301,8 +2301,8 @@ polyline's `points[]`).
 |---|---|---|
 | `component_id`, `polyline_kind`, `branch_index`, `point_index` | — | identifies the source `paths3d` point (§10.2) |
 | `row`, `col` | int | copied from that point |
-| `sigma_total_m` | `[float,float,float]` | `sqrt(diag(Σ_base))` per base-link axis — identical to the source point's own `sigma_base_m` (§10.1); carried here for self-containment |
-| `contributions_m2` | object | `{pixel, depth, handeye, fk}`, each `[9 floats]` row-major 3×3 `Σ_base^(term)`, m²; sums exactly to the source point's `cov_base_m2` under linearization (ADR-018 §2) |
+| `sigma_total_m` | `[float,float,float]` | `sqrt(diag(Σ_base^(total)))` per base-link axis, where `Σ_base^(total) = Σ_base^(pixel) + Σ_base^(depth) + Σ_base^(handeye) + Σ_base^(fk)` — the **new** total this report computes, including the `fk` term this card adds. Component-wise `≥` the source point's own `sigma_base_m` (§10.1) since `Σ_base^(fk)` is positive semi-definite; it is **not** identical to `sigma_base_m` and is never written back into `paths3d` (ADR-018 §2) |
+| `contributions_m2` | object | `{pixel, depth, handeye, fk}`, each `[9 floats]` row-major 3×3 `Σ_base^(term)`, m²; sums exactly to `Σ_base^(total)` (i.e. to `diag(sigma_total_m²)`) under linearization — **not** to the source point's unchanged `cov_base_m2` (ADR-018 §2) |
 | `mc.sigma_total_m` | `[float,float,float]` | `sqrt(diag(Σ_base^(MC)))`, the Monte-Carlo sample covariance's per-axis sigma, m |
 | `mc.n_samples_used` | int | samples actually drawn for this point (equals `parameters.mc.n_samples` unless subsampled out, in which case this point is omitted entirely rather than given a stale/zero entry) |
 | `mc_analytic_agreement.ratio_trace` | float | `trace(Σ_base^(MC)) / trace(Σ_base^(analytic))` |
@@ -2317,12 +2317,13 @@ One entry per `paths3d` segment waypoint (§10.2 `segments[].waypoints[]`), inde
 | Field | Type | Meaning |
 |---|---|---|
 | `component_id`, `polyline_kind`, `branch_index`, `segment_index`, `phase`, `waypoint_index` | — | identifies the source waypoint (§10.2) |
-| `sigma_along_normal_m` | float | copied from the source waypoint's `sigma_along_normal_m` (§10.1) |
-| `contributions_m2` | object | `{pixel, depth, handeye, tcp, fk}`, each a non-negative float, m²; `pixel`/`depth`/`handeye`/`fk` are `nᵀ·Σ_base^(term)·n` from the nearest source point (§10.3's gap-fill rule for `interpolated` points applies identically here); `tcp` is `σ_tool_pos²`; sums exactly to `sigma_along_normal_m²` |
+| `sigma_along_normal_base_m` | float | copied unchanged from the source waypoint's `sigma_along_normal_m` (§10.1) — the accepted, FK-less value; this is the only quantity `within_budget` (below) is computed against |
+| `sigma_along_normal_m` | float | `sqrt(nᵀ·Σ_base^(total)·n + σ_tool_pos²)`, where `Σ_base^(total)` is the §14.4 point-level total for the nearest source point — the **new** total this report computes, including the `fk` term. `≥ sigma_along_normal_base_m`; **not** copied from the source (ADR-018 §2) |
+| `contributions_m2` | object | `{pixel, depth, handeye, tcp, fk}`, each a non-negative float, m²; `pixel`/`depth`/`handeye`/`fk` are `nᵀ·Σ_base^(term)·n` from the nearest source point (§10.3's gap-fill rule for `interpolated` points applies identically here); `tcp` is `σ_tool_pos²`; sums exactly to `sigma_along_normal_m²` (the new total) — **not** to `sigma_along_normal_base_m²` |
 | `mc.sigma_along_normal_m` | float | sample standard deviation of the MC-resampled signed along-normal displacement |
 | `mc_analytic_agreement.ratio_along_normal` | float | `mc.sigma_along_normal_m / sigma_along_normal_m` |
 | `mc_analytic_agreement.flagged` | bool | `true` iff `ratio_along_normal` falls outside `parameters.mc.agreement_band` |
-| `within_budget` | bool | copied from the source waypoint (§10.1); never recomputed here — this report never changes execution eligibility |
+| `within_budget` | bool | copied from the source waypoint (§10.1), i.e. computed against `sigma_along_normal_base_m`, **not** against this report's new `sigma_along_normal_m`; never recomputed here — this report never changes execution eligibility |
 
 ### 14.6 `config/calibration/uncertainty_budget.yaml` (schema `crackvision.uncertainty_budget_config/1`)
 

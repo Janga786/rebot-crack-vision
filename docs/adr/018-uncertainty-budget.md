@@ -62,18 +62,24 @@ at zero, and record each resulting partial covariance:
 - `Σ_base^(fk)`: §3 below
 
 Because `J` is linear in `(σ_px², σ_px², σ_z²)` and the hand-eye term is already additive, these four
-partial covariances sum exactly to the existing `Σ_base = Σ_base^(pixel) + Σ_base^(depth) +
+partial covariances sum exactly to a new quantity `Σ_base^(total) = Σ_base^(pixel) + Σ_base^(depth) +
 Σ_base^(handeye) + Σ_base^(fk)` — the decomposition is exact under linearization, not an
-approximation on top of one. Camera intrinsics are **not** a fifth additive term: `fx`/`fy` appear
+approximation on top of one. `Σ_base^(total)` is **not** the accepted `paths3d` `Σ_base`
+(`cov_base_m2`): that field is, and remains, `Σ_base^(pixel) + Σ_base^(depth) + Σ_base^(handeye)`
+only — §10.4 is unchanged by this card. `Σ_base^(total)` is a new, strictly larger (component-wise
+`≥`) quantity that only this report computes, reported as `sigma_total_m` (§14.4); it is never
+written back into `paths3d`. Camera intrinsics are **not** a fifth additive term: `fx`/`fy` appear
 inside `J` itself (multiplying every pixel/depth contribution), so their effect is reported as a
 documented caveat (intrinsics uncertainty is not separately budgeted; it would require perturbing
 `J` itself, which the Monte-Carlo cross-check does implicitly — see §4's bullet on intrinsics) rather
 than invented as a spurious orthogonal term.
 
-At the waypoint level, `σ_along_normal² = nᵀ·Σ_base·n + σ_tool_pos²` is decomposed the same way:
-`nᵀ·Σ_base^(pixel)·n`, `nᵀ·Σ_base^(depth)·n`, `nᵀ·Σ_base^(handeye)·n`, `nᵀ·Σ_base^(fk)·n`, plus the
-already-separate `σ_tool_pos²` (TCP/pivot) term — five non-negative numbers summing exactly to
-`σ_along_normal²`.
+At the waypoint level, a new `σ_along_normal^(total)² = nᵀ·Σ_base^(total)·n + σ_tool_pos²` is
+decomposed the same way: `nᵀ·Σ_base^(pixel)·n`, `nᵀ·Σ_base^(depth)·n`, `nᵀ·Σ_base^(handeye)·n`,
+`nᵀ·Σ_base^(fk)·n`, plus the already-separate `σ_tool_pos²` (TCP/pivot) term — five non-negative
+numbers summing exactly to `σ_along_normal^(total)²`. This is, again, a new quantity reported as
+`sigma_along_normal_m` (§14.5), `≥` the accepted `paths3d` `σ_along_normal` — which is unchanged and
+reported alongside it, unrenamed in meaning, as `sigma_along_normal_base_m`.
 
 Linearization is adequate here because every step in the chain (pinhole deprojection at a known
 depth, rigid rotation/translation composition, a fixed-point normal projection) is smooth and the
@@ -156,7 +162,9 @@ Makes hard / foreclosed: this card does not budget camera-intrinsics uncertainty
 additive term (§2) — a future card wanting that must perturb `J` itself inside the MC resample and
 define a new analytic term, which is out of scope here. It also does not change any accepted
 `paths3d`/`capture_3d`/`end_effector` field — `cov_base_m2` and `sigma_along_normal_m` keep their
-existing meaning and values; the new report is a read-only derivative.
+existing meaning and values (reported unchanged in §14.5 as `sigma_along_normal_base_m`); the new
+report's own `sigma_total_m`/`sigma_along_normal_m` (§14.4/§14.5) are a distinct, strictly larger,
+read-only derivative that includes the new `fk` term — never written back into `paths3d`.
 
 ## Revisit when
 
