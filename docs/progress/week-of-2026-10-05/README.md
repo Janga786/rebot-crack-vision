@@ -1,6 +1,6 @@
 # Progress — week of Mon Oct 05 – Sun Oct 11, 2026
 
-**28 task(s) completed and independently audited this week** · project total **72/122** accepted
+**29 task(s) completed and independently audited this week** · project total **72/122** accepted
 
 ## Notes
 
@@ -63,10 +63,12 @@
 …[217 chars clipped]
 - **MOT-11 — Vendor-driver readiness check: verify reBotArmController's port, motor IDs, joint order, direction and gripper mapping against the 2026-10-10 bring-up evidence (read-only ~/rebot_ws)** ([details](MOT-11.md)): Implemented scripts/motion/check_vendor_driver.py, a pure read-only static checker verifying reBotArmController's port, motor IDs, joint order, direction, zero, gripper mapping, safe_park, SDK API, Py
 …[170 chars clipped]
+- **MOT-06.1 — Probe MoveIt Cartesian/transit services for task frames on the mock stack** ([details](MOT-06.1.md)): Built and committed a repeatable test that pokes MoveIt's path-planning services (used for tracing cracks) on the simulated robot and records exactly how they behave. The most important result: the pl
+…[452 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 58 / 192
+- Implementation/review sessions run: 59 / 193
 - Audits that rejected work with evidence-backed findings: 16 (repairs created: 12)
 - Re-verified after an upstream change: CAM-02, CAM-05.1, CAM-05.2, GEOM-01, GEOM-01.R1, GEOM-08.1, GEOM-08.2, GEOM-08.2.R1, GEOM-08.5, GEOM-08.5.R1, GEOM-08.6, GEOM-08.7, GEOM-08.8, GEOM-08.8.R1, GEOM-10, MOT-02, MOT-03, MOT-04.1, MOT-04.1.R1, MOT-04.2, MOT-04.3, MOT-04.3.R1, MOT-04.4, MOT-04.4.R1, MOT-04.6, MOT-05.1, MOT-05.1.R1, MOT-05.2, MOT-05.4, MOT-05.4.R1, MOT-10.1, MOT-10.1.R1, MOT-10.2, MOT-10.3, PERC-03, PERC-03.R1, TC-011, TC-016
 
