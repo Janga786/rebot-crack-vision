@@ -18,18 +18,10 @@
 # vendor-profile goal (G-GRAPH only ever resolves /rebotarm/follow_joint_trajectory for those
 # profiles).
 #
-# Known limitation observed while writing this script, not worked around here: execute_trajectory
-# subscribes to every `joint_states_topic` (`_wait_for_message` and the `execute()` monitoring
-# loop's `js_sub`, crackvision_motion/execute_trajectory.py) with the default RELIABLE QoS
-# (depth 10). Both rebot_motion's mock_driver and the real reBotArmController publish
-# joint_states on `rclpy.qos.qos_profile_sensor_data` (BEST_EFFORT) -- a RELIABLE subscriber is
-# never compatible with a BEST_EFFORT publisher, so G-START-STATE can never receive a message for
-# the `vendor_mock`/`vendor` profiles ("no joint_states received within Xs"), and the execute()
-# monitoring loop could never see feedback either. This blocks "mock mode with profile
-# vendor_mock reaches the goal" below until execute_trajectory's joint_states subscriptions use a
-# BEST_EFFORT-compatible QoS; it is not in this card's scope to fix (execute_trajectory.py is not
-# in scope.write), so the corresponding check below is left asserting the required behaviour and
-# will fail loudly against today's code rather than being softened to match the bug.
+# QoS note: both rebot_motion's mock_driver and the real reBotArmController publish joint_states
+# BEST_EFFORT (qos_profile_sensor_data). execute_trajectory originally subscribed RELIABLE and so
+# could never hear them; MOT-05.7 fixed that (sensor-data QoS, discovery wait bounded by
+# --service-timeout-s). The vendor_mock phase below asserts the required behaviour against it.
 set -uo pipefail
 set -m
 
