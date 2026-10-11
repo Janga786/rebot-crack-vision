@@ -140,6 +140,8 @@ def test_missing_sdk_export_fails_v_sdk_api(tmp_path):
     result = _run_capture(tmp_path, rebot_ws)
     assert result["rc"] == cvd.EXIT_NOT_READY
     assert _fail_ids(result["report"]) == ["V-SDK-API"]
+    sdk = next(c for c in result["report"]["checks"] if c["id"] == "V-SDK-API")
+    assert "8427281" in sdk["citation"] and "8427281" in sdk["remedy"]
 
 
 def test_missing_deps_fails_v_pydeps(tmp_path):
