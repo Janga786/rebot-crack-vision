@@ -683,6 +683,10 @@ def check_gains(layout: VendorLayout, limits: dict, kp_cap: float, kd_cap: float
     )
 
 
+# Last SDK commit known to export RobotArm/ArmEndPos (the names hardware_manager.py imports).
+LAST_SDK_COMMIT_WITH_ROBOTARM = "8427281"
+
+
 def check_sdk_api(layout: VendorLayout) -> Check:
     hw_src = _read_text(layout.hardware_manager)
     wanted = _wanted_sdk_imports(hw_src)
@@ -710,15 +714,23 @@ def check_sdk_api(layout: VendorLayout) -> Check:
             "V-SDK-API",
             FAIL,
             f"the vendored SDK does not export: {missing} (SDK HEAD {head})",
-            citation=f"{import_citation} imports vs {layout.actuator_init}, {layout.controllers_init}, {layout.gripper_module}",
+            citation=(
+                f"{import_citation} imports vs {layout.actuator_init}, {layout.controllers_init}, "
+                f"{layout.gripper_module}; commit {LAST_SDK_COMMIT_WITH_ROBOTARM} is the last known SDK commit exporting "
+                "RobotArm and ArmEndPos"
+            ),
             compared=compared,
-            remedy="pin the vendored SDK submodule to a commit that exports these names, or update hardware_manager.py's imports to the SDK's current API",
+            remedy=f"pin the vendored SDK submodule to a commit that exports these names (last known: {LAST_SDK_COMMIT_WITH_ROBOTARM}), or update hardware_manager.py's imports to the SDK's current API",
         )
     return Check(
         "V-SDK-API",
         PASS,
         f"every import hardware_manager.py needs is exported by the SDK (HEAD {head})",
-        citation=f"{import_citation} imports vs {layout.actuator_init}, {layout.controllers_init}, {layout.gripper_module}",
+        citation=(
+            f"{import_citation} imports vs {layout.actuator_init}, {layout.controllers_init}, "
+            f"{layout.gripper_module}; commit {LAST_SDK_COMMIT_WITH_ROBOTARM} is the last known SDK commit exporting "
+            "RobotArm and ArmEndPos"
+        ),
         compared=compared,
     )
 
