@@ -133,6 +133,7 @@ class VendorLayout:
         self.sdk_pkg = sdk / "reBotArm_control_py"
         self.actuator_init = self.sdk_pkg / "actuator" / "__init__.py"
         self.actuator_rebotarm = self.sdk_pkg / "actuator" / "rebotarm.py"
+        self.actuator_arm = self.sdk_pkg / "actuator" / "arm.py"
         self.gripper_module = self.sdk_pkg / "actuator" / "gripper.py"
         self.controllers_init = self.sdk_pkg / "controllers" / "__init__.py"
         self.sdk_git_dir = sdk / ".git"
@@ -226,6 +227,15 @@ def _git_head_commit(git_dir: Path) -> Optional[str]:
 # --------------------------------------------------------------------------------------
 
 
+def _resolve_sdk_arm_module(layout: VendorLayout) -> tuple[Path, str]:
+    """The SDK's arm module: actuator/rebotarm.py, or actuator/arm.py (the layout up to 8427281)."""
+    if layout.actuator_rebotarm.is_file():
+        return layout.actuator_rebotarm, _read_text(layout.actuator_rebotarm)
+    if layout.actuator_arm.is_file():
+        return layout.actuator_arm, _read_text(layout.actuator_arm)
+    raise InputMissing(f"{layout.actuator_rebotarm} (or {layout.actuator_arm})")
+
+
 def check_port(layout: VendorLayout, facts: dict) -> Check:
     arm_text = _read_text(layout.arm_yaml)
     gripper_text = _read_text(layout.gripper_yaml)
@@ -276,7 +286,7 @@ def check_port(layout: VendorLayout, facts: dict) -> Check:
 
 
 def check_baud(layout: VendorLayout, facts: dict) -> Check:
-    sdk_source = _read_text(layout.actuator_rebotarm)
+    sdk_path, sdk_source = _resolve_sdk_arm_module(layout)
     match = re.search(r"from_dm_serial\([^,]+,\s*(\d+)\)", sdk_source)
     sdk_baud = int(match.group(1)) if match else None
     facts_baud = (facts.get("bus") or {}).get("serial_baud")
@@ -284,14 +294,14 @@ def check_baud(layout: VendorLayout, facts: dict) -> Check:
     if sdk_baud is None:
         return Check(
             "V-BAUD", WARN, "could not find a hard-coded baud in the SDK",
-            citation=str(layout.actuator_rebotarm), compared=compared,
+            citation=str(sdk_path), compared=compared,
         )
     status = PASS if sdk_baud == facts_baud else FAIL
     return Check(
         "V-BAUD",
         status,
         f"SDK hard-coded baud {sdk_baud} vs facts {facts_baud}",
-        citation=f"{layout.actuator_rebotarm}:{_mline(sdk_source, match)} Controller.from_dm_serial(...)",
+        citation=f"{sdk_path}:{_mline(sdk_source, match)} Controller.from_dm_serial(...)",
         compared=compared,
         remedy="" if status == PASS else "the SDK baud is hard-coded; cannot be fixed by config",
     )
