@@ -1,6 +1,6 @@
 # Progress — week of Mon Oct 05 – Sun Oct 11, 2026
 
-**27 task(s) completed and independently audited this week** · project total **71/108** accepted
+**28 task(s) completed and independently audited this week** · project total **72/108** accepted
 
 ## Notes
 
@@ -61,11 +61,13 @@
 …[33 chars clipped]
 - **MOT-04.6 — Reachability on task frames (tool_tip / camera_link) with a workcell-faithful specimen proxy + camera view check** ([details](MOT-04.6-v2.md)): Implemented interactively by the technical-lead recovery session (Claude Opus 5.5, operator-authorised, 2026-09-30); commit 54e522e. Fixes MOT-04.5's frame error (standoffs meant as tool-tip clearance
 …[217 chars clipped]
+- **MOT-11 — Vendor-driver readiness check: verify reBotArmController's port, motor IDs, joint order, direction and gripper mapping against the 2026-10-10 bring-up evidence (read-only ~/rebot_ws)** ([details](MOT-11.md)): Implemented scripts/motion/check_vendor_driver.py, a pure read-only static checker verifying reBotArmController's port, motor IDs, joint order, direction, zero, gripper mapping, safe_park, SDK API, Py
+…[170 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 55 / 188
-- Audits that rejected work with evidence-backed findings: 14 (repairs created: 11)
+- Implementation/review sessions run: 57 / 190
+- Audits that rejected work with evidence-backed findings: 15 (repairs created: 11)
 - Re-verified after an upstream change: CAM-02, CAM-05.1, CAM-05.2, GEOM-01, GEOM-01.R1, GEOM-08.1, GEOM-08.2, GEOM-08.2.R1, GEOM-08.5, GEOM-08.5.R1, GEOM-08.6, GEOM-08.7, GEOM-08.8, GEOM-08.8.R1, GEOM-10, MOT-02, MOT-03, MOT-04.1, MOT-04.1.R1, MOT-04.2, MOT-04.3, MOT-04.3.R1, MOT-04.4, MOT-04.4.R1, MOT-04.6, MOT-05.1, MOT-05.1.R1, MOT-05.2, MOT-05.4, MOT-05.4.R1, MOT-10.1, MOT-10.1.R1, MOT-10.2, MOT-10.3, PERC-03, PERC-03.R1, TC-011, TC-016
 
 ## Planning changes
@@ -84,7 +86,7 @@
 | D405 capture (L-CAM) | 7 | 9 |
 | Perception (L-PERC) | 13 | 16 |
 | Geometry & calibration (L-GEOM) | 15 | 24 |
-| Motion planning (L-MOTION) | 18 | 29 |
+| Motion planning (L-MOTION) | 19 | 29 |
 | Integration & commissioning (L-INT) | 1 | 6 |
 | Operator workflow & handoff (L-OPS) | 1 | 4 |
 | Imitation learning (later phase) (L-IL) | 0 | 1 |
