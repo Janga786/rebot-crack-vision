@@ -28,7 +28,8 @@ splitting:
 end_state: start
 surface_object_id: specimen
 surface_object_tolerance_m: 0.002
-service_timeout_s: 2.0
+service_timeout_s: 15.0
+ik_solver_timeout_s: 0.05
 
 view:
   view_distance_m: 0.25
@@ -51,5 +52,6 @@ sources:
   end_state: "'start' (return to the start state) is the §13.1 default end-of-plan behaviour."
   surface_object_id: "'specimen' is the one scene.yaml object every trace waypoint is standoffed from by construction (§10.5 point 2); ADR-017 §5 relaxes, rather than drops, the surface/scene check against exactly this object."
   surface_object_tolerance_m: "0.002 m (ADR-017 §5): an order of magnitude above the trace standoff construction's own floating-point/axis-aligned-box-approximation noise, and an order of magnitude below config/motion/specimen_placement.yaml's own 0.02 m placement tolerance -- so a correctly-placed trace waypoint never false-positives, while a genuinely mis-placed specimen still trips the check."
-  service_timeout_s: "2.0 s nominal per-ROS-service-call timeout for this card, matching this project's other service_timeout_s conventions (e.g. config/motion/view_verify.yaml)."
+  service_timeout_s: "15.0 s (raised from the card body's original 2.0 s default by MOT-06.11, debugger D0010/docs/INTERFACES.md §15): the per-call wait for /compute_cartesian_path, /plan_kinematic_path, /compute_fk and /check_state_validity (and the overall wait_for_services discovery deadline), NOT /compute_ik's own solver budget any more (see ik_solver_timeout_s below). Mock-stack measurement (ADR-017 addendum) found a 0.06 m / 31-waypoint trace leg's own /compute_cartesian_path call takes up to ~5.7 s; 15.0 s keeps >2.6x margin above that without forcing every /compute_ik call to spend the same multi-second budget."
+  ik_solver_timeout_s: "0.05 s (MOT-06.11, docs/INTERFACES.md §15): the /compute_ik request's own internal TRAC-IK solver budget, decoupled from service_timeout_s so raising the latter for a body-sized Cartesian trace does not also make every IK call take that long. Matches ~/rebot_ws's own kinematics.yaml kinematics_solver_timeout (0.05, solve_type: Distance) -- mock-stack measurement (ADR-017 addendum) confirmed TRAC-IK's Distance solve type spends its whole requested budget on every call, success or failure alike (observed ~0.053-0.056 s at this value, ~2.0 s when this field still read service_timeout_s at 2.0)."
   view: "view_distance_m (0.25 m) is the ADR-014 §8.2 nominal mid-band value within its own [0.20, 0.30] bound. tilt_candidates_deg ({0, 15}) brackets that same section's 15 deg anti-normal bound. yaw_candidates_deg (4 cardinal directions) matches config/motion/reachability.yaml's own orientation.tilt_azimuth_samples: 4. fov_deg (87 x 58 deg) is the D405 public datasheet figure (58 deg vertical already cited by ADR-014 §8.2/INTERFACES.md §8.2) -- not yet independently re-verified in this repo, carried with the same nominal-value_status honesty as every other not-yet-measured number here (ADR-017 §6 Revisit). fov_margin_deg (5 deg) is a nominal angular safety margin on the FOV check. footprint_m/surface_z_m reuse config/motion/specimen_placement.yaml's own placement.footprint_m/placement.surface_z_m so the --center-less view path matches the placement pipeline's own nominal specimen."

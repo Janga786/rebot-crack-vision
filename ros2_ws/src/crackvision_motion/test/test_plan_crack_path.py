@@ -16,8 +16,10 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 import pytest
-from moveit_msgs.msg import MoveItErrorCodes
-from moveit_msgs.srv import GetPositionIK, GetStateValidity
+from geometry_msgs.msg import PoseStamped
+from moveit_msgs.msg import MoveItErrorCodes, RobotTrajectory
+from moveit_msgs.srv import GetCartesianPath, GetMotionPlan, GetPositionFK, GetPositionIK, GetStateValidity
+from trajectory_msgs.msg import JointTrajectoryPoint
 
 from crackvision_motion.cartesian_core import Candidate, Pose, SegmentTask, apply_candidate, load_config
 from crackvision_motion.cli_common import EXIT_OK, EXIT_PRECONDITION, EXIT_USAGE
@@ -25,13 +27,18 @@ from crackvision_motion.joint_trajectory import JOINT_NAMES
 from crackvision_motion.plan_crack_path import (
     CandidateAttempt,
     LegResult,
+    _attempt_candidate,
     _classify_shortfall,
+    _quat_angle_deg,
     _index_map_and_errors,
     _joint_dict,
     _max_joint_step,
     _min_joint_margin,
+    _nearest_point_on_segment,
     _pose_errors,
+    _polyline_index_map_and_errors,
     _prefix_length_m,
+    _slerp_quat,
     _synthesized_retract_pose,
     _within_limits,
     aggregate_reasons,
@@ -498,6 +505,92 @@ def test_prefix_length_m():
     assert _prefix_length_m(trace, 3) == pytest.approx(0.03)
 
 
+# --------------------------------------------------------------------------------------
+# _polyline_index_map_and_errors (docs/INTERFACES.md §15, ADR-017 addendum, MOT-06.11): the
+# fraction==1.0 full-trace FK rule, replacing the §13.7 pointer walk for that case only.
+# --------------------------------------------------------------------------------------
+
+def test_nearest_point_on_segment_midpoint():
+    d, t = _nearest_point_on_segment((0.005, 0.001, 0.0), (0.0, 0.0, 0.0), (0.01, 0.0, 0.0))
+    assert d == pytest.approx(0.001)
+    assert t == pytest.approx(0.5)
+
+
+def test_nearest_point_on_segment_clamps_past_endpoints():
+    d, t = _nearest_point_on_segment((-0.01, 0.0, 0.0), (0.0, 0.0, 0.0), (0.01, 0.0, 0.0))
+    assert t == pytest.approx(0.0)
+    assert d == pytest.approx(0.01)
+
+
+def test_slerp_quat_endpoints_and_midpoint():
+    q0 = (0.0, 0.0, 0.0, 1.0)
+    q1 = (0.0, 0.0, 1.0, 0.0)  # 180 deg about Z
+    assert _slerp_quat(q0, q1, 0.0) == pytest.approx(q0)
+    assert _slerp_quat(q0, q1, 1.0) == pytest.approx(q1)
+    mid = _slerp_quat(q0, q1, 0.5)
+    assert _quat_angle_deg(mid, q0) == pytest.approx(90.0, abs=1e-6)
+
+
+def test_polyline_index_map_full_trace_with_widely_spaced_resampled_configs():
+    """The regression this card exists to fix: a fraction==1.0 trace whose returned
+    configurations are resampled far more sparsely than the requested waypoints (consecutive
+    configs here are 0.008 m apart, 8x `2*fk_tolerance_m`) must still be judged `full` -- every
+    configuration lies on the requested polyline within tolerance, which is all this rule checks."""
+    targets = [_pose(x=x) for x in (0.0, 0.002, 0.004, 0.006, 0.008)]
+    fk_poses = [_pose(x=0.0), _pose(x=0.008)]  # 2 configs for 5 requested waypoints
+    index_map, max_pos_err, max_ang_err, ok = _polyline_index_map_and_errors(
+        fk_poses, targets, tol_m=0.001, tol_deg=1.0,
+    )
+    assert ok is True
+    assert index_map == [0, 4]  # nearest-vertex diagnostic; last forced to the final waypoint
+    assert max_pos_err == pytest.approx(0.0, abs=1e-9)
+    assert max_ang_err == pytest.approx(0.0, abs=1e-9)
+
+
+def test_polyline_index_map_mid_segment_config_passes_on_the_line():
+    """A config that lands strictly between two requested waypoints (not at either vertex) is
+    still judged by its perpendicular distance to the segment, not forced to match one vertex."""
+    targets = [_pose(x=0.0), _pose(x=0.01), _pose(x=0.02)]
+    fk_poses = [_pose(x=0.005), _pose(x=0.02)]  # mid-segment config, then the final waypoint
+    index_map, max_pos_err, _max_ang_err, ok = _polyline_index_map_and_errors(
+        fk_poses, targets, tol_m=0.001, tol_deg=1.0,
+    )
+    assert ok is True
+    assert max_pos_err == pytest.approx(0.0, abs=1e-9)
+    assert index_map == [1, 2]
+
+
+def test_polyline_index_map_single_trace_waypoint_degenerates_to_point_check():
+    targets = [_pose(x=0.0)]
+    fk_poses = [_pose(x=0.0005)]
+    index_map, max_pos_err, _max_ang_err, ok = _polyline_index_map_and_errors(
+        fk_poses, targets, tol_m=0.001, tol_deg=1.0,
+    )
+    assert ok is True
+    assert index_map == [0]
+    assert max_pos_err == pytest.approx(0.0005)
+
+
+def test_polyline_index_map_deviating_config_fails():
+    targets = [_pose(x=x) for x in (0.0, 0.002, 0.004, 0.006, 0.008)]
+    fk_poses = [_pose(x=0.0), _pose(x=0.004, y=0.05), _pose(x=0.008)]  # middle config far off the line
+    _index_map, _max_pos_err, _max_ang_err, ok = _polyline_index_map_and_errors(
+        fk_poses, targets, tol_m=0.001, tol_deg=1.0,
+    )
+    assert ok is False
+
+
+def test_polyline_index_map_final_config_must_match_last_waypoint():
+    """Even if every config lies on the polyline somewhere, the final one must land on the *last*
+    waypoint specifically -- landing short (e.g. only reaching the second-to-last vertex) fails."""
+    targets = [_pose(x=x) for x in (0.0, 0.002, 0.004)]
+    fk_poses = [_pose(x=0.0), _pose(x=0.002)]  # never reaches x=0.004
+    _index_map, _max_pos_err, _max_ang_err, ok = _polyline_index_map_and_errors(
+        fk_poses, targets, tol_m=0.001, tol_deg=1.0,
+    )
+    assert ok is False
+
+
 def test_synthesized_retract_pose_offset_matches_approach_standoff():
     task = _task([0.0, 0.01, 0.02])
     pose = _synthesized_retract_pose(task, last_idx=1)
@@ -576,6 +669,141 @@ def test_classify_shortfall_small_joint_step_stays_cartesian_incomplete(cfg):
     })
     reason = _classify_shortfall(moveit, cfg, _joint_dict(_zeros6()), _pose(0.1))
     assert reason == "cartesian_incomplete"
+
+
+# --------------------------------------------------------------------------------------
+# _attempt_candidate end-to-end with fake services (§13.5 steps 1-5), proving the fraction==1.0
+# full-trace fix (docs/INTERFACES.md §15, ADR-017 addendum, MOT-06.11) at the level the card
+# requires: fake services drive the real step 1-5 control flow, no rclpy/running ROS graph.
+# --------------------------------------------------------------------------------------
+
+def _traj(names, points_positions):
+    traj = RobotTrajectory()
+    traj.joint_trajectory.joint_names = list(names)
+    for positions in points_positions:
+        pt = JointTrajectoryPoint()
+        pt.positions = list(positions)
+        traj.joint_trajectory.points.append(pt)
+    return traj
+
+
+def _motion_plan_response(configs):
+    resp = GetMotionPlan.Response()
+    resp.motion_plan_response.error_code.val = MoveItErrorCodes.SUCCESS
+    resp.motion_plan_response.trajectory = _traj(JOINT_NAMES, configs)
+    return resp
+
+
+def _cartesian_response(configs, fraction=1.0):
+    resp = GetCartesianPath.Response()
+    resp.error_code.val = MoveItErrorCodes.SUCCESS
+    resp.fraction = fraction
+    resp.solution = _traj(JOINT_NAMES, configs)
+    return resp
+
+
+def _fk_response(pose: Pose):
+    resp = GetPositionFK.Response()
+    resp.error_code.val = MoveItErrorCodes.SUCCESS
+    resp.fk_link_names = ["tool_tip"]
+    ps = PoseStamped()
+    ps.pose.position.x, ps.pose.position.y, ps.pose.position.z = pose.position_m
+    ps.pose.orientation.x, ps.pose.orientation.y, ps.pose.orientation.z, ps.pose.orientation.w = pose.quat_xyzw
+    resp.pose_stamped = [ps]
+    return resp
+
+
+_TRACE_XS = [0.0, 0.002, 0.004, 0.006, 0.008]  # 5 waypoints, matches paths3d's own default spacing
+
+
+def _full_trace_fake_moveit(cfg, *, trace_fk_poses, trace_fraction=1.0, extra_ik=()):
+    """Fake services for one complete §13.5 steps 1-5 pass over `_task(_TRACE_XS)`: IK+transit
+    succeed trivially, the Cartesian approach/retract legs are single points at the first/last
+    trace pose, and the Cartesian trace leg returns `trace_fraction` with exactly `trace_fk_poses`'
+    own configurations (so its own FK responses are `trace_fk_poses`, however sparse)."""
+    task = _task(_TRACE_XS)
+    n = len(trace_fk_poses)
+    # small per-config steps (0.01 rad): distinct configs, but well under recheck.max_joint_step_rad
+    # (0.2) regardless of how sparse `n` is.
+    trace_configs = [[float(i) * 0.01] * 6 for i in range(n)]
+    return _FakeMoveIt({
+        "ik": [_ik_response(_zeros6()), *extra_ik],
+        "motion_plan": [_motion_plan_response([_zeros6(), _zeros6()])],
+        "cartesian": [
+            _cartesian_response([_zeros6()]),  # step 3: approach to trace[0]
+            _cartesian_response(trace_configs, fraction=trace_fraction),  # step 4: the trace leg under test
+            _cartesian_response([_zeros6()]),  # step 5: retract
+        ],
+        "fk": [
+            _fk_response(task.approach),  # step 2: transit final pose check
+            _fk_response(task.trace[0]),  # step 3: approach config FK
+            *[_fk_response(p) for p in trace_fk_poses],  # step 4: trace config(s) FK
+            _fk_response(task.retract),  # step 5: retract config FK
+        ],
+        "validity": [_validity_response(True)] * (2 + 1 + n + 1),  # transit(2)+approach(1)+trace(n)+retract(1)
+    })
+
+
+def test_attempt_candidate_full_trace_with_widely_resampled_configs_is_full(cfg):
+    """The regression this card exists to fix: a `fraction == 1.0` trace leg whose returned
+    configurations are resampled far more sparsely than the requested waypoints (2 configs for 5
+    waypoints here, matching every intermediate FK-matched position exactly) must still be
+    reported `full` -- the old §13.7 pointer walk would stall partway through this (ADR-017
+    addendum measured it directly on a live mock-stack trace)."""
+    task = _task(_TRACE_XS)
+    trace_fk_poses = [task.trace[0], task.trace[-1]]
+    moveit = _full_trace_fake_moveit(cfg, trace_fk_poses=trace_fk_poses)
+    cand = _candidate("forward", 0.0)
+    limits = _LIMITS
+
+    attempt = _attempt_candidate(moveit, cfg, limits, _joint_dict(_zeros6()), task, cand)
+
+    assert attempt.full is True
+    assert attempt.last_reached_index == len(task.trace) - 1
+    trace_leg = next(leg for leg in attempt.legs if leg.kind == "trace")
+    assert trace_leg.waypoint_index_map == [0, len(task.trace) - 1]
+    assert trace_leg.recheck["max_pos_err_m"] == pytest.approx(0.0, abs=1e-9)
+    assert attempt.reasons == set()
+
+
+def test_attempt_candidate_fraction_below_one_still_uses_pointer_walk_cutoff(cfg):
+    """§13.7's own fraction<1 behaviour is unchanged by this card: a trace leg that only reaches
+    waypoint index 1 of 4 is reported partial, at exactly that cutoff."""
+    task = _task(_TRACE_XS)
+    # two configs, FK-matching trace[0] then trace[1] exactly -- a fraction<1 partial reach, plus
+    # the extra /compute_ik call _classify_shortfall makes for the shortfall classification.
+    trace_fk_poses = [task.trace[0], task.trace[1]]
+    moveit = _full_trace_fake_moveit(
+        cfg, trace_fk_poses=trace_fk_poses, trace_fraction=0.4,
+        extra_ik=[_ik_response(error_code=MoveItErrorCodes.NO_IK_SOLUTION)],
+    )
+    cand = _candidate("forward", 0.0)
+    limits = _LIMITS
+
+    attempt = _attempt_candidate(moveit, cfg, limits, _joint_dict(_zeros6()), task, cand)
+
+    assert attempt.full is False
+    assert attempt.last_reached_index == 1
+    trace_leg = next(leg for leg in attempt.legs if leg.kind == "trace")
+    assert trace_leg.waypoint_index_map == [0, 1]
+    assert "cartesian_incomplete" in attempt.reasons
+
+
+def test_attempt_candidate_full_trace_fk_mismatch_fails_whole_candidate(cfg):
+    """One deviating configuration among an otherwise `fraction == 1.0` trace fails the whole
+    candidate with `fk_mismatch` -- never a partial salvage (that is §13.7's job, fraction<1 only)."""
+    task = _task(_TRACE_XS)
+    trace_fk_poses = [task.trace[0], _pose(x=0.004, y=0.05), task.trace[-1]]
+    moveit = _full_trace_fake_moveit(cfg, trace_fk_poses=trace_fk_poses)
+    cand = _candidate("forward", 0.0)
+    limits = _LIMITS
+
+    attempt = _attempt_candidate(moveit, cfg, limits, _joint_dict(_zeros6()), task, cand)
+
+    assert attempt.full is False
+    assert attempt.last_reached_index == -1
+    assert attempt.legs == []
+    assert attempt.reasons == {"fk_mismatch"}
 
 
 # --------------------------------------------------------------------------------------

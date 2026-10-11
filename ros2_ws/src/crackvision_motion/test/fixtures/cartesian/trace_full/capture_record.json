@@ -1,0 +1,23 @@
+{
+  "schema": "crackvision.capture_3d/1",
+  "case_id": "test_trace_full",
+  "synthetic": true,
+  "robot": {
+    "joint_names": [
+      "joint1",
+      "joint2",
+      "joint3",
+      "joint4",
+      "joint5",
+      "joint6"
+    ],
+    "positions_rad": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ]
+  }
+}

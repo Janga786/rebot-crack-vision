@@ -237,3 +237,86 @@ exactly like every other nominal, not-yet-independently-reverified value in this
   superseding the datasheet-only provenance §13 ships with.
 - Real crack geometry (post-GEOM-08 on real captures) shows the default roll-offset set or
   `max_splits_per_segment` under- or over-covers in practice.
+
+## Addendum (MOT-06.11, debugger D0010): the §13.7 pointer walk stalls at `fraction == 1.0`, and the
+IK solver budget must be decoupled from the Cartesian/motion-plan call wait
+
+MOT-06.7's headless smoke test of `plan_crack_path` timed out three times. Both causes trace back to
+this ADR, not to the smoke test. This addendum records the measured facts (mock stack, `scripts/ros/
+_mock_stack.sh`, this card's own throwaway measurement script against the exact scenario `docs/
+INTERFACES.md §15` normalizes: a straight, boresight-down, 0.06 m / 31-trace-waypoint segment at
+0.002 m spacing, centred at the recommended placement `(0.26, 0.0)` from `config/motion/
+specimen_placement.yaml`, surface top `z = 0.010`) and the resulting fix.
+
+### Fact 1: a `fraction == 1.0` trace's own returned trajectory is resampled far more sparsely than
+the requested waypoints, and the §13.7 FK pointer walk (ADR-017 §3) cannot keep up
+
+For the 31-waypoint / 0.06 m trace leg (step 4 alone, started already at `trace[0]` via its own
+step-3 approach leg, exactly as `_attempt_candidate` does):
+
+| Candidate roll offset | `/compute_cartesian_path` duration | `fraction` | returned point count |
+|---|---|---|---|
+| 0° (forward) | ~2.3 s | 0.505 (collision-truncated — see fact 1's own y=0 region) | 8 |
+| 30° (forward) | ~3.9 s | **1.0** | 11 |
+| 60°..180° (forward), tried without step-3 chaining | ~5.2–5.7 s | **1.0** | 18 |
+
+(31 requested waypoints; 11–18 returned points on full completion, matching ADR-017 §3's own
+"point count has no fixed relationship to waypoint count" fact, here on the *committed* side too,
+not just the probe's single-sample observation.)
+
+FK-ing every returned configuration of the 30°, `fraction == 1.0` run and measuring the spacing
+between *consecutive* configurations' `tool_tip` positions: max **0.0117 m**, mean **0.0053 m**, min
+**0.00033 m** — against the requested 0.002 m waypoint spacing and `recheck.fk_tolerance_m = 0.001 m`
+(i.e. `2·fk_tolerance_m = 0.002 m`). Every consecutive gap above `2·fk_tolerance_m` means the §13.7
+pointer walk (`cartesian_moveit.match_reached_waypoints` / `plan_crack_path._index_map_and_errors`)
+can advance its pointer by at most one requested waypoint per returned configuration and never
+resynchronises after a skip. Running that exact walk against this exact (`fraction == 1.0`) dataset:
+**`last_reached_index == 1`** — the walk believes only 2 of 31 requested waypoints were reached, on a
+trace that in fact reached all of them. This is the stall debugger D0010 found live (12/31 in attempt
+00613; this addendum's own measurement is more extreme, 2/31, because step-3 chaining removes the
+ramp-segment artifact that otherwise partially masked it).
+
+### Fact 2: the proposed replacement rule (nearest-polyline position + bracket-interpolated
+orientation, docs/INTERFACES.md §15) passes comfortably on the same dataset
+
+Checking every one of that same 30°, `fraction == 1.0` run's 11 configurations against the nearest
+point on the requested (rolled) trace polyline, and its orientation against the slerp between the
+bracketing requested waypoints at that point's own projection fraction: max perpendicular position
+error **2.18×10⁻⁶ m**, max bracket-interpolated angular error **1.49×10⁻⁵ deg** — both roughly three
+orders of magnitude inside `recheck.fk_tolerance_m` (0.001 m) / `fk_tolerance_deg` (1.0°). The final
+configuration's direct error against the last requested waypoint: **1.93×10⁻⁶ m** / **1.48×10⁻⁵
+deg**. This confirms §15's rule (§3 below): a genuinely fully-completed trace's own returned
+configurations really do stay on the requested polyline (MoveIt interpolates linearly between
+consecutive input waypoints, so the geometric path is unaffected by how sparsely the time
+parameterization later resamples it) — the pointer walk's stall was a property of the *matching
+method*, not of the underlying trajectory.
+
+### Fact 3: TRAC-IK's `Distance` solve type spends its whole requested budget on every `/compute_ik`
+call, success or failure alike, so the same field cannot serve two needs at once
+
+`~/rebot_ws`'s own `kinematics.yaml` configures `kinematics_solver: trac_ik_kinematics_plugin`,
+`solve_type: "Distance"`, `kinematics_solver_timeout: 0.05`. Measured on this mock stack: at the
+pre-MOT-06.11 config (`service_timeout_s: 2.0`, reused directly as the `/compute_ik` request's own
+`ik_request.timeout`), every `/compute_ik` call — successful or not — took **~2.00–2.01 s** (12 of 12
+sampled roll-offset candidates, both successes and the one tested failure case). Lowering only the
+request's own timeout field to `0.05` (independent of `service_timeout_s`) reproduced the exact
+`~0.053–0.056 s` per call this ADR's §4/`solve_type: Distance` choice implies: the solver always
+consumes its whole requested budget, so that budget must stay small regardless of what the slower
+Cartesian/motion-plan calls need. With the single pre-existing `service_timeout_s` field serving
+both roles, raising it enough to cover fact 1's own ~5.7 s worst-case trace call (to fix the timeout
+defect MOT-06.7 also hit) would have made every `/compute_ik` call cost that same multi-second
+budget — about 20 s per candidate, ~20 minutes for one segment's full 24-candidate search (debugger
+D0010's own finding).
+
+### The fix
+
+1. **Full-ness is `fraction == 1.0` itself** (§13.5 step 4, as written), never the §13.7 pointer walk
+   — that walk is now used only when `fraction < 1` (unchanged, exactly its original scope). See
+   `docs/INTERFACES.md` §15 for the full, appended contract; §13 itself is not edited in place.
+2. **`ik_solver_timeout_s`** (new `cartesian_planning.yaml` key, default `0.05`, matching
+   `~/rebot_ws`'s own `kinematics.yaml`) is now the sole source of `/compute_ik`'s own internal
+   solver budget; `service_timeout_s` (raised to `15.0`, comfortably above fact 1's measured ~5.7 s
+   worst case with margin) is now exclusively the per-call *wait* timeout for
+   `/compute_cartesian_path`, `/plan_kinematic_path`, `/compute_fk` and `/check_state_validity` (and
+   the overall `wait_for_services` discovery deadline). `ik_call_timeout_s()` adds the existing
+   `_IK_CALL_TIMEOUT_MARGIN_S` margin on top of `ik_solver_timeout_s`, unchanged in form.

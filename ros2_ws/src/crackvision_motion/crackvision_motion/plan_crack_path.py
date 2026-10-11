@@ -142,7 +142,12 @@ def _index_map_and_errors(
     the max position/angle error over only the FK-*matched* configurations (§13.11.2's `recheck`
     is scoped to FK-checked configurations, i.e. those that got a `waypoint_index_map` entry) --
     an unmatched intermediate/resampled configuration has no target of its own to be judged
-    against, so it is never allowed to inflate this diagnostic."""
+    against, so it is never allowed to inflate this diagnostic.
+
+    Used for single-target (approach/retract) legs always, and for a multi-waypoint `trace` leg
+    only when `fraction < 1` (§13.7's own partial-trace path). A `fraction == 1.0` trace leg uses
+    `_polyline_index_map_and_errors` instead (docs/INTERFACES.md §15, ADR-017 addendum, MOT-06.11)
+    -- this pointer walk stalls on a resampled fully-completed trajectory (measured directly)."""
     pointer = 0
     index_map: List[Optional[int]] = []
     max_pos_err = 0.0
@@ -166,6 +171,91 @@ def _index_map_and_errors(
 
 def _last_reached(index_map: Sequence[Optional[int]]) -> int:
     return max((v for v in index_map if v is not None), default=-1)
+
+
+def _nearest_point_on_segment(
+    p: Tuple[float, float, float], a: Tuple[float, float, float], b: Tuple[float, float, float],
+) -> Tuple[float, float]:
+    """`(distance, t)`: the perpendicular distance from `p` to the segment `a->b`, and the
+    projection fraction `t` in `[0, 1]` (`0` at `a`, `1` at `b`)."""
+    ab = tuple(bb - aa for aa, bb in zip(a, b))
+    ap = tuple(pp - aa for aa, pp in zip(a, p))
+    denom = sum(c * c for c in ab)
+    t = 0.0 if denom <= 0.0 else max(0.0, min(1.0, sum(x * y for x, y in zip(ap, ab)) / denom))
+    proj = tuple(aa + t * c for aa, c in zip(a, ab))
+    return math.dist(p, proj), t
+
+
+def _slerp_quat(
+    q0: Tuple[float, float, float, float], q1: Tuple[float, float, float, float], t: float,
+) -> Tuple[float, float, float, float]:
+    """Shortest-path spherical interpolation between two xyzw unit quaternions."""
+    dot = sum(a * b for a, b in zip(q0, q1))
+    if dot < 0.0:
+        q1 = tuple(-x for x in q1)
+        dot = -dot
+    dot = max(-1.0, min(1.0, dot))
+    theta = math.acos(dot)
+    if theta < 1e-9:
+        return q0
+    s0 = math.sin((1.0 - t) * theta) / math.sin(theta)
+    s1 = math.sin(t * theta) / math.sin(theta)
+    return tuple(s0 * a + s1 * b for a, b in zip(q0, q1))
+
+
+def _polyline_index_map_and_errors(
+    fk_poses: Sequence[Pose], targets: Sequence[Pose], tol_m: float, tol_deg: float,
+) -> Tuple[List[int], float, float, bool]:
+    """docs/INTERFACES.md §15 (ADR-017 addendum, MOT-06.11): the `fraction == 1.0` full-trace FK
+    agreement rule, applied to **every** returned configuration -- replacing the §13.7 FK pointer
+    walk for this case (that walk is used only when `fraction < 1`, unchanged). Each configuration
+    is checked against the nearest point on the requested (rolled) trace *polyline* (the straight
+    segment between whichever pair of consecutive targets it is closest to), not against one
+    specific waypoint by a sequential pointer -- the server resamples/consolidates the returned
+    trajectory (ADR-017 §3), so configuration count rarely equals waypoint count even on full
+    completion, and a strictly-advancing pointer stalls on any step wider than `tol_m` (measured:
+    ADR-017 addendum). Orientation is checked against the slerp between that segment's own two
+    target orientations, at the same projection fraction. The final configuration is additionally
+    checked directly against the last target (not interpolated) -- "the final configuration
+    matches the last waypoint."
+
+    Returns `(index_map, max_pos_err_m, max_ang_err_deg, ok)`: `index_map` entries are each
+    configuration's *nearest* target index (never `None`) -- diagnostic only, not the pass/fail
+    gate; `ok` is `False` iff any configuration (including the explicit tail check) exceeds
+    `tol_m`/`tol_deg`, in which case the whole candidate is failed with `fk_mismatch` (this
+    function never truncates/drops a prefix -- that partial-trace salvage is §13.7's job, for
+    `fraction < 1` only)."""
+    n = len(targets)
+    index_map: List[int] = []
+    max_pos_err = 0.0
+    max_ang_err = 0.0
+    ok = True
+    for pose in fk_poses:
+        if n == 1:
+            pos_err, ang_err = _pose_errors(pose, targets[0])
+            index_map.append(0)
+        else:
+            best: Optional[Tuple[float, int, float]] = None
+            for j in range(n - 1):
+                d, t = _nearest_point_on_segment(pose.position_m, targets[j].position_m, targets[j + 1].position_m)
+                if best is None or d < best[0]:
+                    best = (d, j, t)
+            pos_err, seg_idx, t = best
+            q_interp = _slerp_quat(targets[seg_idx].quat_xyzw, targets[seg_idx + 1].quat_xyzw, t)
+            ang_err = _quat_angle_deg(pose.quat_xyzw, q_interp)
+            index_map.append(seg_idx if t < 0.5 else seg_idx + 1)
+        max_pos_err = max(max_pos_err, pos_err)
+        max_ang_err = max(max_ang_err, ang_err)
+        if pos_err > tol_m or ang_err > tol_deg:
+            ok = False
+
+    tail_pos_err, tail_ang_err = _pose_errors(fk_poses[-1], targets[-1])
+    max_pos_err = max(max_pos_err, tail_pos_err)
+    max_ang_err = max(max_ang_err, tail_ang_err)
+    if tail_pos_err > tol_m or tail_ang_err > tol_deg:
+        ok = False
+    index_map[-1] = n - 1
+    return index_map, max_pos_err, max_ang_err, ok
 
 
 def _recheck_dict(
@@ -532,20 +622,36 @@ def _attempt_candidate(
     legs.append(LegResult("approach", approach_configs, idx_map, _recheck_dict(pos_err, ang_err, True, True, step)))
     cur_positions = _joint_dict(approach_configs[-1])
 
-    # Step 4: Cartesian trace across every (rolled) trace pose; partial fallback is §13.7's job,
-    # so any recheck failure on the reached prefix conservatively drops the whole prefix (never
-    # over-claims coverage) rather than guessing where within it to truncate.
+    # Step 4: Cartesian trace across every (rolled) trace pose. docs/INTERFACES.md §15 (ADR-017
+    # addendum, MOT-06.11): full-ness is `fraction == 1.0` itself (§13.5), never the §13.7 FK
+    # pointer walk -- that walk stalls on a resampled trajectory (ADR-017 addendum measured this
+    # directly) and is used only when `fraction < 1` (unchanged, the partial-trace path just
+    # below). A `fraction == 1.0` trace still gets every configuration FK-checked
+    # (`_polyline_index_map_and_errors`), just against the requested polyline/bracketing
+    # orientation rather than a sequential waypoint pointer; any violation fails the whole
+    # candidate (`fk_mismatch`), matching the step 3/5 pattern, never a partial salvage.
     trace_leg_start = cur_positions
     cart_resp = moveit.call(moveit.clients["cartesian"], build_cartesian_request(cur_positions, rolled.trace, LINK, cfg))
     trace_configs, fraction, _cart_err = parse_cartesian(cart_resp)
-    if trace_configs:
+
+    if fraction >= 1.0 and trace_configs:
+        fk_poses = _fk_poses(moveit, trace_configs)
+        trace_map, pos_err, ang_err, poly_ok = _polyline_index_map_and_errors(fk_poses, rolled.trace, tol_m, tol_deg)
+        if not poly_ok:
+            return fail("fk_mismatch")
+        committed_configs, committed_map = trace_configs, trace_map
+    elif trace_configs:
+        # §13.7's fraction<1 partial-trace path, unchanged: the sequential FK pointer walk decides
+        # how much of the reached prefix to commit, any recheck failure on it conservatively drops
+        # the whole prefix (never over-claims coverage) rather than guessing where to truncate.
         fk_poses = _fk_poses(moveit, trace_configs)
         trace_map, pos_err, ang_err = _index_map_and_errors(fk_poses, rolled.trace, tol_m, tol_deg)
+        cutoff = max((i for i, v in enumerate(trace_map) if v is not None), default=-1)
+        committed_configs = trace_configs[: cutoff + 1] if cutoff >= 0 else []
+        committed_map = trace_map[: cutoff + 1] if cutoff >= 0 else []
     else:
-        trace_map, pos_err, ang_err = [], 0.0, 0.0
-    cutoff = max((i for i, v in enumerate(trace_map) if v is not None), default=-1)
-    committed_configs = trace_configs[: cutoff + 1] if cutoff >= 0 else []
-    committed_map = trace_map[: cutoff + 1] if cutoff >= 0 else []
+        pos_err, ang_err = 0.0, 0.0
+        committed_configs, committed_map = [], []
 
     if committed_configs:
         ok = (

@@ -133,7 +133,8 @@ def test_build_ik_request_fields(cfg):
     assert req.ik_request.pose_stamped.pose.position.x == pytest.approx(0.2)
     assert list(req.ik_request.robot_state.joint_state.name) == list(JOINT_NAMES)
     total_timeout = req.ik_request.timeout.sec + req.ik_request.timeout.nanosec * 1e-9
-    assert total_timeout == pytest.approx(cfg["service_timeout_s"])
+    assert total_timeout == pytest.approx(cfg["ik_solver_timeout_s"])
+    assert cfg["ik_solver_timeout_s"] != cfg["service_timeout_s"]
 
 
 def test_ik_solver_timeout_is_strictly_smaller_than_call_timeout(cfg):
