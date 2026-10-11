@@ -33,6 +33,7 @@ setup(
             "check_end_effector = crackvision_motion.check_end_effector:main",
             "execute_trajectory = crackvision_motion.execute_trajectory:main",
             "survey_to_scene = crackvision_motion.survey_to_scene:main",
+            "plan_crack_path = crackvision_motion.plan_crack_path:main",
         ],
     },
 )
