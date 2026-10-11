@@ -1,6 +1,6 @@
 # Progress — week of Mon Oct 05 – Sun Oct 11, 2026
 
-**48 task(s) completed and independently audited this week** · project total **90/128** accepted
+**49 task(s) completed and independently audited this week** · project total **91/128** accepted
 
 ## Notes
 
@@ -97,10 +97,12 @@
 - **GEOM-09.3 — Monte-Carlo cross-check of the pixel-to-tool-pose uncertainty chain (crackvision.uncertainty_mc)** ([details](GEOM-09.3.md)): All sub-tasks of this work package were completed and audited together: GEOM-09.3.1.
 - **GEOM-09.4.1 — Implement crackvision.uncertainty_budget CLI + report assembly** ([details](GEOM-09.4.1.md)): Built the uncertainty-budget CLI (`./env.sh python -m crackvision.uncertainty_budget`) that takes an already-generated 3D crack path file and produces a detailed error-budget report, breaking down the
 …[438 chars clipped]
+- **GEOM-09.4.2 — Write docs/geometry/UNCERTAINTY_BUDGET.md** ([details](GEOM-09.4.2.md)): Added documentation for the new uncertainty-budget report tool, explaining in plain language what the per-point/per-waypoint uncertainty breakdown means, how to run it, and its honest limits (it only 
+…[240 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 92 / 438
+- Implementation/review sessions run: 93 / 439
 - Audits that rejected work with evidence-backed findings: 28 (repairs created: 22)
 - Re-verified after an upstream change: CAM-02, CAM-05.1, CAM-05.2, GEOM-01, GEOM-01.R1, GEOM-08.1, GEOM-08.2, GEOM-08.2.R1, GEOM-08.5, GEOM-08.5.R1, GEOM-08.6, GEOM-08.7, GEOM-08.8, GEOM-08.8.R1, GEOM-09.1, GEOM-09.1.R1, GEOM-09.3.1, GEOM-10, MOT-02, MOT-03, MOT-04.1, MOT-04.1.R1, MOT-04.2, MOT-04.3, MOT-04.3.R1, MOT-04.4, MOT-04.4.R1, MOT-04.6, MOT-04.6.R1, MOT-05.1, MOT-05.1.R1, MOT-05.2, MOT-05.4, MOT-05.4.R1, MOT-06.2, MOT-06.2.R1, MOT-06.3, MOT-06.3.R1, MOT-06.4, MOT-06.4.R1, MOT-06.5, MOT-06.5.R1, MOT-06.6, MOT-06.6.R1, MOT-06.8, MOT-10.1, MOT-10.1.R1, MOT-10.1.R2, MOT-10.2, MOT-10.3, PERC-03, PERC-03.R1, TC-011, TC-016
 
@@ -123,7 +125,7 @@
 | Local coding model (L-LLM) | 5 | 8 |
 | D405 capture (L-CAM) | 7 | 9 |
 | Perception (L-PERC) | 13 | 16 |
-| Geometry & calibration (L-GEOM) | 21 | 32 |
+| Geometry & calibration (L-GEOM) | 22 | 32 |
 | Motion planning (L-MOTION) | 31 | 41 |
 | Integration & commissioning (L-INT) | 1 | 6 |
 | Operator workflow & handoff (L-OPS) | 1 | 4 |
