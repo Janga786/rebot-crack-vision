@@ -74,14 +74,25 @@ precisely the evidence that nearby orientations are feasible.
 
 ### 3. Last-reached waypoint: FK matching, not `fraction` (facts 2, 3)
 
-The card body requires FK matching for partial traces; fact 2 is exactly why `fraction`-based or
-trajectory-point-count-based indexing cannot be trusted for this (resampling decouples the two). §13 defines
-the match precisely: walk the returned trajectory's configurations in order, and walk the requested trace
-waypoints with a pointer starting at 0; a configuration advances the pointer when its `/compute_fk` pose at
-`tool_tip` is within the independent re-check tolerance (1 mm / 1°) of the pointed-at waypoint. The last
-waypoint index the pointer reached, minus one, is the last-reached index; `-1` if none matched. This is
+CARTESIAN_PROBE.md's own consequence 2 recommends a fraction-based estimate for this —
+`round(fraction * (len(requested_waypoints) - 1))` against the *requested* waypoints — and rejects only
+indexing or counting the *returned* `RobotTrajectory` directly, whose point count has no fixed
+relationship to the input waypoint count (consequence 3: resampling at `max_step` consolidates or
+inflates it independent of which input waypoints were actually reached). This card does not adopt the
+probe's `round(...)` estimate as its primary method; it uses **FK matching** instead. Rationale:
+`round(fraction*(n-1))` assumes the server's resampling is spatially uniform along the requested
+polyline, and consequence 3 (plus fact 4's roll-ramp point-count inflation) is exactly the evidence that
+it is not — a candidate's own roll offset changes the returned trajectory's point count and timing
+without changing which Cartesian positions were requested, so a linear-proportion index is not a safe
+read of "how far did we get." FK matching instead verifies, pose by pose, which requested waypoints were
+actually reached, reusing the same tolerance (`recheck.fk_tolerance_m`/`_deg`) the independent re-check
+(§4 below) already requires: walk the returned trajectory's configurations in order, and walk the
+requested trace waypoints with a pointer starting at 0; a configuration advances the pointer when its
+`/compute_fk` pose at `tool_tip` is within that tolerance of the pointed-at waypoint. The last waypoint
+index the pointer reached, minus one, is the last-reached index; `-1` if none matched. This is
 well-defined because `/compute_cartesian_path`'s output only ever progresses forward along the requested
-polyline (fact 2's own resampling never reorders it).
+polyline (fact 2's own resampling never reorders it). `fraction` itself still gates whether this search
+runs at all — `fraction == 1.0` skips it entirely (§13.5/§13.6).
 
 Fact 3 (no cause field on a short `fraction`) means a short trace cannot be labelled `collision` for free.
 §13's classification is a deliberately bounded, best-effort post-hoc check: IK the next unreached waypoint
@@ -108,16 +119,31 @@ actually produce. The FK tolerance (1 mm / 1°) and the inclusive `b601_dm_limit
 (never narrowed, exactly ADR-016 §6's rule) complete the independent re-check, together with
 `/check_state_validity` against the production scene for every output configuration.
 
-### 5. Surface/scene mismatch excludes the surface the crack is on
+### 5. Surface/scene mismatch relaxes, rather than drops, the check against the surface the crack is on
 
 The pre-planning pure check (card body) flags a trace position that lies inside or within clearance of a
 scene collision object — but every trace waypoint is *by construction* exactly `trace_clearance_m` from the
-specimen's surface (§10.5 point 2), which is the object the crack is on. Checking against that object
-unmodified would flag every trace waypoint, always, which is not what the card intends (it exists to catch
-*other* objects: the table, a future obstacle, a mis-placed specimen). §13 therefore excludes one named
-scene object — `surface_object_id`, default `"specimen"` — from this check, and checks every other scene
-object normally. This is not forced by a MOT-06.1 fact; it is a necessary clarification to keep the check
-internally consistent with §10.5's own standoff definition, recorded here as the card instructs.
+specimen's surface (§10.5 point 2), which is the object the crack is on. Checking that object against the
+*full* `clearance_m` bound would flag every trace waypoint, always, which is not what the card intends (it
+exists to catch *other* objects: the table, a future obstacle, a mis-placed specimen) — but dropping the
+surface object from the check entirely would also lose the one case a mis-placed specimen actually
+produces: a measured crack surface that ends up inside, or barely clearing, the scene's specimen box
+because that box's pose is wrong (`config/scene/scene.yaml`'s own specimen entry is explicitly a
+placeholder today). §13 therefore keeps checking `surface_object_id` (default `"specimen"`), but against a
+*relaxed* bound: `clearance_m − surface_object_tolerance_m` instead of the full `clearance_m`. Every other
+scene object keeps the full `clearance_m` bound, unchanged.
+
+`surface_object_tolerance_m` defaults to **0.002 m (2 mm)** — one order of magnitude above the kind of
+noise this check must absorb for a geometrically-consistent scene (the standoff construction's own
+floating-point arithmetic, §10.5 point 2, plus the axis-aligned box approximation of the specimen's exact
+shape), so a correctly-placed trace waypoint (distance ≈ `clearance_m`, exactly, modulo that noise) never
+false-positives; and at least one order of magnitude below the scale of a real specimen-placement error
+this check exists to catch (the placement pipeline's own tolerances — `specimen_placement.yaml`'s
+`tolerance_m: 0.02`, i.e. 20 mm — already treat sub-centimetre deviations as noise, so a specimen pose
+wrong enough to matter moves the surface by centimetres, not millimetres). This is not forced by a
+MOT-06.1 fact; it is a necessary clarification to keep the check internally consistent with §10.5's own
+standoff definition while still catching a genuinely mis-placed surface, recorded here as the card
+instructs.
 
 ### 6. View-phase geometry reuses existing project conventions, not new ones
 
@@ -156,15 +182,24 @@ exactly like every other nominal, not-yet-independently-reverified value in this
 - **Ramp the roll across a segment instead of a uniform offset.** Rejected (fact 4): measurably inflates
   trajectory size/duration for no benefit this project needs; §10.5's own fill already handles smooth
   per-waypoint orientation.
-- **Index the returned trajectory by its own point count/`fraction` to find the last-reached waypoint.**
-  Rejected (fact 2): the card body already requires FK matching; the probe is exactly why `fraction`
-  indexing is unsound here.
+- **Index the returned trajectory by its own point count.** Rejected (fact 2/consequence 3): the point
+  count has no fixed relationship to the requested waypoint count, so an index into it is not comparable
+  to a requested-waypoint index at all.
+- **Adopt the probe's own `round(fraction*(n-1))` estimate (consequence 2) as the last-reached-waypoint
+  method, instead of FK matching.** Rejected (§3 above): the probe's own data (consequence 3, fact 4)
+  shows the server's resampling is not spatially uniform along the requested polyline, so a linear
+  proportion of `fraction` is not a reliable read of which waypoints were actually reached; FK matching
+  verifies this directly, at the same tolerance the independent re-check already requires.
 - **Trust MoveIt's `jump_threshold`/`revolute_jump_threshold` numeric defaults for discontinuity
   detection.** Rejected (fact 5): their numeric effect was never calibrated by the probe, which only
   confirmed the fields exist. An explicit, radian-denominated independent re-check is used instead.
-- **Apply the surface/scene mismatch check to every scene object including the specimen.** Rejected
+- **Apply the full `clearance_m` surface/scene mismatch bound to the specimen, unmodified.** Rejected
   (§Decision 5): every trace waypoint is, by design, standoffed exactly `trace_clearance_m` from the
   specimen, so an unmodified check would always fire and catch nothing real.
+- **Exclude the specimen from the surface/scene mismatch check entirely.** Rejected (§Decision 5): it
+  loses the one case that matters most — a mis-placed specimen whose surface itself ends up inside or
+  too close to the scene's specimen collision box — leaving that case to surface only later as a generic
+  `cartesian_incomplete`/`collision` reason instead of the diagnostic `surface_scene_mismatch`.
 - **Attribute every `fraction < 1` shortfall uniformly to `cartesian_incomplete`, skipping the
   IK/validity/joint-step classification.** Rejected: it would make every collision-truncated trace
   indistinguishable from every other failure mode in `reasons[]`, which the card's reason vocabulary

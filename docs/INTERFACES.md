@@ -1821,12 +1821,12 @@ amendment to earlier behaviour is stated here, the way §8 amends §6. The outpu
 | Input | Default path | Role |
 |---|---|---|
 | `paths3d` | `--paths3d PATH` (required) | §10 file: segments, waypoints, `execution_eligible` |
-| scene | `config/scene/scene.yaml` (`--scene-config`) | collision scene, applied for every online check (§13.9) and the pre-planning surface check (§13.10) |
+| scene | `config/scene/scene.yaml` (`--scene-config`) | collision scene, applied for every online check (§13.8) and the pre-planning surface check (§13.9) |
 | end-effector | `config/robot/end_effector.yaml` | task frames (`tool_tip`), collision proxies |
-| limits | `config/robot/b601_dm_limits.yaml` | inclusive position bound (§13.9); velocity/acceleration are out of scope here — untimed output has no timing to check (MOT-07/`G-LIMITS`, §11.7, checks those) |
+| limits | `config/robot/b601_dm_limits.yaml` | inclusive position bound (§13.8); velocity/acceleration are out of scope here — untimed output has no timing to check (MOT-07/`G-LIMITS`, §11.7, checks those) |
 | planning config | `config/motion/cartesian_planning.yaml` (`--planning-config`) | §13.2 |
 
-Every one of these is read by path and sha256; both are recorded in the output file's `sources` (§13.12)
+Every one of these is read by path and sha256; both are recorded in the output file's `sources` (§13.11.1)
 so a plan is fully traceable without re-resolving `--root`-relative defaults later.
 
 **Start state.** The joint state from the `paths3d` file's `sources.capture_record` (§9.1
@@ -1850,19 +1850,22 @@ fixed by this contract, not config keys.
 | `cartesian.jump_threshold` | float | `0.0` | legacy scalar `jump_threshold`; `0.0` = disabled (ADR-017 §4) |
 | `cartesian.prismatic_jump_threshold` | float | `0.0` | disabled (ADR-017 §4) |
 | `cartesian.revolute_jump_threshold` | float | `0.0` | disabled (ADR-017 §4) — jump detection is done entirely by `recheck.max_joint_step_rad` below |
-| `recheck.fk_tolerance_m` | float | `0.001` | §13.9, from the card body |
-| `recheck.fk_tolerance_deg` | float | `1.0` | §13.9, from the card body |
-| `recheck.max_joint_step_rad` | float | `0.2` | max per-joint step between consecutive output configurations (§13.9); ADR-017 §4 |
-| `splitting.max_splits_per_segment` | int | `3` | §13.8 |
-| `splitting.min_waypoints_per_remainder` | int | `3` | §13.8; matches `paths3d`'s own minimum kept-segment length (§10.3) |
+| `recheck.fk_tolerance_m` | float | `0.001` | §13.8, from the card body |
+| `recheck.fk_tolerance_deg` | float | `1.0` | §13.8, from the card body |
+| `recheck.max_joint_step_rad` | float | `0.2` | max per-joint step between consecutive output configurations (§13.8); ADR-017 §4 |
+| `splitting.max_splits_per_segment` | int | `3` | §13.7 |
+| `splitting.min_waypoints_per_remainder` | int | `3` | §13.7; matches `paths3d`'s own minimum kept-segment length (§10.3) |
 | `end_state` | str | `"start"` | `start \| home \| none` (§13.1) |
-| `surface_object_id` | str | `"specimen"` | the one scene object id excluded from §13.10's mismatch check (ADR-017 §5) |
+| `surface_object_id` | str | `"specimen"` | the one scene object id checked, in §13.9's mismatch check, against the relaxed `surface_object_tolerance_m` bound instead of the full `clearance_m` bound (ADR-017 §5) |
+| `surface_object_tolerance_m` | float | `0.002` | §13.9; how much closer than the as-designed standoff a `surface_object_id` trace position must be before it counts as a mismatch (ADR-017 §5) |
 | `service_timeout_s` | float | `2.0` | per-service-call timeout for every ROS call this card makes |
 | `view.view_distance_m` | float | `0.25` | must lie in `[0.20, 0.30]` (ADR-014 §8.2 band); loader refuses otherwise |
 | `view.tilt_candidates_deg` | list[float] | `[0.0, 15.0]` | each value must lie in `[0, 15]` (ADR-014 §8.2 anti-normal bound); loader refuses otherwise |
 | `view.yaw_candidates_deg` | list[float] | `[0.0, 90.0, 180.0, 270.0]` | azimuth candidates for the tilt axis (§13.14); 4 cardinal directions, matching `reachability.yaml`'s own `tilt_azimuth_samples: 4` |
 | `view.fov_deg.horizontal`, `view.fov_deg.vertical` | float | `87.0`, `58.0` | nominal D405 colour-stream FOV (datasheet figures; 58° vertical already cited by ADR-014 §8.2/INTERFACES §8.2). Not yet independently re-verified in this repo — carried with the same `value_status`-style honesty as every other nominal config value here |
 | `view.fov_margin_deg` | float | `5.0` | angular margin subtracted from each half-FOV before the corner check (§13.14) |
+| `view.footprint_m` | `[float, float]` | `[0.20, 0.20]` | footprint (x, y) used whenever `--center` is given (§13.14 — takes precedence over any scene `specimen` object); matches `config/motion/specimen_placement.yaml`'s own `placement.footprint_m` |
+| `view.surface_z_m` | float | `0.0` | specimen-top height used whenever `--center` is given (§13.14 — same precedence); matches `config/motion/specimen_placement.yaml`'s own `placement.surface_z_m` (table top, §12.1 datum) |
 | `value_status` | str | `"nominal"` | file-wide, matching the `reachability.yaml`/`view_verify.yaml` convention |
 | `sources` | map | — | one free-text rationale per block above, same convention as `reachability.yaml`'s `sources` |
 
@@ -1875,7 +1878,7 @@ ordered `trace` poses, one `retract` pose, all `tool_tip` poses in `base_link` (
 
 ### 13.4 Candidate set and deterministic order
 
-For a given segment (or sub-segment, §13.8) attempt, the candidate set is `direction ∈ {forward, reverse}
+For a given segment (or sub-segment, §13.7) attempt, the candidate set is `direction ∈ {forward, reverse}
 × roll_offset_deg ∈ candidates.roll_offsets_deg`. Enumeration and tie-break order (ADR-017 §1) is fixed:
 roll magnitude ascending (`0, 30, 60, 90, 120, 150, 180`), positive sign before negative at equal magnitude
 (skipped where only one sign exists, at `0` and `180`), `forward` before `reverse`. Every candidate in the
@@ -1885,7 +1888,7 @@ enumeration order and the tie-break rule.
 Applying `roll_offset_deg`: for every pose in the segment (approach, every trace waypoint, retract),
 `quat_candidate = quat_waypoint ⊗ [cos(θ/2), sin(θ/2), 0, 0]` (xyzw order, `θ = roll_offset_deg` in
 radians) — an intrinsic rotation about the pose's own local `+X`. `position_m` is unchanged by this (a
-rotation about `+X` never moves the origin), which is why §13.10's surface/scene check does not need to be
+rotation about `+X` never moves the origin), which is why §13.9's surface/scene check does not need to be
 repeated per candidate. `reverse` reorders the pose sequence to `[retract, reverse(trace), approach]` and
 swaps the `approach`/`retract` labels; every pose's `position_m`/base `quat_xyzw` (before the roll offset)
 is unchanged by this — only traversal order and the two end labels flip.
@@ -1903,33 +1906,35 @@ For each candidate, in order (§13.4):
 1. **IK** for the (candidate-rolled) approach pose, `ik_link: tool_tip`, seeded from the current config,
    `avoid_collisions: true`. Failure → candidate fails, reason `ik_failed`.
 2. **Transit**: `/plan_kinematic_path` with `start_state` = the current config and a joint-constraint goal
-   = step 1's IK solution (CARTESIAN_PROBE.md fact/consequence 7 — this exact shape is confirmed to work).
+   = step 1's IK solution (CARTESIAN_PROBE.md consequence 7 — this exact shape is confirmed to work).
    Failure → candidate fails, reason `transit_failed`.
 3. **Cartesian approach**: `/compute_cartesian_path`, `link_name: tool_tip`, `waypoints = [first trace
    pose]`, starting from step 2's final configuration, `avoid_collisions: true`,
    `max_step`/`jump_threshold`* from `cartesian.*` (§13.2). `fraction < 1` → candidate fails, reason
    `cartesian_incomplete` (no partial-trace fallback for this leg — see ADR-017 §Alternatives).
 4. **Cartesian trace**: same service, `waypoints` = every (candidate-rolled) trace pose in this
-   (sub-)segment's order, starting from step 3's final configuration. `fraction < 1` → see §13.8 (partial
+   (sub-)segment's order, starting from step 3's final configuration. `fraction < 1` → see §13.7 (partial
    trace); this is the only step the partial-trace fallback applies to.
 5. **Cartesian retract**: same service, `waypoints = [retract pose]`, starting from step 4's final
    configuration. `fraction < 1` → candidate fails, reason `cartesian_incomplete`.
 
 A candidate **fully completes the trace** iff steps 1–5 all succeed (step 4 at `fraction == 1.0`) and
-every resulting configuration passes §13.9's independent re-check.
+every resulting configuration passes §13.8's independent re-check.
 
 ### 13.6 Selection rule
 
 Among the candidates that fully complete (§13.5), select the one maximising the minimum joint margin to
 `b601_dm_limits.yaml`'s inclusive bound over every configuration in its approach+trace+retract legs; ties
 (compared after rounding to `1e-6` rad) are broken by the §13.4 order (smallest `|roll_offset_deg|`, then
-`forward`). If no candidate fully completes, §13.8 applies.
+`forward`). If no candidate fully completes, §13.7 applies.
 
 ### 13.7 Partial trace, splitting and re-entry
 
 If no candidate's step 4 reaches `fraction == 1.0`: among all attempted candidates, take the one whose
-step-4 Cartesian call reached the most trace waypoints, found by **FK matching** (ADR-017 §3), never by
-`fraction` or by indexing the returned trajectory (CARTESIAN_PROBE.md consequence 2):
+step-4 Cartesian call reached the most trace waypoints, found by **FK matching** (ADR-017 §3) — never by
+indexing or counting the returned trajectory directly (CARTESIAN_PROBE.md consequence 3: its point count
+has no fixed relationship to the requested waypoint count), and not by the probe's own `fraction`-based
+estimate either, for the reasons ADR-017 §3 gives:
 
 > Walk the candidate's returned trace trajectory's configurations in order and the requested trace
 > waypoints with a pointer `j` starting at 0. For each configuration (in order), if `/compute_fk` at
@@ -1959,7 +1964,7 @@ largest-index set.
   first. A remainder still outstanding when retries are exhausted is left uncovered (no `too_short` reason
   in that case; it was long enough, planning for it just never fully succeeded — its own reasons stand).
 
-Each attempt (the original segment and every retry) is one `segments[]` entry (§13.12), distinguished by
+Each attempt (the original segment and every retry) is one `segments[]` entry (§13.11.3), distinguished by
 `segment_ref.sub_segment`: `null` for the original, `0, 1, 2, …` for successive retries in the order they
 were spawned.
 
@@ -1982,11 +1987,11 @@ trailing `end_state: home`/`end_state: start` leg (§13.1), and the §13.14 view
 collision, joint-limit and joint-step checks.
 
 A failed re-check fails the leg carrying the failing configuration, with the corresponding reason
-(`fk_mismatch`, `collision`, `joint_limit` or `joint_jump`, §13.9 below); it is never ignored, and a
+(`fk_mismatch`, `collision`, `joint_limit` or `joint_jump`, §13.10 below); it is never ignored, and a
 candidate carrying a failing leg is not eligible for selection (§13.6) — the search moves to the next
 candidate exactly as it would for an `ik_failed`/`transit_failed` candidate.
 
-**Classifying a `fraction < 1` shortfall** (approach/trace/retract step, CARTESIAN_PROBE.md fact 3: the
+**Classifying a `fraction < 1` shortfall** (approach/trace/retract step, CARTESIAN_PROBE.md consequence 5: the
 service gives no cause). From the last-reached configuration (§13.7's FK match, or the leg's own start
 configuration if none reached): (a) IK the next unreached waypoint, seeded from that configuration; IK
 failure leaves the reason the generic `cartesian_incomplete`; (b) IK success → `/check_state_validity` on
@@ -1999,12 +2004,17 @@ bounded, best-effort attribution (one extra IK + validity call), not a cause Mov
 
 Before any candidate is attempted for a segment (or sub-segment), and independent of direction/roll (§13.4
 — roll never moves `position_m`): for every trace waypoint's `position_m`, compute the signed distance to
-every scene object in `scene.yaml` **except** the one named by `surface_object_id` (default `"specimen"`,
-ADR-017 §5) — transform the point into the object's local frame via its inverse pose, then the exact
-axis-aligned box distance there (negative inside, exact Euclidean distance outside). If, for any such
-object, the distance is less than that waypoint's own `clearance_m` (§10.2; equal to `trace_clearance_m`),
-the segment is reported `surface_scene_mismatch` and is **not planned at all**: zero candidates are tried,
-`segments[]` records `candidates_tried: 0`, `chosen: null`, `trace_waypoints: {total: N, planned: 0}`.
+every scene object in `scene.yaml` — transform the point into the object's local frame via its inverse
+pose, then the exact axis-aligned box distance there (negative inside, exact Euclidean distance outside).
+For every scene object **except** the one named by `surface_object_id` (default `"specimen"`, ADR-017
+§5), a mismatch is flagged if the distance is less than that waypoint's own `clearance_m` (§10.2; equal to
+`trace_clearance_m`). For `surface_object_id` itself, the same comparison uses the relaxed bound
+`clearance_m − surface_object_tolerance_m` (§13.2, default `0.002`) instead of the full `clearance_m` —
+every trace waypoint sits, by construction, exactly `clearance_m` from this object (§10.5 point 2), so the
+full bound would flag every correct waypoint, but a position that is more than `surface_object_tolerance_m`
+closer than that still gets caught (ADR-017 §5). If any object flags a mismatch, the segment is reported
+`surface_scene_mismatch` and is **not planned at all**: zero candidates are tried, `segments[]` records
+`candidates_tried: 0`, `chosen: null`, `trace_waypoints: {total: N, planned: 0}`.
 
 ### 13.10 Reason vocabulary
 
@@ -2017,7 +2027,7 @@ the segment is reported `surface_scene_mismatch` and is **not planned at all**: 
 | `joint_jump` | §13.8 classification, or the independent re-check's `max_joint_step_rad` exceeded between consecutive configurations |
 | `joint_limit` | independent re-check: a configuration violates `b601_dm_limits.yaml`'s inclusive bound |
 | `fk_mismatch` | independent re-check: `/compute_fk` disagrees with the target pose beyond tolerance |
-| `surface_scene_mismatch` | §13.9: a trace position is inside, or closer than its clearance to, a non-surface scene object |
+| `surface_scene_mismatch` | §13.9: a trace position is closer than its clearance to a non-surface scene object, or closer than `clearance_m − surface_object_tolerance_m` to the surface object itself |
 | `too_short` | §13.7: a split remainder has fewer than `splitting.min_waypoints_per_remainder` waypoints and was never attempted |
 
 ### 13.11 Plan file `data/plans/{case}_cartesian_plan.json`
@@ -2111,10 +2121,15 @@ when `sources.paths3d.execution_eligible` is `false`, that the plan was built fr
 Default path `data/plans/view_plan.json` (`--out` overrides). Workcell-level, not per-case (no `case_id`):
 positions the wrist camera to view the specimen, independent of any particular crack trace.
 
-**Geometry.** Centre `(cx, cy)` and footprint from the scene's `specimen` object (`position_m[0:2]`,
-`dimensions_m[0:2]`), or `--center X Y` with `view.fov` defaults' footprint if no scene specimen exists.
-Specimen top `z_top = position_m[2] + dimensions_m[2]/2`. For each `(tilt_deg, yaw_deg)` candidate, in
-`view.tilt_candidates_deg` ascending × `view.yaw_candidates_deg` ascending order:
+**Geometry.** `--center X Y`, when given, always takes precedence over the scene's `specimen` object
+(an explicit operator value overrides the scene default even if a `specimen` object is also present):
+centre `(cx, cy) = (X, Y)`, footprint `= view.footprint_m` and specimen-top height `z_top =
+view.surface_z_m` (§13.2) — both config-sourced, never invented from FOV defaults. Without `--center`,
+centre `(cx, cy)` and footprint come from the scene's `specimen` object (`position_m[0:2]`,
+`dimensions_m[0:2]`), with `z_top = position_m[2] + dimensions_m[2]/2`. If `--center` was not given and
+the scene has no `specimen` object, `plan_view` refuses (exit 3, §13.15) rather than inventing a
+footprint or surface height. For each `(tilt_deg, yaw_deg)` candidate, in `view.tilt_candidates_deg`
+ascending × `view.yaw_candidates_deg` ascending order:
 
 - `camera_link` position: `(cx, cy, z_top + view.view_distance_m)` — always directly above the centre;
   tilt/yaw change orientation only, matching §8.3's own `--emit-view-config` description.
@@ -2131,7 +2146,7 @@ Specimen top `z_top = position_m[2] + dimensions_m[2]/2`. For each `(tilt_deg, y
   already guarantees.
 - **Reachability.** `/compute_ik` for `camera_link` at this pose; if it succeeds, `/plan_kinematic_path`
   with `start_state` = the SRDF all-zero `home` and a joint-constraint goal = that IK solution
-  (CARTESIAN_PROBE.md fact 7). Both legs pass the independent re-check (§13.8), FK-exempt only for `home`'s
+  (CARTESIAN_PROBE.md consequence 7). Both legs pass the independent re-check (§13.8), FK-exempt only for `home`'s
   own trivial start.
 
 **Selection.** The first candidate, in the stated order, that passes the FOV check, the reachability step
@@ -2146,8 +2161,8 @@ and the independent re-check. None passing is a refusal (exit 3, §13.15).
 | `planning_frame` | str | `"base_link"` |
 | `sources.scene`, `.end_effector`, `.limits`, `.config` | `{path, sha256}` | §13.1 inputs (no `paths3d`) |
 | `parameters` | object | the `view.*` block of the loaded config, echoed |
-| `center_source` | str | `"scene.specimen"` \| `"--center"` |
-| `center_xy_m`, `surface_z_m`, `footprint_m` | — | as resolved above |
+| `center_source` | str | `"scene.specimen"` \| `"--center"`; `"--center"` whenever the flag was given, even if a scene `specimen` also exists (§13.14 precedence) |
+| `center_xy_m`, `surface_z_m`, `footprint_m` | — | as resolved above; on the `"--center"` path, `surface_z_m`/`footprint_m` are `view.surface_z_m`/`view.footprint_m` (§13.2) |
 | `candidates[]` | list | one entry per `(tilt_deg, yaw_deg)` tried: `{tilt_deg, yaw_deg, camera_pose: {position_m, quat_xyzw}, fov_check: {passed, horizontal_margins_deg[4], vertical_margins_deg[4]}, reachable, recheck_passed}` — the FOV/tilt evidence the card requires |
 | `chosen` | `{tilt_deg, yaw_deg}`\|null | the selected candidate; `null` on refusal |
 | `transit_leg` | object\|null | one §13.11.2-shaped leg (`kind: transit`, `segment_ref: null`, `direction: null`, `roll_offset_rad: null`), home → the chosen pose's IK solution; `null` on refusal |
@@ -2191,7 +2206,7 @@ writing no file, exit 0 regardless.
 | `cartesian.max_step_m` | 0.001 m | finer than `paths3d`'s own 0.002 m waypoint spacing (§10.4); CARTESIAN_PROBE.md consequence 3 |
 | `cartesian.*jump_threshold*` | `0.0` (disabled) | the probe confirmed these fields exist but never calibrated their numeric effect (fact 5); jump detection is `recheck.max_joint_step_rad` instead (ADR-017 §4) |
 | `recheck.fk_tolerance_m` / `_deg` | 0.001 m / 1.0° | from the card body |
-| `recheck.max_joint_step_rad` | 0.2 rad (~11.5°) | above ordinary per-point motion at `max_step_m` away from a singularity, below the scale of a true wrist-singularity discontinuity (CARTESIAN_PROBE.md fact 1) |
+| `recheck.max_joint_step_rad` | 0.2 rad (~11.5°) | above ordinary per-point motion at `max_step_m` away from a singularity, below the scale of a true wrist-singularity discontinuity (CARTESIAN_PROBE.md consequence 1) |
 | `splitting.max_splits_per_segment` | 3 | the card body's own default |
 | `splitting.min_waypoints_per_remainder` | 3 | matches `paths3d`'s own minimum kept-segment length (§10.3) |
 | `view.view_distance_m` | 0.25 m | ADR-014 §8.2 (band 0.20–0.30 m) |
