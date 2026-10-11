@@ -1,6 +1,6 @@
 # Progress — week of Mon Oct 05 – Sun Oct 11, 2026
 
-**39 task(s) completed and independently audited this week** · project total **82/124** accepted
+**40 task(s) completed and independently audited this week** · project total **63/125** accepted
 
 ## Notes
 
@@ -63,7 +63,7 @@
 …[217 chars clipped]
 - **MOT-11 — Vendor-driver readiness check: verify reBotArmController's port, motor IDs, joint order, direction and gripper mapping against the 2026-10-10 bring-up evidence (read-only ~/rebot_ws)** ([details](MOT-11.md)): Implemented scripts/motion/check_vendor_driver.py, a pure read-only static checker verifying reBotArmController's port, motor IDs, joint order, direction, zero, gripper mapping, safe_park, SDK API, Py
 …[170 chars clipped]
-- **MOT-06.1 — Probe MoveIt Cartesian/transit services for task frames on the mock stack** ([details](MOT-06.1.md)): Built and committed a repeatable test that pokes MoveIt's path-planning services (used for tracing cracks) on the simulated robot and records exactly how they behave. The most important result: the pl
+- **MOT-06.1 — Probe MoveIt Cartesian/transit services for task frames on the mock stack** ([details](MOT-06.11.md)): Built and committed a repeatable test that pokes MoveIt's path-planning services (used for tracing cracks) on the simulated robot and records exactly how they behave. The most important result: the pl
 …[452 chars clipped]
 - **MOT-06.2 — Decision + contract: Cartesian crack-path planning (ADR-017, INTERFACES §13)** ([details](MOT-06.2.md)): Wrote ADR-017 (Cartesian crack-path planning: candidate search over direction x uniform roll offset, selection rule, partial-trace FK-matching/splitting, independent re-check with jump_threshold disab
 …[577 chars clipped]
@@ -83,10 +83,12 @@
 …[353 chars clipped]
 - **MOT-05.5 — Headless mock verification of the execution gate: dry/mock execution, refusals, collision, e-stop injection, vendor-interface mock** ([details](MOT-05.5.md)): scripts/ros/test_execution.sh now checks the commissioning-gated trajectory executor end to end with no hardware, using both the MoveIt mock stack and the vendor-interface mock_driver. All 9 cases pas
 …[387 chars clipped]
+- **MOT-06.11 — plan_crack_path: fraction==1.0 traces are full (no pointer-walk stall on resampled trajectories) + decouple IK solver budget from service-call waits** ([details](MOT-06.11.md)): Fixed the two defects debugger D0010 identified in plan_crack_path's Cartesian trace planning: (1) step-4 full-ness now follows §13.5 literally (fraction == 1.0 from /compute_cartesian_path itself), w
+…[956 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 80 / 317
+- Implementation/review sessions run: 84 / 318
 - Audits that rejected work with evidence-backed findings: 26 (repairs created: 20)
 - Re-verified after an upstream change: CAM-02, CAM-05.1, CAM-05.2, GEOM-01, GEOM-01.R1, GEOM-08.1, GEOM-08.2, GEOM-08.2.R1, GEOM-08.5, GEOM-08.5.R1, GEOM-08.6, GEOM-08.7, GEOM-08.8, GEOM-08.8.R1, GEOM-10, MOT-02, MOT-03, MOT-04.1, MOT-04.1.R1, MOT-04.2, MOT-04.3, MOT-04.3.R1, MOT-04.4, MOT-04.4.R1, MOT-04.6, MOT-04.6.R1, MOT-05.1, MOT-05.1.R1, MOT-05.2, MOT-05.4, MOT-05.4.R1, MOT-06.2, MOT-06.2.R1, MOT-06.3, MOT-06.3.R1, MOT-06.4, MOT-06.4.R1, MOT-06.5, MOT-06.5.R1, MOT-10.1, MOT-10.1.R1, MOT-10.1.R2, MOT-10.2, MOT-10.3, PERC-03, PERC-03.R1, TC-011, TC-016
 
@@ -105,10 +107,10 @@
 |---|---|---|
 | Host platform & reproducibility (L-HOST) | 10 | 10 |
 | Local coding model (L-LLM) | 5 | 8 |
-| D405 capture (L-CAM) | 7 | 9 |
-| Perception (L-PERC) | 13 | 16 |
-| Geometry & calibration (L-GEOM) | 16 | 29 |
-| Motion planning (L-MOTION) | 28 | 40 |
+| D405 capture (L-CAM) | 6 | 9 |
+| Perception (L-PERC) | 12 | 16 |
+| Geometry & calibration (L-GEOM) | 11 | 29 |
+| Motion planning (L-MOTION) | 16 | 41 |
 | Integration & commissioning (L-INT) | 1 | 6 |
 | Operator workflow & handoff (L-OPS) | 1 | 4 |
 | Imitation learning (later phase) (L-IL) | 0 | 1 |
@@ -122,4 +124,4 @@
 …[2288 chars clipped]
 - LLM-06.1: dependency — The backlog currently has zero cards that are simultaneously unaccepted/ready, non-hardware, motion!=true, routing.conse
 …[181 chars clipped]
-- MOT-10.4: hardware — operator must declare: workcell_measured
+- MOT-06.7: dependency — waiting for fix card MOT-06.11 (debugger D0010)
