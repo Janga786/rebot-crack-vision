@@ -2066,7 +2066,7 @@ the planning calls, not to the plan.
 | `direction` | str\|null | `forward \| reverse`; `null` for the trailing `end_state` transit leg |
 | `roll_offset_rad` | float\|null | the owning candidate's roll offset; `null` for the trailing `end_state` transit leg |
 | `positions[][6]` | list[list[float]] | joint configurations in travel order, `joint1..6` |
-| `waypoint_index_map` | list[int\|null] | per `positions[]` entry: the index into this leg's own target-pose list (the single approach/retract target = `0`; the segment's trace waypoint index for a `trace` leg) that configuration FK-matches (§13.7's matching rule), or `null` for an unmatched intermediate/resampled configuration. All `null` for a transit leg whose goal has no Cartesian pose (§13.8). For a `fraction == 1.0` trace leg, §15.2 amends this definition instead (never `null`) |
+| `waypoint_index_map` | list[int\|null] | per `positions[]` entry: the index into this leg's own target-pose list (the single approach/retract target = `0`; the segment's trace waypoint index for a `trace` leg) that configuration FK-matches (§13.7's matching rule), or `null` for an unmatched intermediate/resampled configuration. All `null` for a transit leg whose goal has no Cartesian pose (§13.8) |
 | `recheck.max_pos_err_m` | float | max FK position error over this leg's FK-checked configurations |
 | `recheck.max_ang_err_rad` | float | max FK angular error, same set |
 | `recheck.all_valid` | bool | every configuration passed `/check_state_validity` |
@@ -2344,12 +2344,16 @@ present (unknown key or out-of-range value → exit 2, same convention as §13.2
 ## 15. Cartesian crack-path planning amendment: `fraction == 1.0` full-trace recheck and the
 `/compute_ik` solver budget (MOT-06.11)
 
-**Normative source:** the ADR-017 addendum (debugger D0010). This section **amends** §13.5 step 4,
-§13.7, §13.8 and, for the `fraction == 1.0` trace-leg case only (§15.2's final paragraph),
-§13.11.2's `waypoint_index_map` definition — §13 itself is not edited in place, matching how this
-section's own convention (§8 amending §6) works elsewhere in this file. Nothing here changes
-§13.1–§13.4, §13.6, §13.9, §13.10, §13.12–§13.14 or §13.17; §13.11.2 is unchanged for every leg
-*except* a `fraction == 1.0` trace leg, where §15.2 governs instead.
+**Normative source:** the ADR-017 addendum (debugger D0010). This section **amends**:
+§13.2 (§15.3: the new `ik_solver_timeout_s` config key, and `service_timeout_s`'s scope narrowed to
+non-IK service calls — no longer `/compute_ik`'s own solver budget), §13.5 step 4 (§15.1), §13.7
+(§15.1/§15.2), §13.8 (§15.2) and, for the `fraction == 1.0` trace-leg case only (§15.2's final
+paragraph), §13.11.2's `waypoint_index_map` definition. §13 itself is not edited in place, matching
+how this section's own convention (§8 amending §6) works elsewhere in this file, so where §13's text
+and this section disagree on these points, this section governs. Nothing here changes §13.1,
+§13.3, §13.4, §13.5 apart from its step 4, §13.6, §13.9, §13.10, §13.11.1, §13.11.3 or §13.12–§13.17;
+§13.11.2 is unchanged for every leg
+*except* a `fraction == 1.0` trace leg.
 
 ### 15.1 §13.5 step 4 full-ness is `fraction == 1.0` itself
 
@@ -2399,7 +2403,7 @@ configuration errors in 1–3 above, over the whole leg.
 |---|---|---|---|
 | `ik_solver_timeout_s` | float | `0.05` | `/compute_ik`'s own internal solver budget (`ik_request.timeout`), independent of `service_timeout_s`. Must be `> 0`; loader enforces this (unknown/missing/out-of-range → `ConfigError`/exit 2, same convention as every other §13.2 field) |
 
-`service_timeout_s` (§13.2, unchanged field, value raised from its original default) is, from this
+`service_timeout_s` (the existing §13.2 field, value raised from its original default) is, from this
 card onward, **exclusively** the per-call wait timeout for `/compute_cartesian_path`,
 `/plan_kinematic_path`, `/compute_fk` and `/check_state_validity` (and the overall
 `wait_for_services`/scene-service discovery deadline) — **not** `/compute_ik`'s own solver budget any
