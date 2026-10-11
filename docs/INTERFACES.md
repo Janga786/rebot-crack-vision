@@ -2416,3 +2416,306 @@ the latter made every IK call cost the same multi-second budget. `ik_call_timeou
 `service_timeout_s`, unchanged in form.
 
 ---
+
+## 16. Time parameterization and independent trajectory check (`crackvision.retime_config/1`,
+`crackvision.retime_report/1`, `crackvision.trajectory_check/1`)
+
+**Normative source:** `docs/adr/019-time-parameterization.md`. Nothing here edits §0–§15; any
+amendment to earlier behaviour is stated here, the way §15 amends §13. §13's `cartesian_plan` is
+**consumed unchanged** — this section defines no new top-level `cartesian_plan` keys. §11.2's
+`crackvision.joint_trajectory/1` schema is likewise **consumed unchanged**: `retime_plan` (below)
+produces a file that satisfies §11.2 exactly, with no new top-level trajectory keys. This section's
+retimer is MOT-07's producer of that file; `execute_trajectory` and its gate catalogue (§11.7) are
+unchanged by this section and apply to a retimed file exactly as to any other.
+
+### 16.1 Inputs and `config/motion/retime.yaml` (schema `crackvision.retime_config/1`)
+
+**Inputs**, each read by path and sha256 (recorded in the output, §16.3/§16.4):
+
+| Input | Default path | Role |
+|---|---|---|
+| plan | `--plan PATH` (required) | §13 `crackvision.cartesian_plan/1` file |
+| limits | `config/robot/b601_dm_limits.yaml` | position/velocity/acceleration bounds (§16.2) |
+| end-effector | `config/robot/end_effector.yaml` | `tool` block, composed with the URDF chain for `tool_fk` (§16.2) |
+| execution config | `config/motion/execution.yaml` | `position_margin_rad` (§11.6/§16.2); **never duplicated** into `retime.yaml` |
+| retime config | `config/motion/retime.yaml` (`--retime-config`) | this section |
+| URDF | `presentation/sim/reBot_B601_DM_with_gripper.urdf` | base_link→gripper_link chain for `tool_fk` (MOT-01: byte-identical to the vendor URDF) |
+
+`config/motion/retime.yaml` is loaded strictly: an unknown key, a missing required key, or a value
+outside its stated range is a config error (`ConfigError`/exit 2), exactly §13.2's loader
+convention.
+
+| Field | Type | Default | Meaning |
+|---|---|---|---|
+| `schema` | str | — | `"crackvision.retime_config/1"` |
+| `limit_fraction.velocity` | float | `0.95` | `f_v`, §16.2 (G4); must lie in `(0, 1]` |
+| `limit_fraction.acceleration` | float | `0.95` | `f_a`, §16.2 (G5/G6); must lie in `(0, 1]` |
+| `sampling.max_joint_step_rad` | float | `0.01` | per-joint step bound after refinement (G-STEP); must be `> 0` |
+| `sampling.max_period_s` | float | `0.02` | max segment duration (G-PERIOD); must be `> 0` |
+| `trace.tool_speed_m_s` | float | `0.05` | target constant tool-tip speed on a trace leg, **unscaled** (§16.2 G-TOOLSPEED); must be `> trace.min_tool_speed_m_s` |
+| `trace.min_tool_speed_m_s` | float | `0.005` | refuse a trace leg whose bisected `v_c` falls below this; must be `> 0` |
+| `trace.speed_tolerance` | float | `0.05` | relative band half-width around `v_c` (G-TOOLSPEED); must lie in `(0, 1)` |
+| `trace.max_ramp_m` | float | `0.005` | max tool arc length of a leading/trailing ramp (G-TOOLSPEED); must be `> 0` |
+| `value_status` | str | `"nominal"` | file-wide, matching `cartesian_planning.yaml`'s own convention |
+| `sources` | map | — | one free-text rationale per block above, same convention as `cartesian_planning.yaml`'s `sources` |
+
+`execution.yaml`'s `position_margin_rad` is read directly from `execution.yaml` (§16.1 inputs table)
+for the G7 margin check (§16.2); it is not a `retime.yaml` field and is never copied into one.
+
+### 16.2 Algorithm and output guarantees
+
+**Step 1 — load and concatenate.** Load the plan with `cartesian_plan.load_plan`. Concatenate
+`legs[].positions` in `leg_index` order, dropping each leg's first configuration when it is within
+`cartesian_plan.CONTINUITY_TOL_RAD` of the previous leg's last. Call the result the **plan
+polyline** `P = [p_0, ..., p_K]`; every `p_k` is copied bit-exact (the same float64 values) from the
+plan. A plan with no `legs[]` is refused (§16.3).
+
+**Step 2 — refine.** Build the **refined polyline** `Q = [q_0, ..., q_N]` (`q_0 = p_0`,
+`q_N = p_K`) by subdividing every consecutive pair `(p_k, p_{k+1})` with equally-spaced linear
+interpolation so that no per-joint step between consecutive `Q` entries exceeds
+`sampling.max_joint_step_rad`. There is no corner blending at any `p_k`: the refined polyline sits
+exactly on the plan polyline's own straight segments. This is **G-PATH**:
+
+> **G-PATH (exact plan-polyline following).** Every `p_k ∈ P` appears, bit-exact, as some `q_i ∈ Q`,
+> in the same order. Every `q_i` not equal to some `p_k` lies exactly on the open segment between
+> two consecutive plan vertices `p_k, p_{k+1}`: `q_i = p_k + s·(p_{k+1} - p_k)` for some
+> `s ∈ (0, 1)`. No `q_i` lies off any such segment.
+
+**Step 3 — velocity profiling.** Assign each segment `i` (between `q_i` and `q_{i+1}`) a duration
+`τ_i > 0`, giving `t_0 = 0`, `t_{i+1} = t_i + τ_i`. Per-joint segment FD velocity is
+`v_ij = (q_{i+1,j} - q_{i,j}) / τ_i` — exactly `joint_trajectory.py`'s `seg_v`. Per-joint interior FD
+acceleration is `a_ij = (v_ij - v_{(i-1)j}) / ((τ_{i-1} + τ_i)/2)` for `1 ≤ i ≤ N-1` — exactly
+`joint_trajectory.py`'s centered-difference `a`. A discrete forward–backward pass over per-segment
+path speeds assigns every `τ_i` so that, over the whole trajectory:
+
+> **G-VEL.** For every segment `i` and joint `j`: `|v_ij| ≤ limit_fraction.velocity · V_j`, where
+> `V_j` is `b601_dm_limits.yaml`'s `velocity` for joint `j`.
+>
+> **G-ACC.** For every interior point `i` (`1 ≤ i ≤ N-1`) and joint `j`:
+> `|a_ij| ≤ limit_fraction.acceleration · A_j`, where `A_j` is `b601_dm_limits.yaml`'s
+> `acceleration` for joint `j`.
+>
+> **G-REST (rest-to-rest).** For every joint `j`: `|v_{0j}| ≤ limit_fraction.acceleration · A_j ·
+> τ_0` (the first segment's FD velocity is no larger than what accelerating from rest at the
+> acceleration bound, for that segment's own duration, could reach) and
+> `|v_{(N-1)j}| ≤ limit_fraction.acceleration · A_j · τ_{N-1}` (mirror image at the last segment).
+>
+> **G7 (§11.6 margin).** Running `joint_trajectory.check_limits` on the output trajectory (full,
+> unscaled, `position_margin_rad` = `execution.yaml`'s value, §16.1) reports zero
+> `position_margin` violations. Because the output carries no explicit `velocities` (G8 below), only
+> the finite-difference pass of §11.6's rule is live; it must pass exactly as stated there — a
+> near-limit point moving toward its bound must not speed up into it.
+
+After G-VEL/G-ACC/G-REST/G7 hold, any segment with `τ_i > sampling.max_period_s` is subdivided
+(adding intermediate `Q` points along that same straight segment, preserving G-PATH) and the whole
+pass re-run, for a bounded number of iterations, until:
+
+> **G-PERIOD.** Every segment duration `τ_i ≤ sampling.max_period_s`.
+
+A bounded-iteration failure to satisfy every one of G-VEL/G-ACC/G-REST/G7/G-PERIOD simultaneously is
+a refusal (exit 3) — see G-SELFCHECK below, which is the actual enforcement mechanism: the pass
+either converges to output satisfying every guarantee, or the run refuses. Never a
+partially-converged, silently-non-compliant file.
+
+**Step 4 — constant tool speed on trace legs.** `tool_fk(q)` is a new pure-numpy function
+(`crackvision_motion.tool_fk`) composing the URDF chain `base_link → gripper_link` (§16.1) with
+`end_effector.yaml`'s `tool` block (xyz/rpy, §9), in exactly the same composition
+`crackvision.kinematics.load_chain(...).fk(q)` followed by `load_end_effector(...).
+T_gripper_link_tool_tip` already performs for `tool_tip` — `tool_fk`'s unit tests assert bit-for-bit
+(to floating-point tolerance) parity against that existing `crackvision.kinematics` path, so the two
+independent call sites (this retimer's and the §13/§8 path-generation code) can never silently
+diverge on where `tool_tip` is.
+
+Tool speed of segment `i` is `s_i = ‖tool_fk(q_{i+1}) − tool_fk(q_i)‖ / τ_i` (Euclidean distance
+between consecutive `tool_tip` origins, in `base_link`). For each **trace** leg (identified by the
+plan's own `legs[].kind == "trace"`, carried through unchanged from §13.11.2), find by bisection the
+largest `v_c ≤ trace.tool_speed_m_s` for which the leg's own segments (profiled per Step 3,
+restricted to within this leg) satisfy:
+
+> **G-TOOLSPEED.**
+> 1. **Never above band.** Every segment's tool speed `s_i ≤ v_c · (1 + trace.speed_tolerance)`,
+>    with no exception anywhere in the leg, ramps included.
+> 2. **Band outside ramps.** A **ramp** is a maximal prefix (*leading ramp*) or suffix (*trailing
+>    ramp*) of the leg's own consecutive segments with `s_i < v_c · (1 - trace.speed_tolerance)`.
+>    Every segment **outside** the leading and trailing ramps lies in
+>    `[v_c · (1 - trace.speed_tolerance), v_c · (1 + trace.speed_tolerance)]`.
+> 3. **Ramp bound.** Each ramp's own tool arc length (`Σ ‖tool_fk(q_{i+1}) − tool_fk(q_i)‖` over
+>    that ramp's segments) is `≤ trace.max_ramp_m`.
+> 4. **Refusal below minimum.** If no `v_c ≥ trace.min_tool_speed_m_s` satisfies 1–3, the run
+>    refuses (exit 3) — a trace leg is never silently executed below the configured floor.
+
+The chosen `v_c` for each trace leg feeds back into Step 3 as an additional per-segment velocity cap
+on that leg's tool-tip translational speed (an external cap on top of G-VEL's own per-joint bound,
+exactly as the card's algorithm states); G-VEL/G-ACC/G-REST/G7/G-PERIOD still apply to the resulting
+joint-space profile unchanged.
+
+`execute_trajectory`'s `--speed-scale s` (§11.7 `G-SPEED`) multiplies every `v_ij` — and therefore
+every tool speed `s_i`, which is derived from the same `positions`/`t_s` — by `s` uniformly
+(ADR-016 §4's retiming identity). **The effective tool speed at runtime is `v_c · s`.** This section
+and the written trajectory/report (§16.3/§16.4) always state the unscaled `v_c`; nowhere does this
+section or its output claim the scaled, runtime value.
+
+**Step 5 — self-check.**
+
+> **G-SELFCHECK.** `joint_trajectory.check_limits` run against the finished output trajectory, at
+> full limits (`limit_fraction.velocity = limit_fraction.acceleration = 1.0`, i.e. the raw
+> `b601_dm_limits.yaml` velocity/acceleration bounds — a stricter, independent re-derivation from
+> the one G-VEL/G-ACC already impose at `f_v`/`f_a` fractions `< 1`) and `position_margin_rad` =
+> `execution.yaml`'s value, reports **zero** violations. Any violation refuses the run (exit 3): the
+> retimer **never clamps** an over-limit value and **never applies a hidden uniform slowdown** to
+> make this check pass after the fact. A passing self-check is a precondition for writing any output
+> file at all.
+
+**Step 6 — output.**
+
+> **G8 (no explicit kinematics).** Every output `points[]` entry carries exactly `t_s` and
+> `positions` (§11.2); no `velocities`, no `accelerations`. Rationale: the vendor driver's own
+> linear interpolation (ADR-016 §7, `ros_actions.py:147-184`) commands the finite-difference values
+> regardless of any explicit field, so an explicit field would be a second, unchecked set of
+> numbers next to the ones that are actually checked (G-VEL/G-ACC/G7/G-SELFCHECK) and actually
+> commanded.
+
+**Time-optimality.** The Step 3 profiling pass is a bounded-iteration heuristic, not an analytic
+time-optimal solver (ADR-019). The only optimality claim this section makes:
+
+> **G-NEAROPT.** For a single straight joint-space move (one segment before refinement, i.e. a
+> `cartesian_plan` reduced to two configurations with no intermediate waypoint) retimed at
+> `limit_fraction.velocity = f_v`, `limit_fraction.acceleration = f_a`, the resulting duration is
+> within 10% of the analytic trapezoid/triangle-profile duration for the same two endpoints at the
+> same `f_v·V_j`/`f_a·A_j` bounds, for whichever joint `j` is the time-limiting one.
+
+### 16.3 Trajectory field mapping (producing a §11.2 file)
+
+`retime_plan` writes a `crackvision.joint_trajectory/1` file (§11.2) with these fields set as
+follows; every other §11.2 field (`schema`, `created_utc`, `joint_names`, `points[]` per §16.2) is
+as that section already requires.
+
+| §11.2 field | Value |
+|---|---|
+| `producer` | `"retime_plan"` |
+| `purpose` | `"crack_task"` by default; `"test"` if `--purpose test` is given |
+| `limits_file.path`, `.sha256` | path and sha256 of the limits file `retime_plan` actually read (§16.1). **Refuse** (exit 3) if this sha256 ≠ `plan.sources.limits.sha256` — the plan and the retimer must agree on which limits file was in force |
+| `end_effector_config_sha256` | `plan.sources.end_effector.sha256`. **Refuse** (exit 3) if the `end_effector.yaml` file `retime_plan` actually used for `tool_fk` (§16.2 Step 4) has a different sha256 than that |
+| `scene_config_sha256` | `plan.sources.scene.sha256`, copied **unchecked** — `G-STALE-CONFIG` (§11.7) is where staleness against the *current* scene file is checked, at execution time, not here |
+| `source.paths3d` | `plan.sources.paths3d`, copied verbatim (same `{path, sha256, execution_eligible}` shape, §13.11.1) |
+
+**Refusal conditions** (exit 3, §0.2), in addition to the per-guarantee refusals already stated in
+§16.2 (G-REST/G-PERIOD/G-TOOLSPEED/G-SELFCHECK) and the two sha mismatches above:
+
+- the plan file is invalid (fails `cartesian_plan.load_plan`'s own schema/sha checks);
+- the plan has zero `legs[]`;
+- any trace leg's bisected `v_c` falls below `trace.min_tool_speed_m_s` (G-TOOLSPEED point 4).
+
+### 16.4 `crackvision.retime_report/1` sidecar
+
+Written to `<trajectory path>.retime.json` (e.g. `foo_trajectory.json.retime.json`) alongside every
+successfully written trajectory. Never written on a refusal.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `schema` | str | `"crackvision.retime_report/1"` |
+| `created_utc` | str | ISO-8601 UTC |
+| `trajectory_sha256` | str | sha256 of the trajectory file this report describes |
+| `input_shas` | object | `{plan, limits, end_effector, urdf, retime_config, execution_config}`, each sha256 |
+| `parameters` | object | every field of the loaded `retime.yaml` (§16.1), echoed, plus `position_margin_rad` (sourced from `execution.yaml`, §16.1) |
+| `legs[]` | list | one entry per input `cartesian_plan` leg: `{leg_index, kind, point_range: [first, last], duration_s}`; `kind == "trace"` legs additionally carry `tool_speed: {target, constant, ramp_in_m, ramp_out_m, min, max}` (`target` = `trace.tool_speed_m_s`, `constant` = that leg's chosen `v_c`, `ramp_in_m`/`ramp_out_m` = the leading/trailing ramp arc lengths, `min`/`max` = the leg's observed tool-speed extremes) |
+| `totals` | object | `{n_points, duration_s}` plus `peak_velocity_fraction[6]`, `peak_acceleration_fraction[6]` — per-joint peak finite-difference velocity/acceleration as a fraction of `b601_dm_limits.yaml`'s own bound (i.e. `max|v_ij|/V_j`, `max|a_ij|/A_j`), independent of `limit_fraction.*` |
+| `self_check` | object | `{violations: 0}` — `retime_plan` only ever writes this report once G-SELFCHECK (§16.2) has already passed, so this field is always `{violations: 0}` on a written report; it exists so the checker (§16.5) and a human reader have an explicit, named confirmation rather than its absence meaning something |
+
+### 16.5 `crackvision.trajectory_check/1` — independent checker
+
+`crackvision.trajectory_check` is a **separate implementation**, not a second entry point into
+`retime_plan`'s own code: it runs under the conda interpreter (`./env.sh python`, §0.1), **must not
+import `crackvision_motion`** (enforced by a grep/import-time check in its own test suite), and gets
+forward kinematics from `crackvision.kinematics` (§16.2's `tool_fk` parity target), never from
+`crackvision_motion.tool_fk`. It derives every check below from the trajectory, plan and config
+files directly — never from `retime_plan`'s own report, except where C-REPORT explicitly
+cross-checks the report's claims.
+
+**Inputs:** `--trajectory PATH` (required), `--plan PATH` (required), `--limits PATH`,
+`--end-effector-config PATH`, `--execution-config PATH`, `--retime-config PATH`, `--report PATH`
+(optional; if given, enables C-REPORT).
+
+**Checks** (every one evaluated and reported, mirroring §11.7's "never stop at the first failure"
+convention):
+
+| Check | Rule |
+|---|---|
+| `C-SCHEMA` | the trajectory parses as `crackvision.joint_trajectory/1` (§11.2) and the plan parses as `crackvision.cartesian_plan/1` (§13.11.1) |
+| `C-PROVENANCE` | the trajectory's `limits_file.sha256`/`end_effector_config_sha256`/`scene_config_sha256` match the files given on the command line and, for limits/end-effector, match `plan.sources.limits.sha256`/`plan.sources.end_effector.sha256` (§16.3); `trajectory.source.paths3d` equals `plan.sources.paths3d` field-for-field |
+| `C-LIMITS` | finite-difference velocity/acceleration (same formulas as §16.2 G-VEL/G-ACC) at full limits (must never exceed `V_j`/`A_j`) and, separately, reported as a utilisation fraction of `V_j`/`A_j` (no pass/fail at the configured `limit_fraction.*`, since the checker does not assume the producer's own fractions — utilisation is diagnostic) |
+| `C-MARGIN` | the §11.6 FD rule (G7), independently recomputed, using `execution.yaml`'s `position_margin_rad` |
+| `C-REST` | G-REST, independently recomputed |
+| `C-SAMPLING` | G-STEP (per-joint step `≤ retime.yaml`'s `sampling.max_joint_step_rad`) and G-PERIOD (`τ_i ≤ sampling.max_period_s`), independently recomputed |
+| `C-PATH` | G-PATH, independently recomputed: every plan configuration (`P`, §16.2 Step 1, recomputed from the given `--plan` the same way `retime_plan` does) is present, bit-exact, in the trajectory's `positions`, in order; every trajectory point lies within `1e-6` rad of the plan polyline formed by `P` (perpendicular distance to the nearest segment, mirroring §15.2 point 1's own nearest-segment construction); progress along the polyline is monotone; the trajectory's first point equals `P`'s first and its last equals `P`'s last |
+| `C-TOOLSPEED` | leg membership is derived **geometrically** from the plan (each trajectory point is assigned to the plan leg owning the nearest plan-polyline segment it lies on, via the same projection `C-PATH` already computes — never read from the report or from any trajectory field, since §11.2 carries no leg field), then G-TOOLSPEED's band/ramp/never-above rules are independently recomputed per trace leg using `crackvision.kinematics`-based `tool_fk` |
+| `C-REPORT` | only when `--report` is given: the report's declared per-leg `v_c`, `point_range`, `duration_s` and `tool_speed` extrema agree with what the checker itself recomputes (C-PATH's leg assignment, C-TOOLSPEED's recomputed speeds) |
+
+**Report fields:** one entry per check above, `{check, outcome: pass|fail, detail, numbers}` (free-
+form numeric evidence per check — the specific values compared and their bounds), plus
+`schema: "crackvision.trajectory_check_report/1"`, `trajectory_sha256`, `created_utc`.
+
+**Exit codes** (§0.2): `0` every check `pass`; `3` any check `fail`; `2` usage/config error
+(unreadable/malformed input file, bad CLI flag); `1` runtime error (unexpected exception while
+checking, not a check failure).
+
+### 16.6 CLIs
+
+```bash
+source scripts/ros/env_ros.sh
+set +u; source ros2_ws/install/setup.bash
+ros2 run crackvision_motion retime_plan --plan PATH
+    [--out PATH] [--purpose crack_task|test]
+    [--retime-config PATH] [--limits PATH] [--end-effector-config PATH]
+    [--execution-config PATH] [--urdf PATH] [§0.3 flags]
+```
+
+`retime_plan` imports no `rclpy`/MoveIt message type anywhere (§16.2's whole point), so it is also
+runnable, identically, as `bash scripts/ros/env_ros.sh python3 -m crackvision_motion.retime_plan`
+under system `python3` without a colcon-built console script — exactly how
+`crackvision_motion.execution_gate` (§11.10) is dual-runnable today. `--out` defaults to
+`data/trajectories/{case}_trajectory.json` (`{case}` = the plan's own `case_id`). Config paths
+default per §16.1's table. `--dry-run` (§0.3) validates every input (paths/shas/schema, per-leg tool
+speed feasibility) and prints the leg summary (durations, chosen `v_c` per trace leg) without
+writing the trajectory or the report, exit 0 regardless.
+
+```bash
+./env.sh python -m crackvision.trajectory_check --trajectory PATH --plan PATH
+    [--report PATH] [--limits PATH] [--end-effector-config PATH]
+    [--execution-config PATH] [--retime-config PATH] [--out PATH] [§0.3 flags]
+```
+
+Exit codes for both CLIs follow §0.2 exactly, as restated in §16.3 (refusals) and §16.5
+(checker-specific table).
+
+### 16.7 Default numeric values
+
+| Parameter | Default | Rationale |
+|---|---|---|
+| `limit_fraction.velocity` / `.acceleration` | `0.95` / `0.95` | Leaves a 5% margin below the raw `b601_dm_limits.yaml` bound for `G-SELFCHECK`'s independent full-limit re-derivation (§16.2) and for floating-point/iteration slack in the bounded profiling pass, while still using nearly the full envelope — unlike `execution.yaml`'s separate `speed_scale.real_default` (0.10), which is a *further*, deliberate real-mode cap applied on top of this at execution time, not a substitute for it |
+| `sampling.max_joint_step_rad` | `0.01` rad | Finer than `cartesian_planning.yaml`'s own `recheck.max_joint_step_rad` (0.2 rad, §13.2/§13.16) by 20×, so refinement never coarsens what the plan's own independent re-check already certified at a 0.2 rad grain down to this trajectory's much finer FD sampling grid |
+| `sampling.max_period_s` | `0.02` s | Matches the vendor driver's own 20 ms control tick (§11.12) — a sample period at this scale is what makes a finite-difference acceleration value reflect a real commanded velocity step rather than an artifact of oversampling a coarser physical rate (ADR-019) |
+| `trace.tool_speed_m_s` | `0.05` m/s | Unscaled; at the real-mode default `speed_scale` (`execution.yaml`'s `speed_scale.real_default = 0.10`, §11.12), the effective tool speed is `0.005` m/s = 5 mm/s — a cautious first real-execution speed, well below the trace clearance scale (`trace_clearance_m`, §8.2/§10) |
+| `trace.min_tool_speed_m_s` | `0.005` m/s | An order of magnitude below the target; below this a trace leg is crawling slowly enough that refusing (rather than silently proceeding) is the honest answer — the operator should retune rather than execute an unintentionally crawling pass |
+| `trace.speed_tolerance` | `0.05` (relative, 5%) | Tight enough that "constant tool speed" is a meaningful claim (not a 50%-wide band), loose enough to absorb the discrete, bounded-iteration profiling pass's own numerical slack |
+| `trace.max_ramp_m` | `0.005` m | Half of `execution.yaml`'s `densify_step_m` (0.01 m, §11.12) and equal to `end_effector.yaml`'s own `collision_padding_m` (0.005 m) — a ramp this short cannot eat meaningfully into either margin |
+
+### 16.8 The view-plan / §11.2 `purpose` gap
+
+§13.14's `view_plan` (`crackvision.view_plan/1`) produces one `transit_leg` (home → the chosen view
+pose) that also needs retiming before it could ever be executed — it is just as much an untimed
+joint path as a `cartesian_plan`'s legs are. §11.2's `purpose` field, however, allows only
+`"crack_task"` (which requires a non-null `source.paths3d`, which a view move has none of — view
+plans are workcell-level, not derived from any `paths3d` file, §13.14) or `"test"` (refused
+unconditionally in `real` by `G-TRAJ`, §11.7). Neither value fits a retimed view move today, so a
+camera-positioning move cannot run in `real` through the current §11.2/§11.7 contract.
+
+This section (§16) does **not** resolve that gap: `retime_plan` (§16.6) retimes a `cartesian_plan`
+only, and this card makes no change to `execution_gate`/`joint_trajectory`'s gate behaviour. The
+recommendation, left for a future card (MOT-07.10) to decide and implement: add
+`purpose: "view_move"` to §11.2's enum, with its own `G-TRAJ`/`G-ELIGIBLE`-style rule (§11.7) stating
+what makes a view move eligible to run in `real` without a `paths3d` binding — a decision this
+section deliberately leaves open rather than making unilaterally inside a time-parameterization
+card.
+
+---
