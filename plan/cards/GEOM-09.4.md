@@ -2,7 +2,7 @@
 
 ```json card
 {
-  "kind": "impl",
+  "kind": "branch",
   "depends_on": [
     "GEOM-09.1",
     "GEOM-09.2",
@@ -11,7 +11,6 @@
   "requirements": [
     "REQ-GEOM-1"
   ],
-  "spec_state": "draft",
   "refine_after": [
     "GEOM-09.1"
   ],
@@ -67,3 +66,6 @@ Implement `crackvision/uncertainty_budget.py` as a CLI (module with `build_parse
 Input: a `crackvision.paths3d/1` file (§10) plus its referenced capture record (§9). For every lifted point and tool waypoint it contains, call `crackvision.uncertainty`'s analytic breakdown (GEOM-09.2) and, for a bounded subset (or all, if cheap enough) `crackvision.uncertainty_mc`'s cross-check (GEOM-09.3). Assemble and write a `crackvision.uncertainty_budget/1` report per §14 to `data/uncertainty_budget/{case}_budget.json`, and refuse (non-zero exit) if the MC-vs-analytic disagreement exceeds §14's tolerance anywhere.
 
 Write `docs/geometry/UNCERTAINTY_BUDGET.md` describing the report, its command, and its honest scope (what uncertainty sources it does and does not model), matching the tone of `docs/geometry/PATH3D_VERIFICATION.md`. Add a CLI-smoke test on an existing fixture/synthetic paths3d case.
+
+## Decomposed 2026-10-11T15:15:44Z by L-GEOM (claude-sonnet-5, high)
+Children: GEOM-09.4.1, GEOM-09.4.2
