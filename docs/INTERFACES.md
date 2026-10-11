@@ -2622,6 +2622,16 @@ successfully written trajectory. Never written on a refusal.
 | `totals` | object | `{n_points, duration_s}` plus `peak_velocity_fraction[6]`, `peak_acceleration_fraction[6]` — per-joint peak finite-difference velocity/acceleration as a fraction of `b601_dm_limits.yaml`'s own bound (i.e. `max|v_ij|/V_j`, `max|a_ij|/A_j`), independent of `limit_fraction.*` |
 | `self_check` | object | `{violations: 0}` — `retime_plan` only ever writes this report once G-SELFCHECK (§16.2) has already passed, so this field is always `{violations: 0}` on a written report; it exists so the checker (§16.5) and a human reader have an explicit, named confirmation rather than its absence meaning something |
 
+`point_range: [first, last]` indexes the trajectory's own `points[]` (§11.2), inclusive at both
+ends. **Shared leg-boundary convention:** when leg `i+1`'s first configuration was dropped during
+§16.2 Step 1 concatenation (within `cartesian_plan.CONTINUITY_TOL_RAD` of leg `i`'s last), the single
+surviving trajectory point at that vertex is the *shared boundary point* and belongs to **both**
+legs' `point_range`: leg `i`'s `last` equals leg `i+1`'s `first` (the two ranges overlap by exactly
+one index, never by more). This mirrors §16.2 Step 1 itself: the point is geometrically the
+endpoint of leg `i`'s path and the start of leg `i+1`'s, so both legs' own checks (duration,
+tool-speed extrema) are evaluated inclusive of it. A leg's `duration_s` is `t_s[last] - t_s[first]`
+under this same inclusive convention.
+
 ### 16.5 `crackvision.trajectory_check/1` — independent checker
 
 `crackvision.trajectory_check` is a **separate implementation**, not a second entry point into
@@ -2642,22 +2652,52 @@ convention):
 | Check | Rule |
 |---|---|
 | `C-SCHEMA` | the trajectory parses as `crackvision.joint_trajectory/1` (§11.2) and the plan parses as `crackvision.cartesian_plan/1` (§13.11.1) |
-| `C-PROVENANCE` | the trajectory's `limits_file.sha256`/`end_effector_config_sha256`/`scene_config_sha256` match the files given on the command line and, for limits/end-effector, match `plan.sources.limits.sha256`/`plan.sources.end_effector.sha256` (§16.3); `trajectory.source.paths3d` equals `plan.sources.paths3d` field-for-field |
+| `C-PROVENANCE` | the trajectory's `limits_file.sha256`/`end_effector_config_sha256` match the files given on the command line (`--limits`/`--end-effector-config`) **and** `plan.sources.limits.sha256`/`plan.sources.end_effector.sha256` (§16.3); the trajectory's `scene_config_sha256` matches `plan.sources.scene.sha256` **exactly** (§16.3's own copy-unchecked field) — the checker never reads an actual scene file for this check (no `--scene-config` flag exists; live-scene staleness is `G-STALE-CONFIG`'s job at execution time, §11.7, out of scope here); `trajectory.source.paths3d` equals `plan.sources.paths3d` field-for-field |
 | `C-LIMITS` | finite-difference velocity/acceleration (same formulas as §16.2 G-VEL/G-ACC) at full limits (must never exceed `V_j`/`A_j`) and, separately, reported as a utilisation fraction of `V_j`/`A_j` (no pass/fail at the configured `limit_fraction.*`, since the checker does not assume the producer's own fractions — utilisation is diagnostic) |
 | `C-MARGIN` | the §11.6 FD rule (G7), independently recomputed, using `execution.yaml`'s `position_margin_rad` |
 | `C-REST` | G-REST, independently recomputed |
 | `C-SAMPLING` | G-STEP (per-joint step `≤ retime.yaml`'s `sampling.max_joint_step_rad`) and G-PERIOD (`τ_i ≤ sampling.max_period_s`), independently recomputed |
 | `C-PATH` | G-PATH, independently recomputed: every plan configuration (`P`, §16.2 Step 1, recomputed from the given `--plan` the same way `retime_plan` does) is present, bit-exact, in the trajectory's `positions`, in order; every trajectory point lies within `1e-6` rad of the plan polyline formed by `P` (perpendicular distance to the nearest segment, mirroring §15.2 point 1's own nearest-segment construction); progress along the polyline is monotone; the trajectory's first point equals `P`'s first and its last equals `P`'s last |
-| `C-TOOLSPEED` | leg membership is derived **geometrically** from the plan (each trajectory point is assigned to the plan leg owning the nearest plan-polyline segment it lies on, via the same projection `C-PATH` already computes — never read from the report or from any trajectory field, since §11.2 carries no leg field), then G-TOOLSPEED's band/ramp/never-above rules are independently recomputed per trace leg using `crackvision.kinematics`-based `tool_fk` |
-| `C-REPORT` | only when `--report` is given: the report's declared per-leg `v_c`, `point_range`, `duration_s` and `tool_speed` extrema agree with what the checker itself recomputes (C-PATH's leg assignment, C-TOOLSPEED's recomputed speeds) |
+| `C-TOOLSPEED` | leg membership is derived **geometrically** from the plan (each trajectory point is assigned to the plan leg owning the nearest plan-polyline segment it lies on, via the same projection `C-PATH` already computes — never read from the report or from any trajectory field, since §11.2 carries no leg field). The checker gets `v_c` **the same way `retime_plan` does, independently**: for each trace leg it runs the identical bisection described at §16.2 Step 4 — "the largest `v_c ≤ retime.yaml`'s `trace.tool_speed_m_s` for which that leg's own segments satisfy G-TOOLSPEED rules 1–3" — against the trajectory's *own* segment speeds (recomputed via `crackvision.kinematics`-based `tool_fk`, never `crackvision_motion.tool_fk`). This is an existence statement, not a read: *a `v_c` satisfying rules 1–3 is asserted to exist for a passing trajectory, and the checker's own bisection is how it finds one* — it need not reproduce `retime_plan`'s exact chosen value bit-for-bit (floating-point bisection paths can differ), only find *some* `v_c ≤ trace.tool_speed_m_s` for which 1–3 hold; finding none is `C-TOOLSPEED` `fail`, mirroring G-TOOLSPEED point 4's refusal |
+| `C-REPORT` | only when `--report` is given (§16.5 outcome vocabulary below covers the absent case): the report's declared per-leg `point_range` (§16.4's shared-boundary convention) must match C-PATH's own geometric leg assignment **exactly** (integer indices, zero tolerance). The report's declared per-leg `duration_s` must be within `1e-6 s` (absolute) of `t_s[point_range.last] - t_s[point_range.first]` as read directly from the trajectory. For each trace leg, the report's declared `tool_speed.constant` (its `v_c`) must be within `1e-3 m/s` (absolute) of *some* `v_c` that `C-TOOLSPEED`'s own bisection finds to satisfy G-TOOLSPEED rules 1–3 for that leg (same existence semantics as `C-TOOLSPEED` above — not bit-exact equality to one canonical bisection result), and the report's declared `tool_speed.min`/`tool_speed.max` must each be within `1e-3 m/s` (absolute) of the corresponding extremum the checker itself recomputes over that leg's segments. Any single comparison outside its stated tolerance is `C-REPORT` `fail` |
 
-**Report fields:** one entry per check above, `{check, outcome: pass|fail, detail, numbers}` (free-
-form numeric evidence per check — the specific values compared and their bounds), plus
-`schema: "crackvision.trajectory_check_report/1"`, `trajectory_sha256`, `created_utc`.
+**Outcome vocabulary.** Every check above resolves to exactly one of:
 
-**Exit codes** (§0.2): `0` every check `pass`; `3` any check `fail`; `2` usage/config error
-(unreadable/malformed input file, bad CLI flag); `1` runtime error (unexpected exception while
-checking, not a check failure).
+| Outcome | Meaning |
+|---|---|
+| `pass` | the check ran and its rule held |
+| `fail` | the check ran and its rule did not hold |
+| `skip` | the check did not run because its own precondition was not met — `C-REPORT` is `skip` whenever `--report` is not given (the check has nothing to evaluate), and any check downstream of `C-SCHEMA` (`C-PROVENANCE` through `C-REPORT`) is `skip`, not `fail`, when `C-SCHEMA` itself is `fail` (the trajectory/plan did not even parse into the structures the other checks require) |
+
+`skip` never causes exit `3` by itself; only a `fail` does. `C-SCHEMA` failing is itself a `fail`
+(not a `skip`), so a run where every other check is `skip` because of a failed `C-SCHEMA` still
+exits `3` (via `C-SCHEMA`'s own `fail`), never `0`.
+
+**Report fields:** one entry per check above, `{check, outcome: pass|fail|skip, detail, numbers}`
+(free-form numeric evidence per check — the specific values compared and their bounds; `numbers`
+is `{}` for a `skip`), plus `schema: "crackvision.trajectory_check/1"` (the same schema name the
+card's `crackvision.trajectory_check/1` identifies — there is no separate
+`trajectory_check_report` schema), `trajectory_sha256`, `created_utc`. Written to `--out PATH`,
+defaulting to `<trajectory path>.check.json` (e.g. `foo_trajectory.json.check.json`) when `--out`
+is not given — written unconditionally (on `pass`, `fail`, and a usage-error-free run alike), since
+unlike `retime_plan`'s refuse-and-write-nothing convention (§16.3), reporting *why* a check failed
+is this tool's entire purpose.
+
+**Exit codes** (§0.2), applied in this order:
+
+1. `2` — usage/config error: a bad CLI flag, or an input file (trajectory, plan, or any config)
+   that does not even parse as JSON/YAML (a syntax error) or cannot be opened at all. This is a
+   failure to begin checking at all, before `C-SCHEMA` or any other check runs — no report is
+   written.
+2. `1` — runtime error: an unexpected exception while a check is running (not a check's rule
+   failing to hold).
+3. `3` — otherwise, if any check's outcome is `fail`. This is the **only** path for a trajectory
+   or plan file that parses as JSON/YAML but fails `crackvision.joint_trajectory/1`'s or
+   `crackvision.cartesian_plan/1`'s own schema (wrong/missing `schema` field, missing required key,
+   wrong type): that is a `C-SCHEMA` `fail`, exit `3`, never the exit-`2` "malformed input file"
+   case above, which is reserved for input that does not parse as JSON/YAML in the first place.
+4. `0` — otherwise (every check is `pass` or `skip`; report is written in every case that reaches
+   this point).
 
 ### 16.6 CLIs
 
