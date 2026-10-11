@@ -81,6 +81,7 @@ class SegmentTask(NamedTuple):
     normals: Tuple[Tuple[float, float, float], ...]
     surface_points: Tuple[Tuple[float, float, float], ...]
     trace_length_m: float
+    clearances_m: Tuple[float, ...] = ()
 
 
 class Candidate(NamedTuple):
@@ -432,8 +433,8 @@ def _validate_paths3d(doc: Any) -> None:
                 seen_branch_indices.add(branch_index)
 
             segments = polyline.get("segments")
-            if not isinstance(segments, list) or not segments:
-                raise Paths3dError(f"'{pctx}.segments' must be a non-empty list")
+            if not isinstance(segments, list):
+                raise Paths3dError(f"'{pctx}.segments' must be a list")
             for si, segment in enumerate(segments):
                 _validate_segment(segment, f"{pctx}.segments[{si}]")
 
@@ -484,6 +485,7 @@ def _segment_task(comp: Dict[str, Any], polyline: Dict[str, Any], seg_index: int
     )
     normals = tuple(tuple(float(x) for x in wp["normal_base"]) for wp in trace_wps)
     surface_points = tuple(tuple(float(x) for x in wp["surface_point_m"]) for wp in trace_wps)
+    clearances_m = tuple(float(wp["clearance_m"]) for wp in trace_wps)
     trace_length_m = _polyline_length_m([wp["position_m"] for wp in trace_wps])
 
     segment_ref = {
@@ -493,7 +495,9 @@ def _segment_task(comp: Dict[str, Any], polyline: Dict[str, Any], seg_index: int
         "segment_index": seg_index,
         "sub_segment": None,
     }
-    return SegmentTask(segment_ref, approach, trace, retract, normals, surface_points, trace_length_m)
+    return SegmentTask(
+        segment_ref, approach, trace, retract, normals, surface_points, trace_length_m, clearances_m,
+    )
 
 
 def segment_tasks(doc: Dict[str, Any]) -> List[SegmentTask]:
@@ -560,16 +564,19 @@ def apply_candidate(task: SegmentTask, direction: str, roll_rad: float) -> Segme
         trace = tuple(reversed(task.trace))
         normals = tuple(reversed(task.normals))
         surface_points = tuple(reversed(task.surface_points))
+        clearances_m = tuple(reversed(task.clearances_m))
     else:
-        approach, retract, trace, normals, surface_points = (
-            task.approach, task.retract, task.trace, task.normals, task.surface_points
+        approach, retract, trace, normals, surface_points, clearances_m = (
+            task.approach, task.retract, task.trace, task.normals, task.surface_points, task.clearances_m
         )
 
     approach = _apply_roll(approach, roll_rad)
     retract = _apply_roll(retract, roll_rad)
     trace = tuple(_apply_roll(p, roll_rad) for p in trace)
 
-    return SegmentTask(task.segment_ref, approach, trace, retract, normals, surface_points, task.trace_length_m)
+    return SegmentTask(
+        task.segment_ref, approach, trace, retract, normals, surface_points, task.trace_length_m, clearances_m,
+    )
 
 
 # --------------------------------------------------------------------------------------
@@ -584,6 +591,7 @@ def split_remainder(task: SegmentTask, last_reached_index: int) -> Optional[Segm
     remainder_trace = task.trace[last_reached_index + 1:]
     remainder_normals = task.normals[last_reached_index + 1:]
     remainder_surface_points = task.surface_points[last_reached_index + 1:]
+    remainder_clearances_m = task.clearances_m[last_reached_index + 1:]
 
     if len(remainder_trace) < _MIN_REMAINDER_WAYPOINTS:
         return None
@@ -607,7 +615,7 @@ def split_remainder(task: SegmentTask, last_reached_index: int) -> Optional[Segm
     trace_length_m = _polyline_length_m([p.position_m for p in remainder_trace])
     return SegmentTask(
         segment_ref, approach, remainder_trace, retract, remainder_normals, remainder_surface_points,
-        trace_length_m,
+        trace_length_m, remainder_clearances_m,
     )
 
 
@@ -643,18 +651,26 @@ def _box_signed_distance(point: Sequence[float], pose: Dict[str, Any], dimension
 
 
 def surface_scene_mismatch(
-    task: SegmentTask, scene_cfg: Dict[str, Any], clearance_m: float,
+    task: SegmentTask, scene_cfg: Dict[str, Any], surface_object_id: str, surface_object_tolerance_m: float,
 ) -> List[str]:
-    """Every trace waypoint position closer than `clearance_m` to, or inside, any `scene_cfg`
-    object's (possibly rotated) box (§13.9). Independent of direction/roll -- `position_m` is
-    unaffected by either (§13.4). Returns `[]` when every trace waypoint clears every object."""
+    """Every trace waypoint position closer than its own `clearances_m` entry to, or inside, any
+    `scene_cfg` object's (possibly rotated) box (§13.9). Each waypoint sits exactly `clearance_m`
+    from `surface_object_id` by construction (§10.5 point 2), so that one object is checked against
+    the relaxed bound `clearance_m - surface_object_tolerance_m` instead of the full `clearance_m`;
+    every other object uses the waypoint's full `clearance_m`. Independent of direction/roll --
+    `position_m` is unaffected by either (§13.4). Returns `[]` when every trace waypoint clears
+    every object."""
     reasons: List[str] = []
     for i, pose in enumerate(task.trace):
+        clearance_m = task.clearances_m[i]
         for obj in scene_cfg["objects"]:
             distance_m = _box_signed_distance(pose.position_m, obj["pose"], obj["dimensions_m"])
-            if distance_m < clearance_m:
+            bound_m = (
+                clearance_m - surface_object_tolerance_m if obj["id"] == surface_object_id else clearance_m
+            )
+            if distance_m < bound_m:
                 reasons.append(
                     f"trace waypoint {i} is {distance_m:.4f} m from scene object '{obj['id']}', "
-                    f"less than the required clearance {clearance_m:.4f} m"
+                    f"less than the required clearance {bound_m:.4f} m"
                 )
     return reasons

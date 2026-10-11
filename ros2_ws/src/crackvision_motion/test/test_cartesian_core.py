@@ -243,6 +243,7 @@ def _single_pose_task() -> SegmentTask:
         normals=((0.0, 0.0, 1.0),),
         surface_points=((0.1, 0.2, 0.0),),
         trace_length_m=0.0,
+        clearances_m=(0.01,),
     )
 
 
@@ -283,6 +284,7 @@ def test_apply_candidate_reverse_swaps_and_reverses():
         normals=((0.0, 0.0, 1.0), (0.0, 0.0, 1.0)),
         surface_points=((0.0, 0.0, 0.0), (0.01, 0.0, 0.0)),
         trace_length_m=0.01,
+        clearances_m=(0.01, 0.01),
     )
 
     result = apply_candidate(task, "reverse", 0.0)
@@ -313,6 +315,7 @@ def _five_point_task() -> SegmentTask:
         normals=normals,
         surface_points=surface_points,
         trace_length_m=0.04,
+        clearances_m=tuple(0.01 for _ in xs),
     )
 
 
@@ -359,17 +362,21 @@ def _scene_with_box(position_m, dimensions_m, rpy_rad=(0.0, 0.0, 0.0), obj_id="t
 
 
 def test_surface_scene_mismatch_clear_trace_passes():
-    task = _five_point_task()  # trace z = 0.01
+    task = _five_point_task()  # trace z = 0.01, clearance_m = 0.01 per waypoint
     scene_cfg = _scene_with_box([0.02, 0.0, -0.05], [1.0, 1.0, 0.1])  # top face at z=0, far below trace
-    reasons = surface_scene_mismatch(task, scene_cfg, clearance_m=0.005)
+    reasons = surface_scene_mismatch(
+        task, scene_cfg, surface_object_id="specimen", surface_object_tolerance_m=0.002,
+    )
     assert reasons == []
 
 
 def test_surface_scene_mismatch_flags_close_trace():
-    task = _five_point_task()  # trace z = 0.01
+    task = _five_point_task()  # trace z = 0.01, clearance_m = 0.01 per waypoint
     # top face at z = 0.005: trace sits only 0.005 m above it, less than the 0.01 clearance.
     scene_cfg = _scene_with_box([0.02, 0.0, -0.045], [1.0, 1.0, 0.1])
-    reasons = surface_scene_mismatch(task, scene_cfg, clearance_m=0.01)
+    reasons = surface_scene_mismatch(
+        task, scene_cfg, surface_object_id="specimen", surface_object_tolerance_m=0.002,
+    )
     assert len(reasons) == 5
 
 
@@ -385,11 +392,134 @@ def test_surface_scene_mismatch_handles_rotated_box():
         normals=((0.0, 0.0, 1.0),),
         surface_points=((0.06, 0.0, 0.0),),
         trace_length_m=0.0,
+        clearances_m=(0.001,),
     )
     scene_cfg = _scene_with_box([0.0, 0.0, 0.0], [0.1, 0.1, 1.0], rpy_rad=(0.0, 0.0, math.pi / 4.0))
-    reasons = surface_scene_mismatch(task, scene_cfg, clearance_m=0.001)
+    reasons = surface_scene_mismatch(
+        task, scene_cfg, surface_object_id="specimen", surface_object_tolerance_m=0.0,
+    )
     assert len(reasons) == 1
 
     # Sanity check: the unrotated axis-aligned box would NOT flag this point (outside by 0.01 m).
     axis_aligned_scene = _scene_with_box([0.0, 0.0, 0.0], [0.1, 0.1, 1.0])
-    assert surface_scene_mismatch(task, axis_aligned_scene, clearance_m=0.001) == []
+    assert surface_scene_mismatch(
+        task, axis_aligned_scene, surface_object_id="specimen", surface_object_tolerance_m=0.0,
+    ) == []
+
+
+def test_surface_scene_mismatch_production_scene_trace_at_clearance_clears():
+    """Production-shaped scene (table + specimen): a trace sitting exactly `trace_clearance_m`
+    above the specimen top is a correct, by-construction waypoint and must not be flagged."""
+    scene_cfg = yaml.safe_load((REPO_ROOT / "config" / "scene" / "scene.yaml").read_text())
+    cfg = load_config(PRODUCTION_CONFIG)
+    specimen = next(o for o in scene_cfg["objects"] if o["id"] == "specimen")
+    specimen_top_z = specimen["pose"]["position_m"][2] + specimen["dimensions_m"][2] / 2.0
+    trace_clearance_m = 0.01  # paths3d §10.4 trace_clearance_m default
+    x, y = specimen["pose"]["position_m"][0], specimen["pose"]["position_m"][1]
+    pose = Pose((x, y, specimen_top_z + trace_clearance_m), _BASE_QUAT_XYZW)
+    task = SegmentTask(
+        segment_ref={"component_id": "c", "polyline_kind": "main", "branch_index": None, "segment_index": 0, "sub_segment": None},
+        approach=pose,
+        trace=(pose, pose, pose, pose),
+        retract=pose,
+        normals=((0.0, 0.0, 1.0),) * 4,
+        surface_points=((x, y, specimen_top_z),) * 4,
+        trace_length_m=0.0,
+        clearances_m=(trace_clearance_m,) * 4,
+    )
+    reasons = surface_scene_mismatch(
+        task, scene_cfg, cfg["surface_object_id"], cfg["surface_object_tolerance_m"],
+    )
+    assert reasons == []
+
+
+def test_surface_scene_mismatch_production_scene_too_close_to_specimen_flagged():
+    scene_cfg = yaml.safe_load((REPO_ROOT / "config" / "scene" / "scene.yaml").read_text())
+    cfg = load_config(PRODUCTION_CONFIG)
+    specimen = next(o for o in scene_cfg["objects"] if o["id"] == "specimen")
+    specimen_top_z = specimen["pose"]["position_m"][2] + specimen["dimensions_m"][2] / 2.0
+    trace_clearance_m = 0.01
+    tolerance_m = cfg["surface_object_tolerance_m"]
+    x, y = specimen["pose"]["position_m"][0], specimen["pose"]["position_m"][1]
+    # more than tolerance_m closer than the correct standoff.
+    z = specimen_top_z + trace_clearance_m - tolerance_m - 0.0005
+    pose = Pose((x, y, z), _BASE_QUAT_XYZW)
+    task = SegmentTask(
+        segment_ref={"component_id": "c", "polyline_kind": "main", "branch_index": None, "segment_index": 0, "sub_segment": None},
+        approach=pose,
+        trace=(pose,),
+        retract=pose,
+        normals=((0.0, 0.0, 1.0),),
+        surface_points=((x, y, specimen_top_z),),
+        trace_length_m=0.0,
+        clearances_m=(trace_clearance_m,),
+    )
+    reasons = surface_scene_mismatch(
+        task, scene_cfg, cfg["surface_object_id"], cfg["surface_object_tolerance_m"],
+    )
+    assert len(reasons) == 1
+    assert "specimen" in reasons[0]
+
+
+def test_surface_scene_mismatch_non_surface_object_uses_full_clearance():
+    """A non-surface object (e.g. 'table') within the full clearance is flagged even though it
+    would pass the relaxed surface_object_id bound."""
+    scene_cfg = yaml.safe_load((REPO_ROOT / "config" / "scene" / "scene.yaml").read_text())
+    cfg = load_config(PRODUCTION_CONFIG)
+    table = next(o for o in scene_cfg["objects"] if o["id"] == "table")
+    table_top_z = table["pose"]["position_m"][2] + table["dimensions_m"][2] / 2.0
+    trace_clearance_m = 0.01
+    tolerance_m = cfg["surface_object_tolerance_m"]
+    # a point over the table but well outside the specimen's (0.20x0.20, centred (0.30, 0.0))
+    # footprint, so only 'table' is within range.
+    x, y = table["pose"]["position_m"][0], 0.3
+    # within tolerance_m of the full clearance_m, but not past it -- would clear the relaxed
+    # surface_object_id bound, but 'table' is not surface_object_id so the full bound applies.
+    z = table_top_z + trace_clearance_m - tolerance_m / 2.0
+    pose = Pose((x, y, z), _BASE_QUAT_XYZW)
+    task = SegmentTask(
+        segment_ref={"component_id": "c", "polyline_kind": "main", "branch_index": None, "segment_index": 0, "sub_segment": None},
+        approach=pose,
+        trace=(pose,),
+        retract=pose,
+        normals=((0.0, 0.0, 1.0),),
+        surface_points=((x, y, table_top_z),),
+        trace_length_m=0.0,
+        clearances_m=(trace_clearance_m,),
+    )
+    reasons = surface_scene_mismatch(
+        task, scene_cfg, cfg["surface_object_id"], cfg["surface_object_tolerance_m"],
+    )
+    assert len(reasons) == 1
+    assert "table" in reasons[0]
+
+
+# --------------------------------------------------------------------------------------
+# load_paths3d empty segments (§10.3 drop) / non-list segments
+# --------------------------------------------------------------------------------------
+
+def test_load_paths3d_accepts_empty_segments_list(tmp_path):
+    doc = _minimal_doc()
+    # components[0]/polylines[0] is crack_A's branch polyline (kind 'branch', branch_index 0).
+    assert doc["components"][0]["polylines"][0]["kind"] == "branch"
+    doc["components"][0]["polylines"][0]["segments"] = []
+    p = tmp_path / "ok.json"
+    p.write_text(json.dumps(doc))
+    loaded_doc, _ = load_paths3d(p)
+    tasks = segment_tasks(loaded_doc)
+    refs = [
+        (t.segment_ref["component_id"], t.segment_ref["polyline_kind"], t.segment_ref["branch_index"])
+        for t in tasks
+    ]
+    assert ("crack_A", "branch", 0) not in refs
+    assert ("crack_B", "main", None) in refs
+    assert ("crack_A", "main", None) in refs
+
+
+def test_load_paths3d_rejects_non_list_segments(tmp_path):
+    doc = _minimal_doc()
+    doc["components"][0]["polylines"][0]["segments"] = "not-a-list"
+    p = tmp_path / "bad.json"
+    p.write_text(json.dumps(doc))
+    with pytest.raises(Paths3dError):
+        load_paths3d(p)
