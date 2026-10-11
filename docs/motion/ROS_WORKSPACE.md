@@ -235,3 +235,14 @@ the `arm` chain stays `base_link → gripper_tcp`. The sweep's `specimen_block` 
 table (INTERFACES §8.3) replace the old grid-wide thin slab. That slab ran under the base and
 collided with link2 at surface_z ≥ ≈0.10 m. The legacy `slab` model is still the default, so
 `test_reachability.sh` above is unchanged and still passes.
+
+## 8. Commissioning-gated execution (MOT-05, ADR-016)
+
+`crackvision_motion.execute_trajectory` (console script `execute_trajectory`) is the only code path in
+this repository that can send a `FollowJointTrajectory` goal, mock or real, gated by the catalogue in
+`docs/INTERFACES.md` §11. The operator-facing runbook — prerequisites per gate, how to run `mock`/`dry`/
+`real`, the typed confirmation, e-stop (hardware first, software topics second) and failure recovery — is
+`docs/motion/EXECUTION.md`. Read it before running `execute_trajectory` for anything beyond a smoke test.
+`scripts/ros/test_execution.sh` is the headless, no-hardware verification of the whole mock→dry progression
+(including refusals, collision and e-stop injection); run it after any `crackvision_motion` rebuild that
+touches execution.
