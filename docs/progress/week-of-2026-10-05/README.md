@@ -1,6 +1,6 @@
 # Progress — week of Mon Oct 05 – Sun Oct 11, 2026
 
-**43 task(s) completed and independently audited this week** · project total **85/125** accepted
+**44 task(s) completed and independently audited this week** · project total **86/125** accepted
 
 ## Notes
 
@@ -89,10 +89,12 @@
 …[506 chars clipped]
 - **MOT-06.9 — plan_view node/CLI + headless smoke: reachable, collision-free camera view pose with the specimen in FOV** ([details](MOT-06.9.md)): Added the plan_view ROS 2 CLI that picks a reachable, collision-free camera view pose over the specimen for MOT-06's camera-positioning phase, verified end-to-end on the mock MoveIt stack. The smoke t
 …[336 chars clipped]
+- **GEOM-09.2.1 — Implement crackvision.uncertainty analytic per-term decomposition (pixel, depth, handeye, tcp, fk)** ([details](GEOM-09.2.1.md)): Built and tested a new uncertainty-decomposition module that breaks a lifted 3D crack point's existing position uncertainty down into its pixel-noise, depth-noise, hand-eye-calibration, and new joint/
+…[336 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 88 / 430
+- Implementation/review sessions run: 89 / 431
 - Audits that rejected work with evidence-backed findings: 27 (repairs created: 21)
 - Re-verified after an upstream change: CAM-02, CAM-05.1, CAM-05.2, GEOM-01, GEOM-01.R1, GEOM-08.1, GEOM-08.2, GEOM-08.2.R1, GEOM-08.5, GEOM-08.5.R1, GEOM-08.6, GEOM-08.7, GEOM-08.8, GEOM-08.8.R1, GEOM-09.1, GEOM-09.1.R1, GEOM-10, MOT-02, MOT-03, MOT-04.1, MOT-04.1.R1, MOT-04.2, MOT-04.3, MOT-04.3.R1, MOT-04.4, MOT-04.4.R1, MOT-04.6, MOT-04.6.R1, MOT-05.1, MOT-05.1.R1, MOT-05.2, MOT-05.4, MOT-05.4.R1, MOT-06.2, MOT-06.2.R1, MOT-06.3, MOT-06.3.R1, MOT-06.4, MOT-06.4.R1, MOT-06.5, MOT-06.5.R1, MOT-06.6, MOT-06.6.R1, MOT-06.8, MOT-10.1, MOT-10.1.R1, MOT-10.1.R2, MOT-10.2, MOT-10.3, PERC-03, PERC-03.R1, TC-011, TC-016
 
@@ -113,7 +115,7 @@
 | Local coding model (L-LLM) | 5 | 8 |
 | D405 capture (L-CAM) | 7 | 9 |
 | Perception (L-PERC) | 13 | 16 |
-| Geometry & calibration (L-GEOM) | 16 | 29 |
+| Geometry & calibration (L-GEOM) | 17 | 29 |
 | Motion planning (L-MOTION) | 31 | 41 |
 | Integration & commissioning (L-INT) | 1 | 6 |
 | Operator workflow & handoff (L-OPS) | 1 | 4 |
