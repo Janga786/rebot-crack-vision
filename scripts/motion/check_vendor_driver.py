@@ -164,9 +164,9 @@ def _exported_names(init_source: str) -> set[str]:
     return names
 
 
-def _wanted_sdk_imports(source: str) -> list[tuple[str, list[str]]]:
-    """`from reBotArm_control_py.X import A, B` lines in a consumer file -> [(X, [A, B]), ...]."""
-    wanted: list[tuple[str, list[str]]] = []
+def _wanted_sdk_imports(source: str) -> list[tuple[str, list[str], int]]:
+    """`from reBotArm_control_py.X import A, B` lines in a consumer file -> [(X, [A, B], lineno), ...]."""
+    wanted: list[tuple[str, list[str], int]] = []
     try:
         tree = ast.parse(source)
     except SyntaxError:
@@ -175,8 +175,30 @@ def _wanted_sdk_imports(source: str) -> list[tuple[str, list[str]]]:
         if isinstance(node, ast.ImportFrom) and node.module and node.module.startswith("reBotArm_control_py"):
             submodule = node.module[len("reBotArm_control_py") :].lstrip(".")
             names = [alias.name for alias in node.names]
-            wanted.append((submodule, names))
+            wanted.append((submodule, names, node.lineno))
     return wanted
+
+
+def _line_no(text: str, pos: int) -> int:
+    """1-based line number of a character offset within `text`."""
+    return text.count("\n", 0, pos) + 1
+
+
+def _mline(text: str, match: Optional[re.Match]) -> Optional[int]:
+    """1-based line number of a regex match's start, or None if there was no match."""
+    return _line_no(text, match.start()) if match else None
+
+
+def _cite(path: Path, text: str, *needles: str) -> str:
+    """`path:line1,line2` for every literal `needle` found in `text`, else a bare path."""
+    lines = sorted({_line_no(text, idx) for idx in (text.find(n) for n in needles) if idx != -1})
+    if not lines:
+        return str(path)
+    return f"{path}:{','.join(str(line) for line in lines)}"
+
+
+def _cite_multi(*entries: tuple[Path, str, list[str]]) -> str:
+    return "; ".join(_cite(path, text, *needles) for path, text, needles in entries)
 
 
 def _git_head_commit(git_dir: Path) -> Optional[str]:
@@ -205,6 +227,9 @@ def _git_head_commit(git_dir: Path) -> Optional[str]:
 
 
 def check_port(layout: VendorLayout, facts: dict) -> Check:
+    arm_text = _read_text(layout.arm_yaml)
+    gripper_text = _read_text(layout.gripper_yaml)
+    driver_params_text = _read_text(layout.driver_params_yaml)
     arm_cfg = _read_yaml(layout.arm_yaml) or {}
     gripper_cfg = _read_yaml(layout.gripper_yaml) or {}
     driver_params = _read_yaml(layout.driver_params_yaml) or {}
@@ -222,6 +247,11 @@ def check_port(layout: VendorLayout, facts: dict) -> Check:
     }
     bad = {k: v for k, v in channels.items() if v and not str(v).startswith("/dev/tty")}
     compared = {**channels, "facts.bus.port": facts_port}
+    channel_citation = _cite_multi(
+        (layout.arm_yaml, arm_text, ["channel:"]),
+        (layout.gripper_yaml, gripper_text, ["channel:"]),
+        (layout.driver_params_yaml, driver_params_text, ["channel:"]),
+    )
 
     rebot_arm_warn = Path("/dev/rebot_arm").exists()
     if bad:
@@ -229,11 +259,7 @@ def check_port(layout: VendorLayout, facts: dict) -> Check:
             "V-PORT",
             FAIL,
             f"configured channel(s) do not start with /dev/tty: {sorted(bad)}",
-            citation=(
-                f"{layout.arm_yaml}, {layout.gripper_yaml}, {layout.driver_params_yaml} "
-                "vs facts.bus.port; both SDK versions pick dm-serial only for a /dev/tty* "
-                "channel (rebotarm.py:485-487, arm.py@8427281:119-121)"
-            ),
+            citation=f"{channel_citation} vs facts.bus.port",
             compared=compared,
             remedy="set the vendor arm.yaml/gripper.yaml channel to a /dev/tty* device path",
         )
@@ -246,7 +272,7 @@ def check_port(layout: VendorLayout, facts: dict) -> Check:
     if rebot_arm_warn:
         status = WARN
         msg += "; WARN: /dev/rebot_arm exists on this host and deploy/_env.sh:59 would prefer it"
-    return Check("V-PORT", status, msg, citation=f"{layout.arm_yaml}, {layout.gripper_yaml}", compared=compared)
+    return Check("V-PORT", status, msg, citation=f"{channel_citation} vs facts.bus.port", compared=compared)
 
 
 def check_baud(layout: VendorLayout, facts: dict) -> Check:
@@ -256,19 +282,24 @@ def check_baud(layout: VendorLayout, facts: dict) -> Check:
     facts_baud = (facts.get("bus") or {}).get("serial_baud")
     compared = {"sdk_hardcoded_baud": sdk_baud, "facts.bus.serial_baud": facts_baud}
     if sdk_baud is None:
-        return Check("V-BAUD", WARN, "could not find a hard-coded baud in the SDK", compared=compared)
+        return Check(
+            "V-BAUD", WARN, "could not find a hard-coded baud in the SDK",
+            citation=str(layout.actuator_rebotarm), compared=compared,
+        )
     status = PASS if sdk_baud == facts_baud else FAIL
     return Check(
         "V-BAUD",
         status,
         f"SDK hard-coded baud {sdk_baud} vs facts {facts_baud}",
-        citation=f"{layout.actuator_rebotarm} Controller.from_dm_serial(...)",
+        citation=f"{layout.actuator_rebotarm}:{_mline(sdk_source, match)} Controller.from_dm_serial(...)",
         compared=compared,
         remedy="" if status == PASS else "the SDK baud is hard-coded; cannot be fixed by config",
     )
 
 
 def check_ids(layout: VendorLayout, facts: dict) -> Check:
+    arm_text = _read_text(layout.arm_yaml)
+    gripper_text = _read_text(layout.gripper_yaml)
     arm_cfg = _read_yaml(layout.arm_yaml) or {}
     gripper_cfg = _read_yaml(layout.gripper_yaml) or {}
     joints_facts = facts.get("joints") or {}
@@ -310,17 +341,22 @@ def check_ids(layout: VendorLayout, facts: dict) -> Check:
             mismatches.append(name)
 
     status = PASS if not mismatches else FAIL
+    citation = _cite_multi(
+        (layout.arm_yaml, arm_text, ["joints:"]),
+        (layout.gripper_yaml, gripper_text, ["gripper:"]),
+    )
     return Check(
         "V-IDS",
         status,
         "motor/feedback IDs and models match facts" if status == PASS else f"mismatch on {mismatches}",
-        citation=f"{layout.arm_yaml}, {layout.gripper_yaml} vs facts.joints",
+        citation=f"{citation} vs facts.joints",
         compared=compared,
         remedy="" if status == PASS else "fix motor_id/feedback_id/model in arm.yaml or gripper.yaml to match facts",
     )
 
 
 def check_order(layout: VendorLayout) -> Check:
+    arm_text = _read_text(layout.arm_yaml)
     arm_cfg = _read_yaml(layout.arm_yaml) or {}
     names = [j.get("name") for j in arm_cfg.get("joints", [])]
     status = PASS if names == ARM_JOINTS else FAIL
@@ -328,7 +364,7 @@ def check_order(layout: VendorLayout) -> Check:
         "V-ORDER",
         status,
         f"arm.yaml joint order = {names}",
-        citation=f"{layout.arm_yaml} joints[].name vs INTERFACES §11.2 / URDF joint1..joint6",
+        citation=f"{_cite(layout.arm_yaml, arm_text, 'joints:')} joints[].name vs INTERFACES §11.2 / URDF joint1..joint6",
         compared={"vendor_order": names, "expected_order": ARM_JOINTS},
         remedy="" if status == PASS else "reorder arm.yaml's joints list to joint1..joint6",
     )
@@ -344,6 +380,8 @@ def _find_direction_keys(cfg_joints: list[dict]) -> dict[str, list[str]]:
 
 
 def check_direction(layout: VendorLayout, facts: dict) -> Check:
+    arm_text = _read_text(layout.arm_yaml)
+    gripper_text = _read_text(layout.gripper_yaml)
     arm_cfg = _read_yaml(layout.arm_yaml) or {}
     gripper_cfg = _read_yaml(layout.gripper_yaml) or {}
     key_hits = _find_direction_keys(arm_cfg.get("joints", []))
@@ -357,12 +395,17 @@ def check_direction(layout: VendorLayout, facts: dict) -> Check:
     ]
 
     compared = {"direction_keys_found": key_hits, "sign_check_verdicts_not_match": bad_verdicts}
+    found_keys = sorted({k for hits in key_hits.values() for k in hits})
+    citation = _cite_multi(
+        (layout.arm_yaml, arm_text, found_keys or ["joints:"]),
+        (layout.gripper_yaml, gripper_text, found_keys or ["gripper:"]),
+    )
     if key_hits or bad_verdicts:
         return Check(
             "V-DIRECTION",
             FAIL,
             f"direction/offset keys={key_hits or 'none'}, non-matching sign checks={bad_verdicts or 'none'}",
-            citation=f"{layout.arm_yaml}, {layout.gripper_yaml} vs facts.joints.*.sign_check.verdict",
+            citation=f"{citation} vs facts.joints.*.sign_check.verdict",
             compared=compared,
             remedy="remove any sign/direction/offset/invert key from the vendor joint config; re-run the facts sign check",
         )
@@ -370,12 +413,14 @@ def check_direction(layout: VendorLayout, facts: dict) -> Check:
         "V-DIRECTION",
         PASS,
         "no direction/offset keys; every facts sign_check verdict is 'match'",
-        citation=f"{layout.arm_yaml}, {layout.gripper_yaml} vs facts.joints.*.sign_check.verdict",
+        citation=f"{citation} vs facts.joints.*.sign_check.verdict",
         compared=compared,
     )
 
 
 def check_zero(layout: VendorLayout, facts: dict) -> Check:
+    arm_text = _read_text(layout.arm_yaml)
+    gripper_text = _read_text(layout.gripper_yaml)
     arm_cfg = _read_yaml(layout.arm_yaml) or {}
     gripper_cfg = _read_yaml(layout.gripper_yaml) or {}
     zero_hits = {}
@@ -390,6 +435,11 @@ def check_zero(layout: VendorLayout, facts: dict) -> Check:
     compared = {"zero_keys_found": zero_hits, "facts.zero.consistent_with_urdf_home": consistent,
                 "facts.zero.verified_after_power_cycle": verified}
 
+    found_keys = sorted({k for hits in zero_hits.values() for k in hits})
+    citation = _cite_multi(
+        (layout.arm_yaml, arm_text, found_keys or ["joints:"]),
+        (layout.gripper_yaml, gripper_text, found_keys or ["gripper:"]),
+    )
     ok = not zero_hits and bool(consistent) and bool(verified)
     return Check(
         "V-ZERO",
@@ -397,7 +447,7 @@ def check_zero(layout: VendorLayout, facts: dict) -> Check:
         "no zero-offset keys in vendor configs; facts zero is consistent with the URDF home"
         if ok
         else f"zero_keys={zero_hits or 'none'} consistent={consistent!r} verified={verified!r}",
-        citation=f"{layout.arm_yaml}, {layout.gripper_yaml} vs facts.zero",
+        citation=f"{citation} vs facts.zero",
         compared=compared,
         remedy="" if ok else "remove zero-offset keys from vendor configs, or re-run the facts zero procedure",
     )
@@ -407,14 +457,14 @@ def check_gripper_sign(layout: VendorLayout, facts: dict) -> Check:
     services_src = _read_text(layout.ros_services)
     publishers_src = _read_text(layout.ros_publishers)
 
-    def _const(src: str, name: str) -> Optional[float]:
+    def _const(src: str, name: str) -> tuple[Optional[float], Optional[re.Match]]:
         m = re.search(rf"{name}\s*=\s*(-?\d+\.?\d*)", src)
-        return float(m.group(1)) if m else None
+        return (float(m.group(1)), m) if m else (None, None)
 
-    open_pos = _const(services_src, "_GRIPPER_OPEN_POSITION")
-    close_pos = _const(services_src, "_GRIPPER_CLOSE_POSITION")
-    open_motor = _const(publishers_src, "_GRIPPER_OPEN_MOTOR_POSITION")
-    closed_motor = _const(publishers_src, "_GRIPPER_CLOSED_MOTOR_POSITION")
+    open_pos, open_m = _const(services_src, "_GRIPPER_OPEN_POSITION")
+    close_pos, close_m = _const(services_src, "_GRIPPER_CLOSE_POSITION")
+    open_motor, open_motor_m = _const(publishers_src, "_GRIPPER_OPEN_MOTOR_POSITION")
+    closed_motor, closed_motor_m = _const(publishers_src, "_GRIPPER_CLOSED_MOTOR_POSITION")
     facts_open_sign = ((facts.get("joints") or {}).get("gripper") or {}).get("open_sign")
 
     compared = {
@@ -424,6 +474,14 @@ def check_gripper_sign(layout: VendorLayout, facts: dict) -> Check:
         "ros_publishers._GRIPPER_CLOSED_MOTOR_POSITION": closed_motor,
         "facts.joints.gripper.open_sign": facts_open_sign,
     }
+    services_lines = sorted({ln for ln in (_mline(services_src, open_m), _mline(services_src, close_m)) if ln})
+    publishers_lines = sorted({ln for ln in (_mline(publishers_src, open_motor_m), _mline(publishers_src, closed_motor_m)) if ln})
+    citation_parts = []
+    if services_lines:
+        citation_parts.append(f"{layout.ros_services}:{','.join(map(str, services_lines))}")
+    if publishers_lines:
+        citation_parts.append(f"{layout.ros_publishers}:{','.join(map(str, publishers_lines))}")
+    citation = (", ".join(citation_parts) or f"{layout.ros_services}, {layout.ros_publishers}") + " vs facts.joints.gripper.open_sign"
     ok = (
         open_pos is not None and open_pos < 0
         and close_pos == 0.0
@@ -437,7 +495,7 @@ def check_gripper_sign(layout: VendorLayout, facts: dict) -> Check:
         "gripper open is negative, closed is 0.0, matching facts.open_sign"
         if ok
         else "gripper open/closed sign does not match the negative-open convention",
-        citation=f"{layout.ros_services}:16-17, {layout.ros_publishers}:7-8 vs facts.joints.gripper.open_sign",
+        citation=citation,
         compared=compared,
         remedy="" if ok else "fix _GRIPPER_OPEN_POSITION/_GRIPPER_OPEN_MOTOR_POSITION to be negative with a 0.0 closed position",
     )
@@ -457,15 +515,19 @@ def check_gripper_range(layout: VendorLayout, facts: dict) -> Check:
         "vendor_full_open_command": float(m1.group(1)) if m1 else None,
         "publisher_full_open_rad": float(m2.group(1)) if m2 else None,
     }
+    citation = (
+        f"{_cite(layout.ros_services, services_src, '_GRIPPER_OPEN_POSITION')}, "
+        f"{_cite(layout.ros_publishers, publishers_src, '_GRIPPER_OPEN_MOTOR_POSITION')} vs facts.joints.gripper"
+    )
     if full_open_rad is not None:
-        return Check("V-GRIPPER-RANGE", PASS, "full_open_rad has been measured", compared=compared)
+        return Check("V-GRIPPER-RANGE", PASS, "full_open_rad has been measured", citation=citation, compared=compared)
     return Check(
         "V-GRIPPER-RANGE",
         WARN,
         "the vendor full-open command and the publisher's full-open constant are unverified on "
         "this unit: facts.full_open_rad is null and the largest observed opening is "
         f"{largest_observed} rad",
-        citation=f"{layout.ros_services}:16, {layout.ros_publishers}:7 vs facts.joints.gripper",
+        citation=citation,
         compared=compared,
         remedy="measure the true full-open motor angle before relying on the -4.9/-5.0 rad constants",
     )
@@ -482,13 +544,14 @@ def check_gripper_width(layout: VendorLayout, limits: dict) -> Check:
         "published_max_half_width_m": published_half_width,
         "urdf_gripper_joint_upper_m": urdf_upper,
     }
+    citation = f"{_cite(layout.ros_publishers, publishers_src, '_GRIPPER_MAX_WIDTH')} vs b601_dm_limits.yaml joints.gripper_joint1.upper"
     if published_half_width is not None and urdf_upper is not None and abs(published_half_width - urdf_upper) < 1e-9:
-        return Check("V-GRIPPER-WIDTH", PASS, "published finger width matches the URDF upper limit", compared=compared)
+        return Check("V-GRIPPER-WIDTH", PASS, "published finger width matches the URDF upper limit", citation=citation, compared=compared)
     return Check(
         "V-GRIPPER-WIDTH",
         WARN,
         f"published finger width max {published_half_width} m vs URDF gripper_joint1/2 upper {urdf_upper} m",
-        citation=f"{layout.ros_publishers}:9,15 vs b601_dm_limits.yaml joints.gripper_joint1.upper",
+        citation=citation,
         compared=compared,
         remedy="reconcile the publisher's _GRIPPER_MAX_WIDTH with the URDF finger travel, or document the discrepancy",
     )
@@ -496,7 +559,12 @@ def check_gripper_width(layout: VendorLayout, limits: dict) -> Check:
 
 def check_gripper_units(layout: VendorLayout) -> Check:
     actions_src = _read_text(layout.ros_actions)
+    hw_src = _read_text(layout.hardware_manager)
     hit = "set_gripper_target(goal.position)" in actions_src
+    citation = _cite_multi(
+        (layout.ros_actions, actions_src, ["set_gripper_target(goal.position)"]),
+        (layout.hardware_manager, hw_src, ["def set_gripper_target"]),
+    )
     return Check(
         "V-GRIPPER-UNITS",
         WARN,
@@ -504,13 +572,14 @@ def check_gripper_units(layout: VendorLayout) -> Check:
         "set_gripper_target as motor radians"
         if hit
         else "could not confirm the goal.position -> motor-radians passthrough",
-        citation=f"{layout.ros_actions} execute_gripper_command, {layout.hardware_manager} set_gripper_target",
+        citation=citation,
         compared={"goal_position_passed_as_motor_radians": hit},
         remedy="convert GripperCommand goal.position (metres) to a motor angle before calling set_gripper_target",
     )
 
 
 def check_safe_park(layout: VendorLayout, limits: dict) -> Check:
+    safe_park_text = _read_text(layout.safe_park_yaml)
     safe_park = (_read_yaml(layout.safe_park_yaml) or {}).get("reBotArmController", {}).get("ros__parameters", {})
     enabled = bool(safe_park.get("safe_park_enabled"))
     q = safe_park.get("safe_park_q") or []
@@ -528,17 +597,22 @@ def check_safe_park(layout: VendorLayout, limits: dict) -> Check:
     compared = {"safe_park_enabled": enabled, "safe_park_q": q, "violations": violations}
     hw_src = _read_text(layout.hardware_manager)
     seeds_on_connect = "_seed_endpos_target" in hw_src and "connect" in hw_src
-    parks_on_shutdown = "safe_park()" in hw_src and "shutdown" in hw_src
+    parks_on_shutdown = "self.safe_park()" in hw_src and "shutdown" in hw_src
+
+    config_citation = _cite(layout.safe_park_yaml, safe_park_text, "safe_park_q:")
+    hw_citation = (
+        f"{_cite(layout.hardware_manager, hw_src, 'def connect', '_seed_endpos_target()')} seeds this "
+        f"target at connect; {_cite(layout.hardware_manager, hw_src, 'def shutdown', 'self.safe_park()')} "
+        "parks to it on shutdown"
+    )
+    citation = f"{config_citation} vs b601_dm_limits.yaml; {hw_citation}"
 
     if enabled and violations:
         return Check(
             "V-SAFE-PARK",
             FAIL,
             f"safe_park enabled with safe_park_q outside the joint limits: {violations}",
-            citation=(
-                f"{layout.safe_park_yaml} vs b601_dm_limits.yaml; "
-                f"{layout.hardware_manager} seeds this target at connect and parks to it on shutdown"
-            ),
+            citation=citation,
             compared=compared,
             remedy="fix safe_park_q so every joint is within b601_dm_limits.yaml, or disable safe_park until it is",
         )
@@ -547,7 +621,7 @@ def check_safe_park(layout: VendorLayout, limits: dict) -> Check:
         "V-SAFE-PARK",
         status,
         "safe_park_q is within every joint limit" if status == PASS else "safe_park_q violates a joint limit",
-        citation=f"{layout.safe_park_yaml} vs b601_dm_limits.yaml",
+        citation=citation,
         compared={**compared, "seeds_on_connect": seeds_on_connect, "parks_on_shutdown": parks_on_shutdown},
     )
 
@@ -556,6 +630,10 @@ def check_startup(layout: VendorLayout) -> Check:
     hw_src = _read_text(layout.hardware_manager)
     has_mode_write = "mode_pos_vel" in hw_src
     has_enable_all = "enable_all" in hw_src
+    citation = (
+        f"{_cite(layout.hardware_manager, hw_src, 'def connect', 'def init_gripper')} connect()/init_gripper(); "
+        f"{_cite(layout.hardware_manager, hw_src, '.start()')} SDK start (ArmEndPos)"
+    )
     return Check(
         "V-STARTUP",
         WARN,
@@ -563,13 +641,14 @@ def check_startup(layout: VendorLayout) -> Check:
         "(including the gripper) before starting the position-hold loop"
         if (has_mode_write and has_enable_all)
         else "could not confirm the mode_pos_vel/enable_all startup sequence",
-        citation=f"{layout.hardware_manager} connect()/init_gripper()",
+        citation=citation,
         compared={"mode_pos_vel_present": has_mode_write, "enable_all_present": has_enable_all},
         remedy="confirm with the operator that every motor should energise on driver launch",
     )
 
 
 def check_gains(layout: VendorLayout, limits: dict, kp_cap: float, kd_cap: float) -> Check:
+    arm_text = _read_text(layout.arm_yaml)
     arm_cfg = _read_yaml(layout.arm_yaml) or {}
     joints_limits = limits.get("joints") or {}
     over_velocity = []
@@ -587,14 +666,18 @@ def check_gains(layout: VendorLayout, limits: dict, kp_cap: float, kd_cap: float
         if kd is not None and kd > kd_cap:
             over_gain.append({"joint": name, "kd": kd, "kd_cap": kd_cap})
     compared = {"over_velocity": over_velocity, "over_gain": over_gain}
+    citation = (
+        f"{_cite(layout.arm_yaml, arm_text, 'POS_VEL:', 'MIT:')} POS_VEL.vlim/MIT.kp,kd vs "
+        "b601_dm_limits.yaml velocity and the 2026-10-10 bring-up caps (operator statement)"
+    )
     if not over_velocity and not over_gain:
-        return Check("V-GAINS", PASS, "POS_VEL vlim and MIT kp/kd are within the planning/bring-up caps", compared=compared)
+        return Check("V-GAINS", PASS, "POS_VEL vlim and MIT kp/kd are within the planning/bring-up caps", citation=citation, compared=compared)
     return Check(
         "V-GAINS",
         WARN,
         f"POS_VEL vlim exceeds the planning velocity limit for {[v['joint'] for v in over_velocity]}; "
         f"MIT kp/kd exceeds the bring-up cap for {[g['joint'] for g in over_gain]}",
-        citation=f"{layout.arm_yaml} POS_VEL.vlim/MIT.kp,kd vs b601_dm_limits.yaml velocity and the 2026-10-10 bring-up caps (operator statement)",
+        citation=citation,
         compared=compared,
         remedy="lower POS_VEL vlim to the planning velocity limit and MIT kp/kd to the bring-up caps before any real run",
     )
@@ -605,7 +688,7 @@ def check_sdk_api(layout: VendorLayout) -> Check:
     wanted = _wanted_sdk_imports(hw_src)
 
     missing: list[str] = []
-    for submodule, names in wanted:
+    for submodule, names, _lineno in wanted:
         if submodule in ("actuator", "controllers"):
             init_path = layout.actuator_init if submodule == "actuator" else layout.controllers_init
             exported = _exported_names(_read_text(init_path)) if init_path.is_file() else set()
@@ -619,21 +702,25 @@ def check_sdk_api(layout: VendorLayout) -> Check:
                     missing.append(f"actuator.gripper.{name}")
 
     head = _git_head_commit(layout.sdk_git_dir)
-    compared = {"wanted_imports": wanted, "missing": missing, "sdk_head": head}
+    import_lines = sorted({lineno for _submodule, _names, lineno in wanted})
+    import_citation = f"{layout.hardware_manager}:{','.join(map(str, import_lines))}" if import_lines else str(layout.hardware_manager)
+    compared = {"wanted_imports": [(s, n) for s, n, _l in wanted], "missing": missing, "sdk_head": head}
     if missing:
         return Check(
             "V-SDK-API",
             FAIL,
             f"the vendored SDK does not export: {missing} (SDK HEAD {head})",
-            citation=(
-                f"{layout.hardware_manager} imports vs {layout.actuator_init}/{layout.controllers_init}/"
-                f"{layout.gripper_module}; commit 8427281 is the last known SDK commit exporting "
-                "RobotArm and ArmEndPos"
-            ),
+            citation=f"{import_citation} imports vs {layout.actuator_init}, {layout.controllers_init}, {layout.gripper_module}",
             compared=compared,
             remedy="pin the vendored SDK submodule to a commit that exports these names, or update hardware_manager.py's imports to the SDK's current API",
         )
-    return Check("V-SDK-API", PASS, f"every import hardware_manager.py needs is exported by the SDK (HEAD {head})", compared=compared)
+    return Check(
+        "V-SDK-API",
+        PASS,
+        f"every import hardware_manager.py needs is exported by the SDK (HEAD {head})",
+        citation=f"{import_citation} imports vs {layout.actuator_init}, {layout.controllers_init}, {layout.gripper_module}",
+        compared=compared,
+    )
 
 
 def check_pydeps(driver_pythonpaths: list[str]) -> Check:
@@ -652,29 +739,44 @@ def check_pydeps(driver_pythonpaths: list[str]) -> Check:
         if not hits:
             missing.append(pkg)
     compared = {"search_dirs": search_dirs, "found": found}
+    citation_parts = []
+    for pkg in ("motorbridge", "pinocchio"):
+        hits = found.get(pkg) or []
+        base = Path(hits[0]) if hits else Path(search_dirs[0] if search_dirs else ".")
+        citation_parts.append(f"{base / pkg}:1")
+    citation = ", ".join(citation_parts)
     if missing:
         return Check(
             "V-PYDEPS",
             FAIL,
             f"not importable on the driver interpreter's search path: {missing}",
-            citation="filesystem search of the standard py3.10 dist-packages/site-packages locations",
+            citation=citation,
             compared=compared,
             remedy="install motorbridge and pinocchio into the interpreter the driver actually runs under (/usr/bin/python3), or pass --driver-pythonpath",
         )
-    return Check("V-PYDEPS", PASS, "motorbridge and pinocchio are both importable on the driver interpreter's search path", compared=compared)
+    return Check(
+        "V-PYDEPS",
+        PASS,
+        "motorbridge and pinocchio are both importable on the driver interpreter's search path",
+        citation=citation,
+        compared=compared,
+    )
 
 
 def check_qos(executor_path: Path) -> Check:
     src = _read_text(executor_path)
-    calls = re.findall(
+    matches = list(re.finditer(
         r"create_subscription\(\s*JointState\s*,\s*[^,]+,\s*[^,]+,\s*([^\)]+)\)", src
-    )
-    if not calls:
-        return Check("V-QOS", WARN, f"no JointState subscription found in {executor_path}")
+    ))
+    if not matches:
+        return Check("V-QOS", WARN, f"no JointState subscription found in {executor_path}", citation=str(executor_path))
+
+    calls = [m.group(1).strip() for m in matches]
+    lines = sorted({_mline(src, m) for m in matches})
+    citation = f"{executor_path}:{','.join(map(str, lines))} vs the vendor driver's qos_profile_sensor_data joint_states publisher"
 
     unresolved = []
     for qos_expr in calls:
-        qos_expr = qos_expr.strip()
         if qos_expr == "qos_profile_sensor_data":
             continue
         if re.search(rf"\b{re.escape(qos_expr)}\s*=\s*qos_profile_sensor_data\b", src):
@@ -687,11 +789,11 @@ def check_qos(executor_path: Path) -> Check:
             "V-QOS",
             FAIL,
             f"joint_states subscription QoS not confirmed BEST_EFFORT/sensor-data: {unresolved}",
-            citation=f"{executor_path} vs the vendor driver's qos_profile_sensor_data joint_states publisher",
+            citation=citation,
             compared=compared,
             remedy="subscribe to joint_states with rclpy.qos.qos_profile_sensor_data (BEST_EFFORT), matching the vendor driver's publisher",
         )
-    return Check("V-QOS", PASS, "joint_states subscription(s) use qos_profile_sensor_data (BEST_EFFORT)", compared=compared)
+    return Check("V-QOS", PASS, "joint_states subscription(s) use qos_profile_sensor_data (BEST_EFFORT)", citation=citation, compared=compared)
 
 
 def check_profile(layout: VendorLayout, execution_cfg: dict) -> Check:
@@ -709,6 +811,9 @@ def check_profile(layout: VendorLayout, execution_cfg: dict) -> Check:
     expected_arm_status = f"/{namespace}/arm_status" if namespace else None
 
     vendor_profile = (execution_cfg.get("driver_profiles") or {}).get("vendor") or {}
+    action_idx = actions_src.find('f"/{namespace}/follow_joint_trajectory"')
+    joint_states_idx = publishers_src.find('f"/{namespace}/joint_states"')
+    arm_status_idx = publishers_src.find('f"/{namespace}/arm_status"')
     compared = {
         "driver_node_name": node_name,
         "driver_namespace": namespace,
@@ -716,10 +821,21 @@ def check_profile(layout: VendorLayout, execution_cfg: dict) -> Check:
         "expected_joint_states_topic": expected_joint_states,
         "expected_arm_status_topic": expected_arm_status,
         "execution_yaml.vendor": vendor_profile,
-        "action_template_in_ros_actions": f'f"/{{namespace}}/follow_joint_trajectory"' in actions_src,
-        "joint_states_template_in_ros_publishers": f'f"/{{namespace}}/joint_states"' in publishers_src,
-        "arm_status_template_in_ros_publishers": f'f"/{{namespace}}/arm_status"' in publishers_src,
+        "action_template_in_ros_actions": action_idx != -1,
+        "joint_states_template_in_ros_publishers": joint_states_idx != -1,
+        "arm_status_template_in_ros_publishers": arm_status_idx != -1,
     }
+
+    controller_lines = sorted({ln for ln in (_mline(controller_src, class_match), _mline(controller_src, ns_match)) if ln})
+    publishers_lines = sorted({_line_no(publishers_src, i) for i in (joint_states_idx, arm_status_idx) if i != -1})
+    citation_parts = []
+    if controller_lines:
+        citation_parts.append(f"{layout.rebotarm_controller}:{','.join(map(str, controller_lines))}")
+    if action_idx != -1:
+        citation_parts.append(f"{layout.ros_actions}:{_line_no(actions_src, action_idx)}")
+    if publishers_lines:
+        citation_parts.append(f"{layout.ros_publishers}:{','.join(map(str, publishers_lines))}")
+    citation = (", ".join(citation_parts) or f"{layout.rebotarm_controller}, {layout.ros_actions}, {layout.ros_publishers}") + " vs execution.yaml driver_profiles.vendor"
 
     ok = (
         node_name == vendor_profile.get("expected_node")
@@ -733,13 +849,14 @@ def check_profile(layout: VendorLayout, execution_cfg: dict) -> Check:
         "execution.yaml's vendor profile matches the driver's node name/namespace/topics"
         if ok
         else "execution.yaml's vendor profile does not match the driver",
-        citation=f"{layout.rebotarm_controller}, {layout.ros_actions}, {layout.ros_publishers} vs execution.yaml driver_profiles.vendor",
+        citation=citation,
         compared=compared,
         remedy="" if ok else "fix config/motion/execution.yaml's vendor profile (action/joint_states_topic/arm_status_topic/expected_node) to match the driver",
     )
 
 
 def check_arbitration(layout: VendorLayout) -> Check:
+    driver_params_text = _read_text(layout.driver_params_yaml)
     driver_params = (_read_yaml(layout.driver_params_yaml) or {}).get("reBotArmController", {}).get("ros__parameters", {})
     arbitration = driver_params.get("cmd_arbitration")
     status = PASS if arbitration == "reject" else FAIL
@@ -747,7 +864,7 @@ def check_arbitration(layout: VendorLayout) -> Check:
         "V-ARBITRATION",
         status,
         f"cmd_arbitration = {arbitration!r}",
-        citation=f"{layout.driver_params_yaml} reBotArmController.ros__parameters.cmd_arbitration",
+        citation=f"{_cite(layout.driver_params_yaml, driver_params_text, 'cmd_arbitration')} reBotArmController.ros__parameters.cmd_arbitration",
         compared={"cmd_arbitration": arbitration},
         remedy="" if status == PASS else "set cmd_arbitration: reject in driver_params.yaml",
     )
@@ -758,12 +875,13 @@ def check_urdf(layout: VendorLayout) -> Check:
     m = re.search(r'"urdf",\s*"([^"]+)"', launch_src)
     urdf_name = m.group(1) if m else None
     gripperless = bool(urdf_name) and "fixend" in urdf_name
+    citation = f"{layout.bringup_launch}:{_mline(launch_src, m)} urdf_file, docs/motion/ROBOT_MODEL.md §3" if m else f"{layout.bringup_launch} urdf_file, docs/motion/ROBOT_MODEL.md §3"
     return Check(
         "V-URDF",
         WARN if gripperless else PASS,
         f"bringup.launch.py publishes robot_description from {urdf_name!r}"
         + (" (gripper-less)" if gripperless else ""),
-        citation=f"{layout.bringup_launch} urdf_file, docs/motion/ROBOT_MODEL.md §3",
+        citation=citation,
         compared={"urdf_file": urdf_name, "gripperless": gripperless},
         remedy="repoint bringup.launch.py's robot_description at the gripper URDF if the real driver session needs the gripper in TF" if gripperless else "",
     )
