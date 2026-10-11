@@ -1,6 +1,6 @@
 # Progress — week of Mon Oct 05 – Sun Oct 11, 2026
 
-**36 task(s) completed and independently audited this week** · project total **79/124** accepted
+**37 task(s) completed and independently audited this week** · project total **79/124** accepted
 
 ## Notes
 
@@ -77,10 +77,12 @@
 …[363 chars clipped]
 - **GEOM-09.1 — Decision + contract: pixel-to-tool-pose uncertainty budget (ADR-018, INTERFACES §14)** ([details](GEOM-09.1.md)): Added ADR-018 and a new INTERFACES.md §14 that define how we'll audit the existing pixel-to-robot-arm position uncertainty calculation: breaking the total error estimate down into named causes (camera
 …[351 chars clipped]
+- **MOT-06.6 — plan_crack_path node/CLI: per-segment candidates, transit + approach/trace/retract, split fallback, independent re-check, plan file** ([details](MOT-06.6.md)): Implemented crackvision_motion.plan_crack_path: a MoveIt-calling ROS 2 node/CLI that plans every paths3d segment per docs/INTERFACES.md §13 — §13.3 segment order, §13.4 direction×roll candidates, §13.
+…[556 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 75 / 311
+- Implementation/review sessions run: 76 / 312
 - Audits that rejected work with evidence-backed findings: 26 (repairs created: 20)
 - Re-verified after an upstream change: CAM-02, CAM-05.1, CAM-05.2, GEOM-01, GEOM-01.R1, GEOM-08.1, GEOM-08.2, GEOM-08.2.R1, GEOM-08.5, GEOM-08.5.R1, GEOM-08.6, GEOM-08.7, GEOM-08.8, GEOM-08.8.R1, GEOM-10, MOT-02, MOT-03, MOT-04.1, MOT-04.1.R1, MOT-04.2, MOT-04.3, MOT-04.3.R1, MOT-04.4, MOT-04.4.R1, MOT-04.6, MOT-04.6.R1, MOT-05.1, MOT-05.1.R1, MOT-05.2, MOT-05.4, MOT-05.4.R1, MOT-06.2, MOT-06.2.R1, MOT-06.3, MOT-06.3.R1, MOT-06.4, MOT-06.4.R1, MOT-06.5, MOT-06.5.R1, MOT-10.1, MOT-10.1.R1, MOT-10.1.R2, MOT-10.2, MOT-10.3, PERC-03, PERC-03.R1, TC-011, TC-016
 
