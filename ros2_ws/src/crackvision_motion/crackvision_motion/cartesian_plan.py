@@ -423,12 +423,20 @@ def add_segment_report(
             )
         status = "surface_scene_mismatch"
     elif trace_waypoints_planned == trace_waypoints_total:
+        if chosen_out is None:
+            raise CartesianPlanError("status 'full' requires chosen != null")
         status = "full"
     elif trace_waypoints_planned == 0:
         if candidates_tried == 0:
             raise CartesianPlanError("status 'failed' requires candidates_tried > 0 (else it is a mismatch)")
+        if chosen_out is not None:
+            raise CartesianPlanError("status 'failed' requires chosen == null")
+        if not reasons_list:
+            raise CartesianPlanError("status 'failed' requires at least one reason")
         status = "failed"
     else:
+        if chosen_out is None:
+            raise CartesianPlanError("status 'partial' requires chosen != null")
         status = "partial"
 
     entry = {
@@ -484,8 +492,19 @@ def finalize(
         raise CartesianPlanError(f"segments[] is missing original segment(s): {sorted(missing)}")
 
     plan["coverage"] = _compute_coverage(plan["segments"], paths3d_doc["counts"])
-    execution_eligible = plan.get("sources", {}).get("paths3d", {}).get("execution_eligible")
-    plan["caveats"] = build_caveats(task_frame_note, execution_eligible)
+
+    doc_eligible = paths3d_doc["execution_eligible"]
+    if not isinstance(doc_eligible, bool):
+        raise CartesianPlanError(f"paths3d_doc 'execution_eligible' must be a bool, got {doc_eligible!r}")
+    sources_paths3d = plan["sources"]["paths3d"]
+    existing_eligible = sources_paths3d.get("execution_eligible")
+    if existing_eligible is not None and existing_eligible != doc_eligible:
+        raise CartesianPlanError(
+            f"'sources.paths3d.execution_eligible' ({existing_eligible!r}) does not match the "
+            f"paths3d file's 'execution_eligible' ({doc_eligible!r})"
+        )
+    sources_paths3d["execution_eligible"] = doc_eligible
+    plan["caveats"] = build_caveats(task_frame_note, doc_eligible)
 
     validate_plan(plan, limits)
     return plan
@@ -534,12 +553,20 @@ def _validate_segment_report(v: object, ctx: str) -> Dict[str, Any]:
     elif status == "full":
         if tw_planned != tw_total:
             raise CartesianPlanError(f"'{ctx}' status 'full' requires trace_waypoints.planned == total")
+        if chosen is None:
+            raise CartesianPlanError(f"'{ctx}' status 'full' requires chosen != null")
     elif status == "failed":
         if tw_planned != 0 or candidates_tried == 0:
             raise CartesianPlanError(f"'{ctx}' status 'failed' requires planned == 0 and candidates_tried > 0")
+        if chosen is not None:
+            raise CartesianPlanError(f"'{ctx}' status 'failed' requires chosen == null")
+        if not reasons:
+            raise CartesianPlanError(f"'{ctx}' status 'failed' requires at least one reason")
     else:  # partial
         if not (0 < tw_planned < tw_total):
             raise CartesianPlanError(f"'{ctx}' status 'partial' requires 0 < planned < total")
+        if chosen is None:
+            raise CartesianPlanError(f"'{ctx}' status 'partial' requires chosen != null")
 
     return {
         "segment_ref": segment_ref, "status": status, "reasons": reasons, "candidates_tried": candidates_tried,

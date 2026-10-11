@@ -94,13 +94,14 @@ def _end_state():
     return {"mode": "none", "positions_rad": None}
 
 
-def _paths3d_doc(points=100, valid=90, invalid_by_reason=None):
+def _paths3d_doc(points=100, valid=90, invalid_by_reason=None, execution_eligible=True):
     return {
         "counts": {
             "points": points,
             "valid": valid,
             "invalid_by_reason": invalid_by_reason or {"depth_invalid": 10},
-        }
+        },
+        "execution_eligible": execution_eligible,
     }
 
 
@@ -217,6 +218,30 @@ def test_add_segment_report_rejects_planned_over_total():
         add_segment_report(plan, _seg_ref(), [], 1, {"direction": "forward", "roll_offset_rad": 0.0}, 10, 11, 1.0, 1.0)
 
 
+def test_add_segment_report_failed_rejects_chosen_set():
+    plan = _bare_plan()
+    with pytest.raises(CartesianPlanError):
+        add_segment_report(plan, _seg_ref(), ["ik_failed"], 1, {"direction": "forward", "roll_offset_rad": 0.0}, 10, 0, 1.0, 0.0)
+
+
+def test_add_segment_report_failed_rejects_empty_reasons():
+    plan = _bare_plan()
+    with pytest.raises(CartesianPlanError):
+        add_segment_report(plan, _seg_ref(), [], 1, None, 10, 0, 1.0, 0.0)
+
+
+def test_add_segment_report_full_requires_chosen():
+    plan = _bare_plan()
+    with pytest.raises(CartesianPlanError):
+        add_segment_report(plan, _seg_ref(), [], 1, None, 10, 10, 1.0, 1.0)
+
+
+def test_add_segment_report_partial_requires_chosen():
+    plan = _bare_plan()
+    with pytest.raises(CartesianPlanError):
+        add_segment_report(plan, _seg_ref(), ["cartesian_incomplete"], 1, None, 10, 6, 1.0, 0.6)
+
+
 # --------------------------------------------------------------------------------------
 # finalize: coverage arithmetic on hand-built examples
 # --------------------------------------------------------------------------------------
@@ -313,9 +338,26 @@ def test_finalize_sets_caveats_disclaimer_first():
 
 def test_finalize_ineligible_note_when_execution_ineligible():
     plan, tasks = _plan_with_one_full_leg_pair_and_segment()
-    plan["sources"]["paths3d"]["execution_eligible"] = False
-    finalize(plan, _paths3d_doc(), tasks, LIMITS)
+    plan["sources"]["paths3d"]["execution_eligible"] = None
+    finalize(plan, _paths3d_doc(execution_eligible=False), tasks, LIMITS)
+    assert plan["sources"]["paths3d"]["execution_eligible"] is False
     assert any("ineligible" in c.lower() for c in plan["caveats"])
+
+
+def test_finalize_copies_execution_eligible_from_paths3d_doc():
+    plan, tasks = _plan_with_one_full_leg_pair_and_segment()
+    plan["sources"]["paths3d"]["execution_eligible"] = None
+    finalize(plan, _paths3d_doc(execution_eligible=True), tasks, LIMITS)
+    assert plan["sources"]["paths3d"]["execution_eligible"] is True
+    assert not any("ineligible" in c.lower() for c in plan["caveats"])
+
+
+def test_finalize_raises_on_execution_eligible_mismatch():
+    plan, tasks = _plan_with_one_full_leg_pair_and_segment()
+    # _sources() sets sources.paths3d.execution_eligible to True; a paths3d_doc disagreeing
+    # with it must be rejected rather than silently trusted.
+    with pytest.raises(CartesianPlanError):
+        finalize(plan, _paths3d_doc(execution_eligible=False), tasks, LIMITS)
 
 
 # --------------------------------------------------------------------------------------
@@ -452,6 +494,44 @@ def test_validate_plan_rejects_segment_ref_bad_polyline_kind():
 def test_validate_plan_rejects_status_inconsistent_with_counts():
     plan = _finalized_plan_with_two_legs()
     plan["segments"][0]["status"] = "partial"
+    with pytest.raises(CartesianPlanError):
+        validate_plan(plan, LIMITS)
+
+
+def test_validate_plan_rejects_failed_with_chosen_set():
+    plan = _finalized_plan_with_two_legs()
+    plan["segments"][0]["status"] = "failed"
+    plan["segments"][0]["reasons"] = ["ik_failed"]
+    plan["segments"][0]["trace_waypoints"]["planned"] = 0
+    plan["segments"][0]["trace_length_m"]["planned"] = 0.0
+    with pytest.raises(CartesianPlanError):
+        validate_plan(plan, LIMITS)
+
+
+def test_validate_plan_rejects_failed_with_empty_reasons():
+    plan = _finalized_plan_with_two_legs()
+    plan["segments"][0]["status"] = "failed"
+    plan["segments"][0]["reasons"] = []
+    plan["segments"][0]["chosen"] = None
+    plan["segments"][0]["trace_waypoints"]["planned"] = 0
+    plan["segments"][0]["trace_length_m"]["planned"] = 0.0
+    with pytest.raises(CartesianPlanError):
+        validate_plan(plan, LIMITS)
+
+
+def test_validate_plan_rejects_full_with_chosen_none():
+    plan = _finalized_plan_with_two_legs()
+    plan["segments"][0]["chosen"] = None
+    with pytest.raises(CartesianPlanError):
+        validate_plan(plan, LIMITS)
+
+
+def test_validate_plan_rejects_partial_with_chosen_none():
+    plan = _finalized_plan_with_two_legs()
+    plan["segments"][0]["status"] = "partial"
+    plan["segments"][0]["chosen"] = None
+    plan["segments"][0]["trace_waypoints"]["planned"] = 6
+    plan["segments"][0]["trace_length_m"]["planned"] = 0.6
     with pytest.raises(CartesianPlanError):
         validate_plan(plan, LIMITS)
 
