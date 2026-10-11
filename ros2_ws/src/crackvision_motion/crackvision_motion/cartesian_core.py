@@ -42,8 +42,8 @@ _MIN_REMAINDER_WAYPOINTS = 3
 
 _TOP_LEVEL_KEYS = frozenset({
     "schema", "candidates", "cartesian", "recheck", "splitting", "end_state",
-    "surface_object_id", "surface_object_tolerance_m", "service_timeout_s", "view",
-    "value_status", "sources",
+    "surface_object_id", "surface_object_tolerance_m", "service_timeout_s", "ik_solver_timeout_s",
+    "view", "value_status", "sources",
 })
 _CANDIDATES_KEYS = frozenset({"roll_offsets_deg"})
 _CARTESIAN_KEYS = frozenset({
@@ -281,6 +281,12 @@ def load_config(path: Union[str, Path]) -> Dict[str, Any]:
     if service_timeout_s <= 0:
         raise CartesianConfigError(f"'service_timeout_s' must be > 0, got {service_timeout_s}")
 
+    ik_solver_timeout_s = _as_float(
+        _require(raw, "ik_solver_timeout_s", "<root>"), "ik_solver_timeout_s"
+    )
+    if ik_solver_timeout_s <= 0:
+        raise CartesianConfigError(f"'ik_solver_timeout_s' must be > 0, got {ik_solver_timeout_s}")
+
     view_cfg = _load_view(_require(raw, "view", "<root>"))
 
     value_status = _require(raw, "value_status", "<root>")
@@ -304,6 +310,7 @@ def load_config(path: Union[str, Path]) -> Dict[str, Any]:
         "surface_object_id": surface_object_id,
         "surface_object_tolerance_m": surface_object_tolerance_m,
         "service_timeout_s": service_timeout_s,
+        "ik_solver_timeout_s": ik_solver_timeout_s,
         "view": view_cfg,
         "value_status": value_status,
         "sources": dict(sources),

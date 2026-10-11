@@ -1,0 +1,41 @@
+# test/fixtures/cartesian/trace_full/scene.yaml — test-only collision scene for
+# scripts/ros/test_plan_trace_full.sh (MOT-06.11). Mirrors config/scene/scene.yaml's schema and
+# docs/motion/CARTESIAN_PROBE.md's own probe-local scene: a table top at z=0 plus a 0.20x0.20 m
+# specimen box whose top face sits at z=0.010 m, centred at the recommended placement (0.26, 0.0)
+# from config/motion/specimen_placement.yaml. Committed test fixture, never read by production
+# code paths -- config/scene/scene.yaml itself is untouched by this card.
+schema: crackvision.scene_config/1
+frame: base_link
+
+objects:
+  - id: table
+    shape: box
+    dimensions_m: [1.0, 1.0, 0.02]
+    pose:
+      frame: base_link
+      position_m: [0.0, 0.0, -0.01]
+      rpy_rad: [0.0, 0.0, 0.0]
+    value_status: nominal
+    source: "Test-only fixture scene (MOT-06.11): mirrors CARTESIAN_PROBE.md's own probe-local table, top face at z=0 so the robot base (bolted to it) does not collide."
+
+  - id: specimen
+    shape: box
+    dimensions_m: [0.20, 0.20, 0.05]
+    pose:
+      frame: base_link
+      position_m: [0.26, 0.0, -0.015]
+      rpy_rad: [0.0, 0.0, 0.0]
+    value_status: nominal
+    source: "Test-only fixture scene (MOT-06.11): specimen top face at z=0.010 centred at the recommended placement (0.26, 0.0, specimen_placement.yaml), matching CARTESIAN_PROBE.md's own probe-local specimen box exactly."
+
+allowed_collisions:
+  - link_a: table
+    link_b: base_link
+    reason: "the robot base is bolted to the table, so the table top (z=0) and the base necessarily touch/overlap"
+    value_status: nominal
+    source: "Test-only fixture scene (MOT-06.11): same mounting assumption as config/scene/scene.yaml."
+  - link_a: specimen
+    link_b: table
+    reason: "the specimen rests directly on the table top"
+    value_status: nominal
+    source: "Test-only fixture scene (MOT-06.11): same placement assumption as config/scene/scene.yaml."

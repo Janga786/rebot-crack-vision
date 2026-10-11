@@ -68,12 +68,17 @@ _GOAL_JOINT_TOLERANCE_RAD = 0.001
 _IK_INFEASIBLE_CODES = frozenset({MoveItErrorCodes.NO_IK_SOLUTION, MoveItErrorCodes.TIMED_OUT})
 
 # `build_ik_request`'s `ik_request.timeout` (the solver's own internal budget) is
-# `cfg['service_timeout_s']`; the TRAC-IK solver runs for the *full* requested timeout when no
-# solution exists (CARTESIAN_PROBE.md's NO_IK_SOLUTION case), so a `/compute_ik` *call* timeout
-# equal to that same value races the solver's own completion. `ik_call_timeout_s()` below adds
-# this margin to the call-side wait, mirroring reachability_sweep.py's `_IK_CALL_TIMEOUT_MARGIN_S`
-# -- callers must pass its result as `MoveItClients.call(..., timeout_s=ik_call_timeout_s(cfg))`
-# for `/compute_ik`, never the bare `cfg['service_timeout_s']` default.
+# `cfg['ik_solver_timeout_s']` -- a *separate* budget from `cfg['service_timeout_s']` (MOT-06.11,
+# docs/INTERFACES.md §15): the TRAC-IK `Distance` solve type this install's kinematics.yaml
+# configures runs for the *full* requested timeout on every call, success or failure alike
+# (measured: ~0.05 s at `ik_solver_timeout_s: 0.05`, ~2.0 s when this field was still
+# `service_timeout_s: 2.0`, ADR-017 addendum) -- so this budget must stay small and independent of
+# whatever `service_timeout_s` needs to be for a body-sized Cartesian trace call (several seconds,
+# ADR-017 addendum), or every `/compute_ik` call would cost that same multi-second budget too.
+# `ik_call_timeout_s()` below adds a margin to the call-side wait so it never races the solver's
+# own completion, mirroring reachability_sweep.py's `_IK_CALL_TIMEOUT_MARGIN_S` -- callers must
+# pass its result as `MoveItClients.call(..., timeout_s=ik_call_timeout_s(cfg))` for
+# `/compute_ik`, never the bare `cfg['service_timeout_s']` default.
 _IK_CALL_TIMEOUT_MARGIN_S = 2.0
 
 _MOVEIT_ERROR_CODE_NAMES = {
@@ -187,10 +192,11 @@ def build_ik_request(
 ) -> GetPositionIK.Request:
     """`/compute_ik` request for `pose`, seeded from `seed` (reuses
     `reachability_sweep._build_ik_request`'s field layout). `avoid_collisions` is unconditionally
-    `True`; the solver timeout is `cfg['service_timeout_s']` -- §13.2 has no separate IK-solver
-    timeout key, so the one `cartesian_planning.yaml` timeout value is reused as the request's own
-    internal solver budget. The call-side wait must use `ik_call_timeout_s(cfg)` instead of this
-    same value (see `_IK_CALL_TIMEOUT_MARGIN_S` above), so the solver always finishes first."""
+    `True`; the solver timeout is `cfg['ik_solver_timeout_s']` (docs/INTERFACES.md §15, MOT-06.11)
+    -- a dedicated, small IK-solver budget, independent of `cfg['service_timeout_s']` (the
+    per-call wait for the slower Cartesian/motion-plan calls). The call-side wait must use
+    `ik_call_timeout_s(cfg)` instead of this same value (see `_IK_CALL_TIMEOUT_MARGIN_S` above), so
+    the solver always finishes first."""
     req = GetPositionIK.Request()
     req.ik_request.group_name = GROUP
     req.ik_request.ik_link_name = link_name
@@ -199,7 +205,7 @@ def build_ik_request(
     ps.header.frame_id = FRAME
     ps.pose = _pose_msg(pose)
     req.ik_request.pose_stamped = ps
-    timeout_s = float(cfg["service_timeout_s"])
+    timeout_s = float(cfg["ik_solver_timeout_s"])
     sec = int(timeout_s)
     req.ik_request.timeout.sec = sec
     req.ik_request.timeout.nanosec = int(round((timeout_s - sec) * 1e9))
@@ -208,11 +214,11 @@ def build_ik_request(
 
 
 def ik_call_timeout_s(cfg: Dict[str, Any]) -> float:
-    """The `/compute_ik` *call's* wait timeout: `cfg['service_timeout_s']` (the solver budget
+    """The `/compute_ik` *call's* wait timeout: `cfg['ik_solver_timeout_s']` (the solver budget
     `build_ik_request` puts in the request) plus `_IK_CALL_TIMEOUT_MARGIN_S`, so the call never
     times out before the solver itself can report `NO_IK_SOLUTION`/`TIMED_OUT` (§13.5 step 1).
     Callers must pass this as `MoveItClients.call(clients['ik'], req, timeout_s=ik_call_timeout_s(cfg))`."""
-    return float(cfg["service_timeout_s"]) + _IK_CALL_TIMEOUT_MARGIN_S
+    return float(cfg["ik_solver_timeout_s"]) + _IK_CALL_TIMEOUT_MARGIN_S
 
 
 def build_fk_request(positions: Dict[str, float], links: Sequence[str]) -> GetPositionFK.Request:

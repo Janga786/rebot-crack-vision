@@ -2340,3 +2340,73 @@ present (unknown key or out-of-range value → exit 2, same convention as §13.2
 | `sigma_joint_rad` | float \| `null` | `null` (→ `0.001` nominal, ADR-018 §3) | overrides `b601_dm_limits.yaml`'s repeatability figure if given |
 
 ---
+
+## 15. Cartesian crack-path planning amendment: `fraction == 1.0` full-trace recheck and the
+`/compute_ik` solver budget (MOT-06.11)
+
+**Normative source:** the ADR-017 addendum (debugger D0010). This section **amends** §13.5 step 4,
+§13.7 and §13.8 as stated below — §13 itself is not edited in place, matching how this section's own
+convention (§8 amending §6) works elsewhere in this file. Nothing here changes §13.1–§13.4, §13.6,
+§13.9–§13.14 or §13.17.
+
+### 15.1 §13.5 step 4 full-ness is `fraction == 1.0` itself
+
+A candidate's step 4 (the Cartesian trace across every rolled trace pose) is judged **full** iff
+`/compute_cartesian_path`'s own response reports `fraction == 1.0` for that call — never by the
+§13.7 FK pointer walk. That walk stalls on a fully-completed but resampled trajectory (the ADR-017
+addendum measures this directly: a `fraction == 1.0` trace whose returned configurations are spaced
+wider, between consecutive configurations, than `2·recheck.fk_tolerance_m` can only ever advance the
+walk's pointer by one requested waypoint per configuration, and never recovers). The §13.7 pointer
+walk is unchanged and still the *only* method used to find the last-reached index when
+`fraction < 1` (§13.7's own partial-trace/splitting path is untouched by this section).
+
+### 15.2 §13.8 FK agreement for a `fraction == 1.0` trace leg
+
+Every returned configuration of a `fraction == 1.0` trace leg (not only ones a sequential pointer
+would have matched) is checked against the requested (rolled) trace polyline directly:
+
+1. **Position.** The perpendicular distance from the configuration's `/compute_fk` `tool_tip`
+   position to the *nearest point* on the polyline formed by the rolled trace waypoints in order
+   (i.e. the nearest point on whichever consecutive-waypoint segment it is closest to, clamped to
+   that segment) must be `≤ recheck.fk_tolerance_m`.
+2. **Orientation.** Let `t ∈ [0, 1]` be that nearest point's own projection fraction along its
+   segment (`0` at the earlier waypoint, `1` at the later one). The configuration's `/compute_fk`
+   `tool_tip` orientation must be within `recheck.fk_tolerance_deg` of the spherical interpolation
+   (slerp) between that segment's two waypoint orientations at the same `t`.
+3. **Final configuration.** The *last* returned configuration is additionally checked directly
+   (not interpolated) against the *last* requested trace waypoint — same `fk_tolerance_m`/`_deg`
+   bounds — "the final configuration matches the last waypoint."
+
+Any violation of 1–3 fails the **whole candidate**, reason `fk_mismatch` (§13.10, unchanged
+vocabulary) — never a partial salvage; a `fraction == 1.0` trace either commits in full or not at
+all, exactly as any other leg failing its independent re-check already does (§13.8's own general
+rule: "a candidate carrying a failing leg is not eligible for selection"). This is a replacement for
+the §13.7 pointer walk's role in this one case only; the collision/joint-limit/joint-step checks
+(§13.8, unchanged) still apply to every configuration of a `fraction == 1.0` trace leg exactly as
+before.
+
+`legs[].waypoint_index_map` (§13.11.2) for a `fraction == 1.0` trace leg is each configuration's
+*nearest* requested trace-waypoint index under the same projection (never `null` — every
+configuration always has a nearest waypoint under this rule) — diagnostic only, not itself a
+pass/fail gate. `legs[].recheck.max_pos_err_m`/`max_ang_err_rad` are the maxima of the per-
+configuration errors in 1–3 above, over the whole leg.
+
+### 15.3 `ik_solver_timeout_s` (new `config/motion/cartesian_planning.yaml` key)
+
+| Field | Type | Default | Meaning |
+|---|---|---|---|
+| `ik_solver_timeout_s` | float | `0.05` | `/compute_ik`'s own internal solver budget (`ik_request.timeout`), independent of `service_timeout_s`. Must be `> 0`; loader enforces this (unknown/missing/out-of-range → `ConfigError`/exit 2, same convention as every other §13.2 field) |
+
+`service_timeout_s` (§13.2, unchanged field, value raised from its original default) is, from this
+card onward, **exclusively** the per-call wait timeout for `/compute_cartesian_path`,
+`/plan_kinematic_path`, `/compute_fk` and `/check_state_validity` (and the overall
+`wait_for_services`/scene-service discovery deadline) — **not** `/compute_ik`'s own solver budget any
+more. The ADR-017 addendum measured why these two cannot share one field: this install's TRAC-IK
+`solve_type: Distance` solver spends its *entire* requested budget on every `/compute_ik` call,
+success or failure alike, while a body-sized (0.06 m / 31-waypoint) trace leg's own
+`/compute_cartesian_path` call can take several seconds — raising the one shared field enough for
+the latter made every IK call cost the same multi-second budget. `ik_call_timeout_s()`
+(`cartesian_moveit.py`) now adds its existing margin on top of `ik_solver_timeout_s` instead of
+`service_timeout_s`, unchanged in form.
+
+---

@@ -63,6 +63,33 @@ def test_load_config_production_file():
     assert len(cfg["candidates"]["roll_offsets_deg"]) == 12
 
 
+def test_load_config_ik_solver_timeout_s_decoupled_from_service_timeout_s():
+    """MOT-06.11 (docs/INTERFACES.md §15): the /compute_ik solver budget is its own key, distinct
+    from the per-call wait timeout for the slower Cartesian/motion-plan/fk/validity calls."""
+    cfg = load_config(PRODUCTION_CONFIG)
+    assert cfg["ik_solver_timeout_s"] > 0
+    assert cfg["ik_solver_timeout_s"] != cfg["service_timeout_s"]
+
+
+@pytest.mark.parametrize("bad_value", [0.0, -1.0])
+def test_load_config_rejects_non_positive_ik_solver_timeout_s(tmp_path, bad_value):
+    raw = _valid_config_raw()
+    raw["ik_solver_timeout_s"] = bad_value
+    p = tmp_path / "bad.yaml"
+    p.write_text(yaml.safe_dump(raw))
+    with pytest.raises(CartesianConfigError):
+        load_config(p)
+
+
+def test_load_config_rejects_missing_ik_solver_timeout_s(tmp_path):
+    raw = _valid_config_raw()
+    del raw["ik_solver_timeout_s"]
+    p = tmp_path / "bad.yaml"
+    p.write_text(yaml.safe_dump(raw))
+    with pytest.raises(CartesianConfigError):
+        load_config(p)
+
+
 def test_load_config_rejects_unknown_key(tmp_path):
     raw = _valid_config_raw()
     raw["bogus_key"] = 1
