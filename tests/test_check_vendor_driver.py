@@ -18,6 +18,7 @@ import check_vendor_driver as cvd  # noqa: E402
 
 FIXTURES = REPO_ROOT / "tests" / "fixtures" / "vendor_driver" / "good"
 PINNED_SDK_FIXTURE = REPO_ROOT / "tests" / "fixtures" / "vendor_driver" / "pinned_sdk"
+PINNED_SDK_HEAD = "8427281aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 
 
 def _hash_tree(root: Path) -> dict[str, str]:
@@ -39,7 +40,12 @@ def _make_pinned_sdk_tree(tmp_path: Path) -> Path:
     rebot_ws = _make_tree(tmp_path)
     sdk_root = rebot_ws / "third_party/reBotArm_control_py"
     shutil.rmtree(sdk_root)
-    shutil.copytree(PINNED_SDK_FIXTURE, sdk_root)
+    shutil.copytree(PINNED_SDK_FIXTURE, sdk_root, ignore=shutil.ignore_patterns(".git"))
+    # git refuses to track any path with a '.git' component, so the detached-HEAD
+    # metadata of the pinned checkout is written here at test run time instead.
+    git_dir = sdk_root / ".git"
+    git_dir.mkdir()
+    (git_dir / "HEAD").write_text(PINNED_SDK_HEAD + "\n", encoding="utf-8")
     return rebot_ws
 
 
@@ -175,7 +181,7 @@ def test_pinned_sdk_detached_head_reported_as_sdk_head(tmp_path):
     rebot_ws = _make_pinned_sdk_tree(tmp_path)
     result = _run_capture(tmp_path, rebot_ws)
     sdk = next(c for c in result["report"]["checks"] if c["id"] == "V-SDK-API")
-    assert sdk["compared"]["sdk_head"] == "8427281aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    assert sdk["compared"]["sdk_head"] == PINNED_SDK_HEAD
 
 
 def test_pinned_sdk_missing_arm_endpos_export_fails_v_sdk_api(tmp_path):
