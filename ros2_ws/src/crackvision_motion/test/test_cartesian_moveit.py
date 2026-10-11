@@ -33,6 +33,7 @@ from crackvision_motion.cartesian_moveit import (
     build_ik_request,
     build_motion_plan_request,
     build_validity_request,
+    ik_call_timeout_s,
     match_reached_waypoints,
     parse_cartesian,
     parse_fk,
@@ -133,6 +134,22 @@ def test_build_ik_request_fields(cfg):
     assert list(req.ik_request.robot_state.joint_state.name) == list(JOINT_NAMES)
     total_timeout = req.ik_request.timeout.sec + req.ik_request.timeout.nanosec * 1e-9
     assert total_timeout == pytest.approx(cfg["service_timeout_s"])
+
+
+def test_ik_solver_timeout_is_strictly_smaller_than_call_timeout(cfg):
+    """The /compute_ik request's own solver timeout must leave a positive margin before the
+    service-call wait timeout gives up, or an infeasible pose can surface as a
+    ServiceCallTimeoutError instead of the ik_failed/TIMED_OUT result §13.5 step 1 expects."""
+    seed = _joints([0.0] * 6)
+    pose = _pose(0.2, 0.0, 0.3)
+    req = build_ik_request(pose, seed, "tool_tip", cfg)
+    solver_timeout_s = req.ik_request.timeout.sec + req.ik_request.timeout.nanosec * 1e-9
+
+    call_timeout_s = ik_call_timeout_s(cfg)
+
+    margin_s = call_timeout_s - solver_timeout_s
+    assert margin_s > 0
+    assert solver_timeout_s + margin_s <= call_timeout_s
 
 
 def test_build_fk_request_fields():

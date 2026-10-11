@@ -67,6 +67,15 @@ _GOAL_JOINT_TOLERANCE_RAD = 0.001
 # `ik_failed` (mirrors reachability_sweep.py's own _IK_INFEASIBLE_CODES distinction).
 _IK_INFEASIBLE_CODES = frozenset({MoveItErrorCodes.NO_IK_SOLUTION, MoveItErrorCodes.TIMED_OUT})
 
+# `build_ik_request`'s `ik_request.timeout` (the solver's own internal budget) is
+# `cfg['service_timeout_s']`; the TRAC-IK solver runs for the *full* requested timeout when no
+# solution exists (CARTESIAN_PROBE.md's NO_IK_SOLUTION case), so a `/compute_ik` *call* timeout
+# equal to that same value races the solver's own completion. `ik_call_timeout_s()` below adds
+# this margin to the call-side wait, mirroring reachability_sweep.py's `_IK_CALL_TIMEOUT_MARGIN_S`
+# -- callers must pass its result as `MoveItClients.call(..., timeout_s=ik_call_timeout_s(cfg))`
+# for `/compute_ik`, never the bare `cfg['service_timeout_s']` default.
+_IK_CALL_TIMEOUT_MARGIN_S = 2.0
+
 _MOVEIT_ERROR_CODE_NAMES = {
     getattr(MoveItErrorCodes, name): name
     for name in dir(MoveItErrorCodes)
@@ -179,8 +188,9 @@ def build_ik_request(
     """`/compute_ik` request for `pose`, seeded from `seed` (reuses
     `reachability_sweep._build_ik_request`'s field layout). `avoid_collisions` is unconditionally
     `True`; the solver timeout is `cfg['service_timeout_s']` -- §13.2 has no separate IK-solver
-    timeout key, so the one `cartesian_planning.yaml` timeout value (the per-service-call budget)
-    is reused for both the request's own internal solver timeout and the call's wait timeout."""
+    timeout key, so the one `cartesian_planning.yaml` timeout value is reused as the request's own
+    internal solver budget. The call-side wait must use `ik_call_timeout_s(cfg)` instead of this
+    same value (see `_IK_CALL_TIMEOUT_MARGIN_S` above), so the solver always finishes first."""
     req = GetPositionIK.Request()
     req.ik_request.group_name = GROUP
     req.ik_request.ik_link_name = link_name
@@ -195,6 +205,14 @@ def build_ik_request(
     req.ik_request.timeout.nanosec = int(round((timeout_s - sec) * 1e9))
     req.ik_request.robot_state = _robot_state(seed)
     return req
+
+
+def ik_call_timeout_s(cfg: Dict[str, Any]) -> float:
+    """The `/compute_ik` *call's* wait timeout: `cfg['service_timeout_s']` (the solver budget
+    `build_ik_request` puts in the request) plus `_IK_CALL_TIMEOUT_MARGIN_S`, so the call never
+    times out before the solver itself can report `NO_IK_SOLUTION`/`TIMED_OUT` (§13.5 step 1).
+    Callers must pass this as `MoveItClients.call(clients['ik'], req, timeout_s=ik_call_timeout_s(cfg))`."""
+    return float(cfg["service_timeout_s"]) + _IK_CALL_TIMEOUT_MARGIN_S
 
 
 def build_fk_request(positions: Dict[str, float], links: Sequence[str]) -> GetPositionFK.Request:
