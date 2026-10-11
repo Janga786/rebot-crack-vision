@@ -1,6 +1,6 @@
 # Progress — week of Mon Oct 05 – Sun Oct 11, 2026
 
-**45 task(s) completed and independently audited this week** · project total **87/125** accepted
+**46 task(s) completed and independently audited this week** · project total **88/126** accepted
 
 ## Notes
 
@@ -92,10 +92,12 @@
 - **GEOM-09.2.1 — Implement crackvision.uncertainty analytic per-term decomposition (pixel, depth, handeye, tcp, fk)** ([details](GEOM-09.2.1.md)): Built and tested a new uncertainty-decomposition module that breaks a lifted 3D crack point's existing position uncertainty down into its pixel-noise, depth-noise, hand-eye-calibration, and new joint/
 …[336 chars clipped]
 - **GEOM-09.2 — Analytic per-term uncertainty decomposition library (crackvision.uncertainty)** ([details](GEOM-09.2.md)): All sub-tasks of this work package were completed and audited together: GEOM-09.2.1.
+- **GEOM-09.3.1 — Implement crackvision.uncertainty_mc Monte-Carlo cross-check (pixel/depth/handeye/fk/tcp)** ([details](GEOM-09.3.1.md)): Implemented crackvision.uncertainty_mc (mc_point_covariance, mc_waypoint_sigma) per docs/INTERFACES.md §14/ADR-018 §4: seeded Monte-Carlo cross-check that reruns geometry.deproject_pixels and kinemati
+…[324 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 89 / 432
+- Implementation/review sessions run: 90 / 433
 - Audits that rejected work with evidence-backed findings: 27 (repairs created: 21)
 - Re-verified after an upstream change: CAM-02, CAM-05.1, CAM-05.2, GEOM-01, GEOM-01.R1, GEOM-08.1, GEOM-08.2, GEOM-08.2.R1, GEOM-08.5, GEOM-08.5.R1, GEOM-08.6, GEOM-08.7, GEOM-08.8, GEOM-08.8.R1, GEOM-09.1, GEOM-09.1.R1, GEOM-10, MOT-02, MOT-03, MOT-04.1, MOT-04.1.R1, MOT-04.2, MOT-04.3, MOT-04.3.R1, MOT-04.4, MOT-04.4.R1, MOT-04.6, MOT-04.6.R1, MOT-05.1, MOT-05.1.R1, MOT-05.2, MOT-05.4, MOT-05.4.R1, MOT-06.2, MOT-06.2.R1, MOT-06.3, MOT-06.3.R1, MOT-06.4, MOT-06.4.R1, MOT-06.5, MOT-06.5.R1, MOT-06.6, MOT-06.6.R1, MOT-06.8, MOT-10.1, MOT-10.1.R1, MOT-10.1.R2, MOT-10.2, MOT-10.3, PERC-03, PERC-03.R1, TC-011, TC-016
 
@@ -107,6 +109,7 @@
 - decomposed: LLM-06 → LLM-06.1, LLM-06.2
 - decomposed: MOT-06 → MOT-06.1, MOT-06.10, MOT-06.2, MOT-06.3, MOT-06.4, MOT-06.5, MOT-06.6, MOT-06.7, MOT-06.8, MOT-06.9
 - decomposed: GEOM-09 → GEOM-09.1, GEOM-09.2, GEOM-09.3, GEOM-09.4
+- decomposed: GEOM-09.3 → GEOM-09.3.1
 
 ## Progress by work package
 
@@ -116,7 +119,7 @@
 | Local coding model (L-LLM) | 5 | 8 |
 | D405 capture (L-CAM) | 7 | 9 |
 | Perception (L-PERC) | 13 | 16 |
-| Geometry & calibration (L-GEOM) | 18 | 29 |
+| Geometry & calibration (L-GEOM) | 19 | 30 |
 | Motion planning (L-MOTION) | 31 | 41 |
 | Integration & commissioning (L-INT) | 1 | 6 |
 | Operator workflow & handoff (L-OPS) | 1 | 4 |
