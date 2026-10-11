@@ -2,14 +2,13 @@
 
 ```json card
 {
-  "kind": "impl",
+  "kind": "branch",
   "depends_on": [
     "GEOM-08"
   ],
   "requirements": [
     "REQ-GEOM-1"
   ],
-  "spec_state": "draft",
   "refine_after": [
     "GEOM-08"
   ],
@@ -22,3 +21,6 @@
 ```
 
 Draft.
+
+## Decomposed 2026-10-11T00:51:20Z by L-GEOM (claude-sonnet-5, high)
+Children: GEOM-09.1, GEOM-09.2, GEOM-09.3, GEOM-09.4
