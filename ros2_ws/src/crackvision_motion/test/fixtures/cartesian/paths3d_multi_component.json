@@ -1,0 +1,153 @@
+{
+  "schema": "crackvision.paths3d/1",
+  "case_id": "test_multi_component",
+  "frame": "base_link",
+  "components": [
+    {
+      "order_index": 1,
+      "component_id": "crack_A",
+      "polylines": [
+        {
+          "kind": "branch",
+          "branch_index": 0,
+          "segments": [
+            {
+              "waypoints": [
+                {
+                  "phase": "approach",
+                  "position_m": [0.1, 0.0, 0.04],
+                  "quat_xyzw": [0.0, 0.7071067811865476, 0.0, 0.7071067811865476],
+                  "surface_point_m": [0.1, 0.0, 0.0],
+                  "normal_base": [0.0, 0.0, 1.0],
+                  "clearance_m": 0.04
+                },
+                {
+                  "phase": "trace",
+                  "position_m": [0.1, 0.0, 0.01],
+                  "quat_xyzw": [0.0, 0.7071067811865476, 0.0, 0.7071067811865476],
+                  "surface_point_m": [0.1, 0.0, 0.0],
+                  "normal_base": [0.0, 0.0, 1.0],
+                  "clearance_m": 0.01
+                },
+                {
+                  "phase": "retract",
+                  "position_m": [0.1, 0.0, 0.04],
+                  "quat_xyzw": [0.0, 0.7071067811865476, 0.0, 0.7071067811865476],
+                  "surface_point_m": [0.1, 0.0, 0.0],
+                  "normal_base": [0.0, 0.0, 1.0],
+                  "clearance_m": 0.04
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "main",
+          "branch_index": null,
+          "segments": [
+            {
+              "waypoints": [
+                {
+                  "phase": "approach",
+                  "position_m": [0.0, 0.0, 0.04],
+                  "quat_xyzw": [0.0, 0.7071067811865476, 0.0, 0.7071067811865476],
+                  "surface_point_m": [0.0, 0.0, 0.0],
+                  "normal_base": [0.0, 0.0, 1.0],
+                  "clearance_m": 0.04
+                },
+                {
+                  "phase": "trace",
+                  "position_m": [0.0, 0.0, 0.01],
+                  "quat_xyzw": [0.0, 0.7071067811865476, 0.0, 0.7071067811865476],
+                  "surface_point_m": [0.0, 0.0, 0.0],
+                  "normal_base": [0.0, 0.0, 1.0],
+                  "clearance_m": 0.01
+                },
+                {
+                  "phase": "trace",
+                  "position_m": [0.01, 0.0, 0.01],
+                  "quat_xyzw": [0.0, 0.7071067811865476, 0.0, 0.7071067811865476],
+                  "surface_point_m": [0.01, 0.0, 0.0],
+                  "normal_base": [0.0, 0.0, 1.0],
+                  "clearance_m": 0.01
+                },
+                {
+                  "phase": "trace",
+                  "position_m": [0.02, 0.0, 0.01],
+                  "quat_xyzw": [0.0, 0.7071067811865476, 0.0, 0.7071067811865476],
+                  "surface_point_m": [0.02, 0.0, 0.0],
+                  "normal_base": [0.0, 0.0, 1.0],
+                  "clearance_m": 0.01
+                },
+                {
+                  "phase": "trace",
+                  "position_m": [0.03, 0.0, 0.01],
+                  "quat_xyzw": [0.0, 0.7071067811865476, 0.0, 0.7071067811865476],
+                  "surface_point_m": [0.03, 0.0, 0.0],
+                  "normal_base": [0.0, 0.0, 1.0],
+                  "clearance_m": 0.01
+                },
+                {
+                  "phase": "trace",
+                  "position_m": [0.04, 0.0, 0.01],
+                  "quat_xyzw": [0.0, 0.7071067811865476, 0.0, 0.7071067811865476],
+                  "surface_point_m": [0.04, 0.0, 0.0],
+                  "normal_base": [0.0, 0.0, 1.0],
+                  "clearance_m": 0.01
+                },
+                {
+                  "phase": "retract",
+                  "position_m": [0.04, 0.0, 0.04],
+                  "quat_xyzw": [0.0, 0.7071067811865476, 0.0, 0.7071067811865476],
+                  "surface_point_m": [0.04, 0.0, 0.0],
+                  "normal_base": [0.0, 0.0, 1.0],
+                  "clearance_m": 0.04
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "order_index": 0,
+      "component_id": "crack_B",
+      "polylines": [
+        {
+          "kind": "main",
+          "branch_index": null,
+          "segments": [
+            {
+              "waypoints": [
+                {
+                  "phase": "approach",
+                  "position_m": [0.2, 0.0, 0.04],
+                  "quat_xyzw": [0.0, 0.7071067811865476, 0.0, 0.7071067811865476],
+                  "surface_point_m": [0.2, 0.0, 0.0],
+                  "normal_base": [0.0, 0.0, 1.0],
+                  "clearance_m": 0.04
+                },
+                {
+                  "phase": "trace",
+                  "position_m": [0.2, 0.0, 0.01],
+                  "quat_xyzw": [0.0, 0.7071067811865476, 0.0, 0.7071067811865476],
+                  "surface_point_m": [0.2, 0.0, 0.0],
+                  "normal_base": [0.0, 0.0, 1.0],
+                  "clearance_m": 0.01
+                },
+                {
+                  "phase": "retract",
+                  "position_m": [0.2, 0.0, 0.04],
+                  "quat_xyzw": [0.0, 0.7071067811865476, 0.0, 0.7071067811865476],
+                  "surface_point_m": [0.2, 0.0, 0.0],
+                  "normal_base": [0.0, 0.0, 1.0],
+                  "clearance_m": 0.04
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

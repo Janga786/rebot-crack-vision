@@ -1,0 +1,55 @@
+# config/motion/cartesian_planning.yaml — Cartesian crack-path planning parameters (MOT-06.3).
+#
+# Schema: crackvision.cartesian_planning_config/1 (docs/INTERFACES.md §13.2), loaded strictly by
+# ros2_ws/src/crackvision_motion/crackvision_motion/cartesian_core.py:load_config (unknown key,
+# missing key or out-of-range value -> CartesianConfigError). `frame` (base_link), `group` (arm),
+# `ik_link` (tool_tip / camera_link for the view phase) and `avoid_collisions` (hardcoded true,
+# ADR-017 §7) are fixed by that contract, not config keys here.
+schema: crackvision.cartesian_planning_config/1
+
+candidates:
+  roll_offsets_deg: [0, 30, -30, 60, -60, 90, -90, 120, -120, 150, -150, 180]
+
+cartesian:
+  max_step_m: 0.001
+  jump_threshold: 0.0
+  prismatic_jump_threshold: 0.0
+  revolute_jump_threshold: 0.0
+
+recheck:
+  fk_tolerance_m: 0.001
+  fk_tolerance_deg: 1.0
+  max_joint_step_rad: 0.2
+
+splitting:
+  max_splits_per_segment: 3
+  min_waypoints_per_remainder: 3
+
+end_state: start
+surface_object_id: specimen
+surface_object_tolerance_m: 0.002
+service_timeout_s: 2.0
+
+view:
+  view_distance_m: 0.25
+  tilt_candidates_deg: [0.0, 15.0]
+  yaw_candidates_deg: [0.0, 90.0, 180.0, 270.0]
+  fov_deg:
+    horizontal: 87.0
+    vertical: 58.0
+  fov_margin_deg: 5.0
+  footprint_m: [0.20, 0.20]
+  surface_z_m: 0.0
+
+value_status: nominal
+
+sources:
+  candidates: "roll_offsets_deg: ADR-017 §1's own default 12-value uniform roll-offset set (0..180 by 30 deg, both signs where distinct), card body default. A uniform per-segment offset (not a ramp) is chosen because MOT-06.1's CARTESIAN_PROBE.md fact 4 measured a ramped roll inflating trajectory size/duration for no benefit this project needs."
+  cartesian: "max_step_m (0.001 m) is finer than paths3d's own 0.002 m default waypoint spacing (INTERFACES.md §10.4), so the Cartesian interpolation never coarsens an already-resampled trace (CARTESIAN_PROBE.md consequence 3). jump_threshold/prismatic_jump_threshold/revolute_jump_threshold are disabled (0.0): MOT-06.1's probe only confirmed these fields exist on this Humble install (fact 5), never calibrated their numeric effect; jump detection is recheck.max_joint_step_rad instead (ADR-017 §4)."
+  recheck: "fk_tolerance_m/_deg (1 mm / 1 deg) and max_joint_step_rad (0.2 rad, ~11.5 deg) are the card body's own defaults (ADR-017 §4): the joint-step bound sits above ordinary per-point motion at cartesian.max_step_m away from a singularity and below the scale of a true wrist-singularity discontinuity (CARTESIAN_PROBE.md consequence 1 / fact 1)."
+  splitting: "max_splits_per_segment=3 is the card body's own default. min_waypoints_per_remainder=3 matches paths3d's own minimum kept-segment length after trimming/splitting (INTERFACES.md §10.3)."
+  end_state: "'start' (return to the start state) is the §13.1 default end-of-plan behaviour."
+  surface_object_id: "'specimen' is the one scene.yaml object every trace waypoint is standoffed from by construction (§10.5 point 2); ADR-017 §5 relaxes, rather than drops, the surface/scene check against exactly this object."
+  surface_object_tolerance_m: "0.002 m (ADR-017 §5): an order of magnitude above the trace standoff construction's own floating-point/axis-aligned-box-approximation noise, and an order of magnitude below config/motion/specimen_placement.yaml's own 0.02 m placement tolerance -- so a correctly-placed trace waypoint never false-positives, while a genuinely mis-placed specimen still trips the check."
+  service_timeout_s: "2.0 s nominal per-ROS-service-call timeout for this card, matching this project's other service_timeout_s conventions (e.g. config/motion/view_verify.yaml)."
+  view: "view_distance_m (0.25 m) is the ADR-014 §8.2 nominal mid-band value within its own [0.20, 0.30] bound. tilt_candidates_deg ({0, 15}) brackets that same section's 15 deg anti-normal bound. yaw_candidates_deg (4 cardinal directions) matches config/motion/reachability.yaml's own orientation.tilt_azimuth_samples: 4. fov_deg (87 x 58 deg) is the D405 public datasheet figure (58 deg vertical already cited by ADR-014 §8.2/INTERFACES.md §8.2) -- not yet independently re-verified in this repo, carried with the same nominal-value_status honesty as every other not-yet-measured number here (ADR-017 §6 Revisit). fov_margin_deg (5 deg) is a nominal angular safety margin on the FOV check. footprint_m/surface_z_m reuse config/motion/specimen_placement.yaml's own placement.footprint_m/placement.surface_z_m so the --center-less view path matches the placement pipeline's own nominal specimen."
