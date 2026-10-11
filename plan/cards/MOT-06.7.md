@@ -64,6 +64,7 @@
     "local_ok": false
   },
   "track": "simulation",
+  "max_attempts": 5,
   "id": "MOT-06.7",
   "title": "Headless mock-stack smoke test of plan_crack_path with consistent scene + paths3d fixtures",
   "parent": "MOT-06",
@@ -89,3 +90,6 @@ Set `execution_eligible: false` with the nominal reasons, as real synthetic data
 3. Run the independent assertions in an embedded python3 block that calls /compute_fk and /check_state_validity itself.
 4. Re-run with --require-full-coverage and expect exit 3.
 5. `stop_mock_stack`.
+
+## Debugger note (D0010, 2026-10-11T09:50:29Z)
+D0010 diagnosis: the three timeouts were caused by plan_crack_path (MOT-06.6), not by this card's scope. (1) Step-4 full-ness was decided by the §13.7 FK pointer walk even at fraction 1.0. move_group resamples the trajectory, so a body-sized trace stalled (12/31 in 00613) and every candidate and split was retried. (2) service_timeout_s is both the call wait and the TRAC-IK (solve_type Distance) solver budget. At 2.0 s the 3-4.6 s trace call aborts; at 10 s every /compute_ik takes 10 s, about 20 s per candidate and about 20 min per planner run. MOT-06.11 fixes both, and this card resumes after it is accepted. The body's fixture geometry and the criteria are binding as written. Do not shrink segments or relax any assertion to make planning pass. If a body-sized reachable segment still cannot be planned `full` after MOT-06.11, report a blocker that includes the plan output. WIP ref refs/claude-auto/wip/MOT-06.7/00614-MOT-06.7-impl (e013b4a7) already has body-sized fixtures (31-waypoint 0.06 m straight, 33-waypoint 120° r=0.03 m arc, unreachable segment at x 0.62-0.66, 6-waypoint mismatch) and a script. It may be restored as a starting point but must be re-checked against every criterion. Drop its service_timeout_s=10 override unless the MOT-06.11 config still requires it. Do not use ScheduleWakeup: in 00612 a wakeup turn after StructuredOutput replaced the result. Run long commands in the foreground with explicit timeouts, time one planner run early, and submit the structured result before the 3600 s limit.
