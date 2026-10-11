@@ -51,5 +51,10 @@
     "push": true,
     "week_start": "monday",
     "include_models": false
+  },
+  "debugger": {
+    "extra_rw_allowlist": [
+      "~/miniconda3/envs/crackvision"
+    ]
   }
 }
