@@ -1,6 +1,6 @@
 # Progress — week of Mon Oct 05 – Sun Oct 11, 2026
 
-**28 task(s) completed and independently audited this week** · project total **72/108** accepted
+**28 task(s) completed and independently audited this week** · project total **72/122** accepted
 
 ## Notes
 
@@ -66,8 +66,8 @@
 
 ## Quality loop
 
-- Implementation/review sessions run: 57 / 190
-- Audits that rejected work with evidence-backed findings: 15 (repairs created: 11)
+- Implementation/review sessions run: 58 / 192
+- Audits that rejected work with evidence-backed findings: 16 (repairs created: 12)
 - Re-verified after an upstream change: CAM-02, CAM-05.1, CAM-05.2, GEOM-01, GEOM-01.R1, GEOM-08.1, GEOM-08.2, GEOM-08.2.R1, GEOM-08.5, GEOM-08.5.R1, GEOM-08.6, GEOM-08.7, GEOM-08.8, GEOM-08.8.R1, GEOM-10, MOT-02, MOT-03, MOT-04.1, MOT-04.1.R1, MOT-04.2, MOT-04.3, MOT-04.3.R1, MOT-04.4, MOT-04.4.R1, MOT-04.6, MOT-05.1, MOT-05.1.R1, MOT-05.2, MOT-05.4, MOT-05.4.R1, MOT-10.1, MOT-10.1.R1, MOT-10.2, MOT-10.3, PERC-03, PERC-03.R1, TC-011, TC-016
 
 ## Planning changes
@@ -76,6 +76,8 @@
 - decomposed: MOT-05 → MOT-05.1, MOT-05.2, MOT-05.3, MOT-05.4, MOT-05.5, MOT-05.6
 - decomposed: MOT-10 → MOT-10.1, MOT-10.2, MOT-10.3, MOT-10.4, MOT-10.5
 - decomposed: LLM-06 → LLM-06.1, LLM-06.2
+- decomposed: MOT-06 → MOT-06.1, MOT-06.10, MOT-06.2, MOT-06.3, MOT-06.4, MOT-06.5, MOT-06.6, MOT-06.7, MOT-06.8, MOT-06.9
+- decomposed: GEOM-09 → GEOM-09.1, GEOM-09.2, GEOM-09.3, GEOM-09.4
 
 ## Progress by work package
 
@@ -85,8 +87,8 @@
 | Local coding model (L-LLM) | 5 | 8 |
 | D405 capture (L-CAM) | 7 | 9 |
 | Perception (L-PERC) | 13 | 16 |
-| Geometry & calibration (L-GEOM) | 15 | 24 |
-| Motion planning (L-MOTION) | 19 | 29 |
+| Geometry & calibration (L-GEOM) | 15 | 28 |
+| Motion planning (L-MOTION) | 19 | 39 |
 | Integration & commissioning (L-INT) | 1 | 6 |
 | Operator workflow & handoff (L-OPS) | 1 | 4 |
 | Imitation learning (later phase) (L-IL) | 0 | 1 |
