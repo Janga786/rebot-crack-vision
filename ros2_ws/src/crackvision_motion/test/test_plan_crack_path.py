@@ -1,6 +1,8 @@
 """Unit tests for plan_crack_path (MOT-06.6). Runs without a colcon build or a running ROS graph
 -- the selection/splitting logic is tested with fake planner results (`attempt_fn`/`synth_retract_fn`/
-`split_fn` injected), never a real MoveIt call; the CLI-level tests only ever exercise `--dry-run`
+`split_fn` injected), never a real MoveIt call; `_classify_shortfall` is tested against canned
+`moveit_msgs` response messages via a `MoveItClients`-shaped fake (mirrors test_cartesian_moveit.py
+-- still no `rclpy.init`, no running graph); the CLI-level tests only ever exercise `--dry-run`
 (no `rclpy.init`, no file write).
 
 Usage: bash scripts/ros/env_ros.sh python3 -m pytest \
@@ -11,15 +13,19 @@ from __future__ import annotations
 
 import math
 from pathlib import Path
+from typing import Any, Dict, List
 
 import pytest
+from moveit_msgs.msg import MoveItErrorCodes
+from moveit_msgs.srv import GetPositionIK, GetStateValidity
 
-from crackvision_motion.cartesian_core import Candidate, Pose, SegmentTask
+from crackvision_motion.cartesian_core import Candidate, Pose, SegmentTask, apply_candidate, load_config
 from crackvision_motion.cli_common import EXIT_OK, EXIT_PRECONDITION, EXIT_USAGE
 from crackvision_motion.joint_trajectory import JOINT_NAMES
 from crackvision_motion.plan_crack_path import (
     CandidateAttempt,
     LegResult,
+    _classify_shortfall,
     _index_map_and_errors,
     _joint_dict,
     _max_joint_step,
@@ -38,6 +44,7 @@ from crackvision_motion.plan_crack_path import (
 REPO_ROOT = Path(__file__).resolve().parents[4]
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures" / "cartesian"
 MULTI_COMPONENT_FIXTURE = FIXTURES_DIR / "paths3d_multi_component.json"
+PRODUCTION_PLANNING_CONFIG = REPO_ROOT / "config" / "motion" / "cartesian_planning.yaml"
 
 _LIMITS = {n: {"lower": -3.0, "upper": 3.0} for n in JOINT_NAMES}
 _Q = (0.0, 0.0, 0.0, 1.0)
@@ -169,7 +176,9 @@ def test_run_segment_splits_full_completion_first_round():
     def synth_retract_fn(rolled, idx, positions):
         raise AssertionError("must not be called on a full first-round completion")
 
-    leg_specs, report_specs, final = run_segment_splits(task, _joint_dict(_zeros6()), 3, attempt_fn, synth_retract_fn)
+    leg_specs, report_specs, final = run_segment_splits(
+        task, _joint_dict(_zeros6()), 3, attempt_fn, synth_retract_fn, min_waypoints_per_remainder=3,
+    )
     assert len(report_specs) == 1
     r = report_specs[0]
     assert r["trace_waypoints_total"] == 3
@@ -189,7 +198,9 @@ def test_run_segment_splits_all_fail_path():
     def synth_retract_fn(rolled, idx, positions):
         raise AssertionError("must not be called when no candidate reaches anything")
 
-    leg_specs, report_specs, final = run_segment_splits(task, _joint_dict(_zeros6()), 3, attempt_fn, synth_retract_fn)
+    leg_specs, report_specs, final = run_segment_splits(
+        task, _joint_dict(_zeros6()), 3, attempt_fn, synth_retract_fn, min_waypoints_per_remainder=3,
+    )
     assert leg_specs == []
     assert len(report_specs) == 1
     r = report_specs[0]
@@ -201,8 +212,9 @@ def test_run_segment_splits_all_fail_path():
 
 def test_run_segment_splits_partial_then_split_then_full():
     """A partial first round (reaches waypoint 0 of 3) synthesises a retract, splits off the
-    2-waypoint remainder (>= min_waypoints_per_remainder would normally be 3, but the injected
-    split_fn controls this directly), and the second round fully completes it."""
+    2-waypoint remainder (passing `min_waypoints_per_remainder=1` here so the 2-waypoint
+    remainder clears the gate; the injected `split_fn` itself is what actually builds it), and
+    the second round fully completes it."""
     task = _task([0.0, 0.01, 0.02])
     remainder = _task([0.01, 0.02], sub_segment=0)
     cand = _candidate()
@@ -223,7 +235,9 @@ def test_run_segment_splits_partial_then_split_then_full():
         assert idx == 0
         return remainder
 
-    leg_specs, report_specs, final = run_segment_splits(task, _joint_dict(_zeros6()), 3, attempt_fn, synth_retract_fn, split_fn)
+    leg_specs, report_specs, final = run_segment_splits(
+        task, _joint_dict(_zeros6()), 3, attempt_fn, synth_retract_fn, split_fn, min_waypoints_per_remainder=1,
+    )
 
     assert len(report_specs) == 2
     first, second = report_specs
@@ -238,6 +252,8 @@ def test_run_segment_splits_partial_then_split_then_full():
 
 
 def test_run_segment_splits_too_short_remainder_not_attempted():
+    """The 2-waypoint remainder (3 total, waypoint 0 reached) is below the default
+    `min_waypoints_per_remainder` of 3, so `split_fn` is never even consulted."""
     task = _task([0.0, 0.01, 0.02])
     cand = _candidate()
 
@@ -248,9 +264,11 @@ def test_run_segment_splits_too_short_remainder_not_attempted():
         return _leg("retract", 1)
 
     def split_fn(rolled, idx):
-        return None  # too_short
+        raise AssertionError("must not be called: the remainder is shorter than min_waypoints_per_remainder")
 
-    leg_specs, report_specs, final = run_segment_splits(task, _joint_dict(_zeros6()), 3, attempt_fn, synth_retract_fn, split_fn)
+    leg_specs, report_specs, final = run_segment_splits(
+        task, _joint_dict(_zeros6()), 3, attempt_fn, synth_retract_fn, split_fn, min_waypoints_per_remainder=3,
+    )
 
     assert len(report_specs) == 1
     assert "too_short" in report_specs[0]["reasons"]
@@ -272,7 +290,9 @@ def test_run_segment_splits_stops_at_max_splits_without_too_short():
         split_calls.append(idx)
         return _task([0.01, 0.02])
 
-    leg_specs, report_specs, final = run_segment_splits(task, _joint_dict(_zeros6()), 0, attempt_fn, synth_retract_fn, split_fn)
+    leg_specs, report_specs, final = run_segment_splits(
+        task, _joint_dict(_zeros6()), 0, attempt_fn, synth_retract_fn, split_fn, min_waypoints_per_remainder=3,
+    )
 
     assert split_calls == []  # max_splits_per_segment=0: never even tries to split
     assert len(report_specs) == 1
@@ -292,10 +312,80 @@ def test_run_segment_splits_synth_retract_failure_degrades_reason_and_skips_leg(
     def split_fn(rolled, idx):
         return None
 
-    leg_specs, report_specs, final = run_segment_splits(task, _joint_dict(_zeros6()), 3, attempt_fn, synth_retract_fn, split_fn)
+    leg_specs, report_specs, final = run_segment_splits(
+        task, _joint_dict(_zeros6()), 3, attempt_fn, synth_retract_fn, split_fn, min_waypoints_per_remainder=1,
+    )
 
     assert "retract" not in [spec["kind"] for spec in leg_specs]
     assert "cartesian_incomplete" in report_specs[0]["reasons"]
+
+
+def test_run_segment_splits_too_short_uses_cfg_min_waypoints_per_remainder():
+    """Finding 2d382ffda7d1d567: the too_short decision must use the caller's own
+    `splitting.min_waypoints_per_remainder`, never `cartesian_core`'s hard-coded minimum (3) --
+    here a non-default value of 4 rejects the same 3-waypoint remainder a value of 3 accepts."""
+    task = _task([0.0, 0.01, 0.02, 0.03, 0.04])  # 5 waypoints; reaching index 1 leaves 3
+    cand = _candidate()
+
+    def attempt_fn(t, positions):
+        return [_partial_attempt(t, cand, last_idx=1, margin=0.3)]
+
+    def synth_retract_fn(rolled, idx, positions):
+        return _leg("retract", 1)
+
+    split_calls = []
+
+    def split_fn(rolled, idx):
+        split_calls.append(idx)
+        return _task([0.03, 0.04, 0.05], sub_segment=0)
+
+    run_segment_splits(
+        task, _joint_dict(_zeros6()), 3, attempt_fn, synth_retract_fn, split_fn, min_waypoints_per_remainder=3,
+    )
+    assert split_calls == [1]
+
+    split_calls.clear()
+    _leg_specs, report_specs, _final = run_segment_splits(
+        task, _joint_dict(_zeros6()), 3, attempt_fn, synth_retract_fn, split_fn, min_waypoints_per_remainder=4,
+    )
+    assert split_calls == []  # the 3-waypoint remainder is below this non-default min of 4
+    assert "too_short" in report_specs[0]["reasons"]
+
+
+def test_run_segment_splits_retry_remainder_uses_unrolled_base_quaternions():
+    """Finding 11ab2dba7b6b1849: a split retry's remainder must be built from paths3d's own base
+    poses, never the previous round's rolled/reversed ones -- a roll-0 forward candidate applied
+    to the remainder must reproduce the original task's own base quaternions exactly, not the
+    30 deg the first round's candidate actually rolled by."""
+    task = _task([0.0, 0.01, 0.02, 0.03])
+    roll_30 = _candidate("forward", 30.0)
+    roll_0 = _candidate("forward", 0.0)
+    rolled_30 = apply_candidate(task, roll_30.direction, roll_30.roll_offset_rad)
+    checked_quats = []
+
+    def attempt_fn(t, positions):
+        if t is task:
+            return [
+                CandidateAttempt(
+                    candidate=roll_30, rolled_task=rolled_30,
+                    legs=[_leg("transit"), _leg("approach", 1), _leg("trace", 1)],
+                    last_reached_index=0, full=False, margin=0.3,
+                    final_positions=_joint_dict(_zeros6()), reasons=set(),
+                )
+            ]
+        rolled = apply_candidate(t, roll_0.direction, roll_0.roll_offset_rad)
+        checked_quats.append(rolled.trace[0].quat_xyzw)
+        return [_full_attempt(t, roll_0, margin=0.6)]
+
+    def synth_retract_fn(rolled, idx, positions):
+        return _leg("retract", 1)
+
+    leg_specs, report_specs, final = run_segment_splits(
+        task, _joint_dict(_zeros6()), 3, attempt_fn, synth_retract_fn, min_waypoints_per_remainder=1,
+    )
+
+    assert len(report_specs) == 2
+    assert checked_quats == [pytest.approx(task.trace[1].quat_xyzw)]
 
 
 # --------------------------------------------------------------------------------------
@@ -332,7 +422,23 @@ def test_index_map_and_errors_matches_in_order():
     fk_poses = [targets[0], targets[1], _pose(5.0), targets[2]]
     index_map, max_pos_err, max_ang_err = _index_map_and_errors(fk_poses, targets, tol_m=0.001, tol_deg=1.0)
     assert index_map == [0, 1, None, 2]
-    assert max_pos_err > 1.0  # the far-off config dominates the diagnostic max
+    # Finding 8e9a7e822fe1b8a8: the far-off, unmatched config must never inflate the diagnostic
+    # max -- only FK-matched (and therefore within-tolerance) configurations count.
+    assert max_pos_err <= 0.001
+    assert max_ang_err <= 1.0
+
+
+def test_index_map_and_errors_approach_leg_interpolated_intermediates_within_tolerance():
+    """Finding 8e9a7e822fe1b8a8's own scenario: an approach leg interpolated in from z=0.04 down
+    to the trace pose at z=0.01 must never record a recheck error above the FK tolerance -- the
+    interpolated intermediates never match (and so never count), only the final configuration
+    that actually reaches the target does."""
+    target = [_pose(z=0.01)]
+    fk_poses = [_pose(z=0.04), _pose(z=0.025), _pose(z=0.01)]
+    index_map, max_pos_err, max_ang_err = _index_map_and_errors(fk_poses, target, tol_m=0.001, tol_deg=1.0)
+    assert index_map == [None, None, 0]
+    assert max_pos_err <= 0.001
+    assert max_ang_err <= 1.0
 
 
 def test_prefix_length_m():
@@ -348,6 +454,78 @@ def test_synthesized_retract_pose_offset_matches_approach_standoff():
     standoff = math.dist(task.approach.position_m, task.surface_points[0])
     assert pose.position_m[2] == pytest.approx(standoff)
     assert pose.quat_xyzw == task.trace[1].quat_xyzw
+
+
+# --------------------------------------------------------------------------------------
+# _classify_shortfall (§13.8's fraction<1 collision/joint_jump attribution), fake service results
+# --------------------------------------------------------------------------------------
+
+@pytest.fixture()
+def cfg():
+    return load_config(PRODUCTION_PLANNING_CONFIG)
+
+
+class _FakeMoveIt:
+    """A minimal `MoveItClients`-shaped double: `.clients[key]` is `key` itself, so `.call()` can
+    dispatch purely on the key `_classify_shortfall` indexes with; each key's canned responses are
+    returned in order. No `rclpy`/running ROS graph involved -- every response is a plain
+    `moveit_msgs` message built directly, exactly as test_cartesian_moveit.py does."""
+
+    def __init__(self, responses: Dict[str, List[Any]]):
+        self.clients = {key: key for key in responses}
+        self._queues = {key: list(resp) for key, resp in responses.items()}
+
+    def call(self, client, request, timeout_s=None):
+        return self._queues[client].pop(0)
+
+
+def _ik_response(values=None, error_code=MoveItErrorCodes.SUCCESS):
+    resp = GetPositionIK.Response()
+    resp.error_code.val = error_code
+    if values is not None:
+        resp.solution.joint_state.name = list(JOINT_NAMES)
+        resp.solution.joint_state.position = list(values)
+    return resp
+
+
+def _validity_response(valid: bool):
+    resp = GetStateValidity.Response()
+    resp.valid = valid
+    return resp
+
+
+def test_classify_shortfall_ik_failure_stays_cartesian_incomplete(cfg):
+    moveit = _FakeMoveIt({"ik": [_ik_response(error_code=MoveItErrorCodes.NO_IK_SOLUTION)]})
+    reason = _classify_shortfall(moveit, cfg, _joint_dict(_zeros6()), _pose(0.1))
+    assert reason == "cartesian_incomplete"
+
+
+def test_classify_shortfall_invalid_ik_solution_is_collision(cfg):
+    moveit = _FakeMoveIt({
+        "ik": [_ik_response(_zeros6())],
+        "validity": [_validity_response(False)],
+    })
+    reason = _classify_shortfall(moveit, cfg, _joint_dict(_zeros6()), _pose(0.1))
+    assert reason == "collision"
+
+
+def test_classify_shortfall_big_joint_step_is_joint_jump(cfg):
+    big_step = [1.0] + [0.0] * 5  # exceeds recheck.max_joint_step_rad (0.2 rad)
+    moveit = _FakeMoveIt({
+        "ik": [_ik_response(big_step)],
+        "validity": [_validity_response(True)],
+    })
+    reason = _classify_shortfall(moveit, cfg, _joint_dict(_zeros6()), _pose(0.1))
+    assert reason == "joint_jump"
+
+
+def test_classify_shortfall_small_joint_step_stays_cartesian_incomplete(cfg):
+    moveit = _FakeMoveIt({
+        "ik": [_ik_response(_zeros6())],
+        "validity": [_validity_response(True)],
+    })
+    reason = _classify_shortfall(moveit, cfg, _joint_dict(_zeros6()), _pose(0.1))
+    assert reason == "cartesian_incomplete"
 
 
 # --------------------------------------------------------------------------------------
