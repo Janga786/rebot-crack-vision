@@ -305,6 +305,16 @@ SynthRetractFn = Callable[[SegmentTask, int, Dict[str, float]], Optional[LegResu
 SplitFn = Callable[[SegmentTask, int], Optional[SegmentTask]]
 
 
+def _reverse_task(task: SegmentTask) -> SegmentTask:
+    """`task` traversed end-to-start with its base orientations untouched (no roll): the trace and
+    its per-waypoint arrays reversed, approach/retract swapped -- its own inverse."""
+    return task._replace(
+        approach=task.retract, retract=task.approach, trace=tuple(reversed(task.trace)),
+        normals=tuple(reversed(task.normals)), surface_points=tuple(reversed(task.surface_points)),
+        clearances_m=tuple(reversed(task.clearances_m)),
+    )
+
+
 def run_segment_splits(
     task: SegmentTask,
     start_positions: Dict[str, float],
@@ -387,11 +397,15 @@ def run_segment_splits(
         if total - planned < min_waypoints_per_remainder:
             report_specs[-1]["reasons"] = sorted(set(report_specs[-1]["reasons"]) | {"too_short"})
             break
-        # §13.7's remainder is retried "from scratch" against paths3d's own base poses, never the
-        # previous candidate's rolled/reversed ones -- only this round's own direction (not its
-        # roll) carries over, since it fixes which end of `cur_task` the remainder continues from.
-        traversal_task = apply_candidate(cur_task, fallback.candidate.direction, 0.0)
-        remainder = split_fn(traversal_task, fallback.last_reached_index)
+        # §13.7's remainder is retried "from scratch" against paths3d's own base poses, in paths3d
+        # order, never the previous candidate's rolled/reversed ones. A reverse round reached
+        # original indices N-1..N-1-k, so its remainder is the original prefix trace[0:N-1-k]:
+        # split the un-rolled reversed task, then flip the remainder back to paths3d order.
+        if fallback.candidate.direction == "reverse":
+            reversed_remainder = split_fn(_reverse_task(cur_task), fallback.last_reached_index)
+            remainder = None if reversed_remainder is None else _reverse_task(reversed_remainder)
+        else:
+            remainder = split_fn(cur_task, fallback.last_reached_index)
         if remainder is None:
             report_specs[-1]["reasons"] = sorted(set(report_specs[-1]["reasons"]) | {"too_short"})
             break

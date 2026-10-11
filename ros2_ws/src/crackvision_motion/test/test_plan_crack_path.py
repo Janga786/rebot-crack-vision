@@ -388,6 +388,56 @@ def test_run_segment_splits_retry_remainder_uses_unrolled_base_quaternions():
     assert checked_quats == [pytest.approx(task.trace[1].quat_xyzw)]
 
 
+def test_run_segment_splits_retry_after_reverse_partial_uses_paths3d_order():
+    """Finding c6af65a5745b06c4: after a reverse (rolled) partial reaching index k of the reversed
+    traversal, the remainder is the original prefix trace[0:N-1-k] in paths3d order, un-rolled --
+    the retry's forward roll-0 candidate must reproduce exactly those paths3d base poses, and the
+    retry's reported `chosen` direction is relative to paths3d."""
+    base = _task([0.0, 0.01, 0.02, 0.03, 0.04])
+    # distinct per-waypoint base orientations (yaw about +z), so both order and roll are observable
+    quats = tuple((0.0, 0.0, math.sin(math.radians(10 * i) / 2), math.cos(math.radians(10 * i) / 2)) for i in range(5))
+    task = base._replace(trace=tuple(Pose(p.position_m, q) for p, q in zip(base.trace, quats)))
+    rev_30 = _candidate("reverse", 30.0)
+    fwd_0 = _candidate("forward", 0.0)
+    rolled = apply_candidate(task, rev_30.direction, rev_30.roll_offset_rad)
+    k = 0
+    seen = []
+
+    def attempt_fn(t, positions):
+        if t is task:
+            return [
+                CandidateAttempt(
+                    candidate=rev_30, rolled_task=rolled,
+                    legs=[_leg("transit"), _leg("approach", 1), _leg("trace", k + 1)],
+                    last_reached_index=k, full=False, margin=0.3,
+                    final_positions=_joint_dict(_zeros6()), reasons=set(),
+                )
+            ]
+        seen.append(apply_candidate(t, fwd_0.direction, fwd_0.roll_offset_rad))
+        return [_full_attempt(t, fwd_0, margin=0.6)]
+
+    def synth_retract_fn(rolled_task, idx, positions):
+        return _leg("retract", 1)
+
+    _, report_specs, _ = run_segment_splits(
+        task, _joint_dict(_zeros6()), 3, attempt_fn, synth_retract_fn, min_waypoints_per_remainder=1,
+    )
+
+    expected = task.trace[0:len(task.trace) - 1 - k]
+    assert len(seen) == 1
+    retry = seen[0]
+    assert len(retry.trace) == len(expected) == 4
+    for got, want in zip(retry.trace, expected):
+        assert got.position_m == pytest.approx(want.position_m)
+        assert got.quat_xyzw == pytest.approx(want.quat_xyzw)
+    assert retry.approach.position_m[0] == pytest.approx(expected[0].position_m[0])
+    assert retry.retract.position_m[0] == pytest.approx(expected[-1].position_m[0])
+    assert len(report_specs) == 2
+    assert report_specs[1]["segment_ref"]["sub_segment"] == 0
+    assert report_specs[1]["chosen"]["direction"] == "forward"
+    assert report_specs[1]["chosen"]["roll_offset_rad"] == pytest.approx(0.0)
+
+
 # --------------------------------------------------------------------------------------
 # small pure helpers
 # --------------------------------------------------------------------------------------
