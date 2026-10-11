@@ -1,6 +1,6 @@
 # Progress — week of Mon Oct 05 – Sun Oct 11, 2026
 
-**29 task(s) completed and independently audited this week** · project total **71/122** accepted
+**29 task(s) completed and independently audited this week** · project total **71/123** accepted
 
 ## Notes
 
@@ -90,7 +90,7 @@
 | D405 capture (L-CAM) | 7 | 9 |
 | Perception (L-PERC) | 13 | 16 |
 | Geometry & calibration (L-GEOM) | 15 | 28 |
-| Motion planning (L-MOTION) | 18 | 39 |
+| Motion planning (L-MOTION) | 18 | 40 |
 | Integration & commissioning (L-INT) | 1 | 6 |
 | Operator workflow & handoff (L-OPS) | 1 | 4 |
 | Imitation learning (later phase) (L-IL) | 0 | 1 |
