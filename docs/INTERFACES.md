@@ -2222,3 +2222,120 @@ own `order_index`/`branch_index`/file order. A future card may re-sequence segme
 distance between them; this section does not attempt that.
 
 ---
+
+## 14. Pixel-to-tool-pose uncertainty budget (`crackvision.uncertainty_budget/1`)
+
+**Normative source:** `docs/adr/018-uncertainty-budget.md`. Additive: this section does not edit or
+reopen §9, §10 or any GEOM-04/06/08-accepted contract. It adds an aggregation/audit layer **on top of**
+an already-written §10 `paths3d` file — decomposing its existing `cov_base_m2`/`sigma_along_normal_m`
+into named per-term contributions, adding the one new FK term §10.4 explicitly left `unmodelled`, and
+cross-checking the linearized result against a Monte-Carlo resample of the same chain (ADR-018 §4).
+GEOM-09.2–.4 implement the analytic decomposition, the FK term and the MC cross-check respectively,
+against this schema.
+
+### 14.1 Inputs
+
+Every input is read by path and sha256; both are recorded in `sources` (§14.3).
+
+| Input | Role |
+|---|---|
+| §10 `paths3d` file (`data/paths3d/{case}_paths3d.json`) | source of `cov_base_m2`, `sigma_along_normal_m`, `sigma_normal_rad`, `calibration.*`, `parameters.*`, every point/waypoint this report decomposes |
+| §9 capture record (`paths3d.sources.capture_record`) | `robot.positions_rad` (FK operating point, §14.2's FK term), `robot.kinematic_model.path` (FK Jacobian) |
+| hand-eye calibration output (GEOM-04.3; `end_effector.yaml`'s `wrist_camera.uncertainty` block when `measured`, else the §10.4 nominal prior) | `σ_cam_pos`, `σ_cam_rot` |
+| TCP/pivot calibration output (GEOM-06; `end_effector.yaml`'s `tool.uncertainty` block when `measured`, else the §10.4 nominal prior) | `σ_tool_pos` |
+| `config/robot/b601_dm_limits.yaml` (if it carries a repeatability figure; else the ADR-018 §3 nominal) | `σ_joint_rad` |
+| `config/calibration/uncertainty_budget.yaml` (schema `crackvision.uncertainty_budget_config/1`, optional — defaults below apply if absent) | `mc.n_samples`, `mc.subsample`, `mc.agreement_band`, `mc.seed` |
+
+### 14.2 Named terms
+
+Fixed vocabulary, every report lists exactly these five (ADR-018 §1–§3):
+
+| Term | Meaning | Separable additive covariance? |
+|---|---|---|
+| `pixel` | skeleton-centreline pixel localization noise (`σ_px`) | yes — `Σ_base^(pixel)` |
+| `depth` | D405 stereo depth noise (`σ_z`) | yes — `Σ_base^(depth)` |
+| `handeye` | GEOM-04.3 hand-eye calibration sigma (rot+pos) | yes — `Σ_base^(handeye)` |
+| `tcp` | GEOM-06 TCP/pivot calibration sigma (`σ_tool_pos`) | waypoint-level only (ADR-018 §2) |
+| `fk` | joint-encoder/FK uncertainty (new in this card, ADR-018 §3) | yes — `Σ_base^(fk)` |
+
+Camera intrinsics are **not** a sixth term: ADR-018 §2 documents why their effect is folded into `J`
+rather than budgeted separately. `report.caveats[]` (§14.3) always states this verbatim.
+
+### 14.3 Report file `data/uncertainty/{case}_uncertainty_budget.json`
+
+| Field | Type | Meaning |
+|---|---|---|
+| `schema` | str | `"crackvision.uncertainty_budget/1"` |
+| `case_id` | str | §1 case id, copied from the input `paths3d` file |
+| `created_utc` | str | ISO-8601 UTC |
+| `producer` | str | the generating CLI/tool name |
+| `frame` | str | `"base_link"` for every per-point/per-waypoint quantity below |
+| `sources.paths3d` | `{path, sha256}` | the §10 file this report decomposes |
+| `sources.capture_record` | `{path, sha256}` | from `paths3d.sources.capture_record` |
+| `sources.end_effector` | `{path, sha256}` | `calibration.wrist_camera`/`calibration.tool` provenance |
+| `sources.limits` | `{path, sha256}` \| `null` | `b601_dm_limits.yaml`, if it supplied `σ_joint_rad`; `null` if the nominal was used |
+| `sources.config` | `{path, sha256}` \| `null` | `uncertainty_budget.yaml`, if present |
+| `parameters.sigma_joint_rad` | float | the `σ_joint_rad` actually used (file value or ADR-018 §3 nominal `0.001`) |
+| `parameters.sigma_joint_rad_source` | str | `"limits_file"` \| `"nominal"` |
+| `parameters.mc.n_samples` | int | MC sample count used (default **2000**) |
+| `parameters.mc.seed` | int | RNG seed used (for reproducibility) |
+| `parameters.mc.subsample` | int \| `"all"` | how many of `paths3d`'s dense points were MC-resampled (default `"all"`; an int subsamples uniformly by index for cost control) |
+| `parameters.mc.agreement_band` | `[float, float]` | `[min, max]` ratio band, default `[0.5, 2.0]` (ADR-018 §4) |
+| `points[]` | list | per-point decomposition, §14.4 |
+| `waypoints[]` | list | per-waypoint decomposition, §14.5 |
+| `summary.points_flagged` | int | count of `points[]` entries with `mc_analytic_agreement.flagged == true` |
+| `summary.waypoints_flagged` | int | count of `waypoints[]` entries with `mc_analytic_agreement.flagged == true` |
+| `summary.overall_pass` | bool | `summary.points_flagged == 0 and summary.waypoints_flagged == 0` |
+| `caveats[]` | list[str] | always includes, verbatim: *"Camera intrinsics uncertainty is not budgeted as a separate additive term; it is only indirectly exercised by the Monte-Carlo resample's nonlinear deprojection/annulus geometry (ADR-018 §2)."* |
+
+The file is **always** written, including when `summary.overall_pass` is `false` — a budget report is
+diagnostic, not a gate; nothing in this card changes `paths3d.execution_eligible` or any §10.6 reason.
+
+### 14.4 `points[]`
+
+One entry per dense `paths3d` point with `valid: true` (invalid points carry no geometry to decompose
+and are skipped). Indexing mirrors §10.2 (`component_id`, `polyline` identity, `point_index` into that
+polyline's `points[]`).
+
+| Field | Type | Meaning |
+|---|---|---|
+| `component_id`, `polyline_kind`, `branch_index`, `point_index` | — | identifies the source `paths3d` point (§10.2) |
+| `row`, `col` | int | copied from that point |
+| `sigma_total_m` | `[float,float,float]` | `sqrt(diag(Σ_base))` per base-link axis — identical to the source point's own `sigma_base_m` (§10.1); carried here for self-containment |
+| `contributions_m2` | object | `{pixel, depth, handeye, fk}`, each `[9 floats]` row-major 3×3 `Σ_base^(term)`, m²; sums exactly to the source point's `cov_base_m2` under linearization (ADR-018 §2) |
+| `mc.sigma_total_m` | `[float,float,float]` | `sqrt(diag(Σ_base^(MC)))`, the Monte-Carlo sample covariance's per-axis sigma, m |
+| `mc.n_samples_used` | int | samples actually drawn for this point (equals `parameters.mc.n_samples` unless subsampled out, in which case this point is omitted entirely rather than given a stale/zero entry) |
+| `mc_analytic_agreement.ratio_trace` | float | `trace(Σ_base^(MC)) / trace(Σ_base^(analytic))` |
+| `mc_analytic_agreement.ratio_eig_max` | float | `λ_max(Σ_base^(MC)) / λ_max(Σ_base^(analytic))` |
+| `mc_analytic_agreement.flagged` | bool | `true` iff either ratio falls outside `parameters.mc.agreement_band` |
+
+### 14.5 `waypoints[]`
+
+One entry per `paths3d` segment waypoint (§10.2 `segments[].waypoints[]`), indexed the same way plus
+`phase`/`waypoint_index`.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `component_id`, `polyline_kind`, `branch_index`, `segment_index`, `phase`, `waypoint_index` | — | identifies the source waypoint (§10.2) |
+| `sigma_along_normal_m` | float | copied from the source waypoint's `sigma_along_normal_m` (§10.1) |
+| `contributions_m2` | object | `{pixel, depth, handeye, tcp, fk}`, each a non-negative float, m²; `pixel`/`depth`/`handeye`/`fk` are `nᵀ·Σ_base^(term)·n` from the nearest source point (§10.3's gap-fill rule for `interpolated` points applies identically here); `tcp` is `σ_tool_pos²`; sums exactly to `sigma_along_normal_m²` |
+| `mc.sigma_along_normal_m` | float | sample standard deviation of the MC-resampled signed along-normal displacement |
+| `mc_analytic_agreement.ratio_along_normal` | float | `mc.sigma_along_normal_m / sigma_along_normal_m` |
+| `mc_analytic_agreement.flagged` | bool | `true` iff `ratio_along_normal` falls outside `parameters.mc.agreement_band` |
+| `within_budget` | bool | copied from the source waypoint (§10.1); never recomputed here — this report never changes execution eligibility |
+
+### 14.6 `config/calibration/uncertainty_budget.yaml` (schema `crackvision.uncertainty_budget_config/1`)
+
+Optional; every field below has the stated default and the file need not exist. Loaded strictly when
+present (unknown key or out-of-range value → exit 2, same convention as §13.2).
+
+| Field | Type | Default | Meaning |
+|---|---|---|---|
+| `schema` | str | — | `"crackvision.uncertainty_budget_config/1"` |
+| `mc.n_samples` | int | `2000` | ADR-018 §4 |
+| `mc.seed` | int | `0` | RNG seed |
+| `mc.subsample` | int \| `"all"` | `"all"` | §14.3 |
+| `mc.agreement_band` | `[float, float]` | `[0.5, 2.0]` | ADR-018 §4; `min < 1.0 < max`, both `> 0`, enforced by the loader |
+| `sigma_joint_rad` | float \| `null` | `null` (→ `0.001` nominal, ADR-018 §3) | overrides `b601_dm_limits.yaml`'s repeatability figure if given |
+
+---
