@@ -11,8 +11,7 @@
   ],
   "scope": {
     "write": [
-      "docs/llm/CANARY.md",
-      "plan/cards/*.md"
+      "docs/llm/CANARY.md"
     ]
   },
   "inputs": [
@@ -55,7 +54,11 @@
   "id": "LLM-06.1",
   "parent": "LLM-06",
   "title": "Select real low-risk mechanical cards and flip their routing to the qualified local model",
-  "outcome": "2–3 real, currently-unaccepted, low-risk mechanical leaf cards elsewhere in the backlog are selected; their routing.task_class is set to 'script' (the only class LLM-05 qualified) and routing.local_ok flipped to true, with nothing else in those cards changed. docs/llm/CANARY.md records the selection, rationale and pre-change state so the change is revertible."
+  "outcome": "2–3 real, currently-unaccepted, low-risk mechanical leaf cards elsewhere in the backlog are selected; their routing.task_class is set to 'script' (the only class LLM-05 qualified) and routing.local_ok flipped to true, with nothing else in those cards changed. docs/llm/CANARY.md records the selection, rationale and pre-change state so the change is revertible.",
+  "plan_patch_allow": [
+    "routing.local_ok",
+    "routing.task_class"
+  ]
 }
 ```
 
@@ -71,3 +74,6 @@ Pick 2 or 3 such cards. For each: set routing.task_class = 'script' and routing.
 Write docs/llm/CANARY.md with a fenced ```json canary block: {"qualification_ref": "evidence/llm/qualification.json", "selected_cards": [...], "selection_rationale": "...", "pre_state": [{"id":, "prior_task_class":, "prior_local_ok":, "status":}, ...]}. The pre_state entries let LLM-06.2 (or anyone) revert local_ok to its prior value if the canary reveals a problem. Add prose above the block explaining why each chosen card is real, mechanical, low-risk, and why it is safe to let the as-yet-untested local route attempt it for real.
 
 Do not touch any other file, and do not start/stop the llama-server yourself — that happens automatically when the scheduler later runs the chosen cards' impl attempts.
+
+## Debugger note (D0002, 2026-10-11T00:19:15Z)
+Debugger D0002: plan/ is read-only to agents. Do NOT edit plan/cards/*.md directly. Return the routing edits as plan_patch entries, e.g. [{"card": "X", "field": "routing.task_class", "value": "script"}, {"card": "X", "field": "routing.local_ok", "value": true}]. The scheduler applies and commits them with your docs/llm/CANARY.md change, and reverts them if the checks fail. Re-do the selection: HOST-05 (chosen in partial commit 04551f9) is now ACCEPTED and no longer eligible. GEOM-04.1 is blocked on an operator-only OpenCV swap, so re-check whether it is still a sensible canary. Update CANARY.md's selected_cards/pre_state to match. If fewer than 2 real candidates qualify, report that honestly.
