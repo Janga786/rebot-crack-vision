@@ -139,7 +139,10 @@ def _index_map_and_errors(
 ) -> Tuple[List[Optional[int]], float, float]:
     """§13.7 FK-matching pointer walk (mirrors cartesian_moveit.match_reached_waypoints), but also
     returns the full per-config `waypoint_index_map` (§13.11.2) that function does not expose, plus
-    the max position/angle error over every comparison attempted (matched or not), for diagnostics."""
+    the max position/angle error over only the FK-*matched* configurations (§13.11.2's `recheck`
+    is scoped to FK-checked configurations, i.e. those that got a `waypoint_index_map` entry) --
+    an unmatched intermediate/resampled configuration has no target of its own to be judged
+    against, so it is never allowed to inflate this diagnostic."""
     pointer = 0
     index_map: List[Optional[int]] = []
     max_pos_err = 0.0
@@ -151,10 +154,10 @@ def _index_map_and_errors(
             continue
         target = targets[pointer]
         pos_err, ang_err = _pose_errors(pose, target)
-        max_pos_err = max(max_pos_err, pos_err)
-        max_ang_err = max(max_ang_err, ang_err)
         if pos_err <= tol_m and ang_err <= tol_deg:
             index_map.append(pointer)
+            max_pos_err = max(max_pos_err, pos_err)
+            max_ang_err = max(max_ang_err, ang_err)
             pointer += 1
         else:
             index_map.append(None)
@@ -309,6 +312,8 @@ def run_segment_splits(
     attempt_fn: AttemptFn,
     synth_retract_fn: SynthRetractFn,
     split_fn: SplitFn = split_remainder,
+    *,
+    min_waypoints_per_remainder: int,
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], Dict[str, float]]:
     """§13.5-13.7 orchestration for one original segment, including every split retry. Pure with
     respect to ROS: `attempt_fn`/`synth_retract_fn`/`split_fn` are injected, so this is directly
@@ -379,7 +384,14 @@ def run_segment_splits(
             break
         if splits_used >= max_splits:
             break
-        remainder = split_fn(fallback.rolled_task, fallback.last_reached_index)
+        if total - planned < min_waypoints_per_remainder:
+            report_specs[-1]["reasons"] = sorted(set(report_specs[-1]["reasons"]) | {"too_short"})
+            break
+        # §13.7's remainder is retried "from scratch" against paths3d's own base poses, never the
+        # previous candidate's rolled/reversed ones -- only this round's own direction (not its
+        # roll) carries over, since it fixes which end of `cur_task` the remainder continues from.
+        traversal_task = apply_candidate(cur_task, fallback.candidate.direction, 0.0)
+        remainder = split_fn(traversal_task, fallback.last_reached_index)
         if remainder is None:
             report_specs[-1]["reasons"] = sorted(set(report_specs[-1]["reasons"]) | {"too_short"})
             break
@@ -410,6 +422,32 @@ def _fk_poses(moveit: MoveItClients, configs: Sequence[Sequence[float]]) -> List
             raise RuntimeError(f"/compute_fk failed: {err}")
         poses.append(pose)
     return poses
+
+
+def _classify_shortfall(
+    moveit: MoveItClients, cfg: Dict[str, Any], from_positions: Dict[str, float], target: Pose,
+) -> str:
+    """§13.8's bounded, best-effort attribution for a `fraction < 1` approach/trace/retract
+    shortfall (CARTESIAN_PROBE.md consequence 5: the service itself gives no cause): one extra IK
+    call, seeded from `from_positions` (the last-reached, or leg-start, configuration), to
+    `target` (the next unreached waypoint); IK failure leaves the generic `cartesian_incomplete`.
+    On an IK solution, `/check_state_validity` -> `collision` if invalid; otherwise the per-joint
+    step from `from_positions` to that solution against `recheck.max_joint_step_rad` ->
+    `joint_jump` if over, else the generic `cartesian_incomplete` stands."""
+    ik_resp = moveit.call(
+        moveit.clients["ik"], build_ik_request(target, from_positions, LINK, cfg),
+        timeout_s=ik_call_timeout_s(cfg),
+    )
+    ik_joints, err = parse_ik(ik_resp)
+    if err is not None:
+        return "cartesian_incomplete"
+    ik_vals = [ik_joints[n] for n in JOINT_NAMES]
+    if not _check_all_valid(moveit, [ik_vals]):
+        return "collision"
+    from_vals = [from_positions[n] for n in JOINT_NAMES]
+    if _max_joint_step([from_vals, ik_vals]) > cfg["recheck"]["max_joint_step_rad"]:
+        return "joint_jump"
+    return "cartesian_incomplete"
 
 
 def _attempt_candidate(
@@ -461,10 +499,11 @@ def _attempt_candidate(
     cur_positions = _joint_dict(transit_configs[-1])
 
     # Step 3: Cartesian approach to the first (rolled) trace pose.
+    approach_leg_start = cur_positions
     cart_resp = moveit.call(moveit.clients["cartesian"], build_cartesian_request(cur_positions, [rolled.trace[0]], LINK, cfg))
     approach_configs, fraction, err = parse_cartesian(cart_resp)
     if err is not None or fraction < 1.0:
-        return fail(err or "cartesian_incomplete")
+        return fail(_classify_shortfall(moveit, cfg, approach_leg_start, rolled.trace[0]))
     fk_poses = _fk_poses(moveit, approach_configs)
     idx_map, pos_err, ang_err = _index_map_and_errors(fk_poses, [rolled.trace[0]], tol_m, tol_deg)
     if _last_reached(idx_map) != 0:
@@ -482,8 +521,9 @@ def _attempt_candidate(
     # Step 4: Cartesian trace across every (rolled) trace pose; partial fallback is §13.7's job,
     # so any recheck failure on the reached prefix conservatively drops the whole prefix (never
     # over-claims coverage) rather than guessing where within it to truncate.
+    trace_leg_start = cur_positions
     cart_resp = moveit.call(moveit.clients["cartesian"], build_cartesian_request(cur_positions, rolled.trace, LINK, cfg))
-    trace_configs, fraction, cart_err = parse_cartesian(cart_resp)
+    trace_configs, fraction, _cart_err = parse_cartesian(cart_resp)
     if trace_configs:
         fk_poses = _fk_poses(moveit, trace_configs)
         trace_map, pos_err, ang_err = _index_map_and_errors(fk_poses, rolled.trace, tol_m, tol_deg)
@@ -503,8 +543,15 @@ def _attempt_candidate(
             committed_configs, committed_map = [], []
 
     last_reached = _last_reached(committed_map)
+    full_trace = last_reached == len(rolled.trace) - 1
+
+    if not full_trace:
+        # §13.8's fraction<1 classification, from the last FK-matched config (or this leg's own
+        # start if none matched) to the next still-unreached trace waypoint.
+        shortfall_start = _joint_dict(committed_configs[-1]) if committed_configs else trace_leg_start
+        reasons.add(_classify_shortfall(moveit, cfg, shortfall_start, rolled.trace[last_reached + 1]))
+
     if not committed_configs:
-        reasons.add(cart_err or "cartesian_incomplete")
         return CandidateAttempt(candidate, rolled, legs, -1, False, _min_joint_margin(approach_configs, limits), cur_positions, reasons)
 
     trace_step = _max_joint_step(committed_configs)
@@ -512,15 +559,16 @@ def _attempt_candidate(
     cur_positions = _joint_dict(committed_configs[-1])
     margin = _min_joint_margin(approach_configs + committed_configs, limits)
 
-    full_trace = last_reached == len(rolled.trace) - 1
     if not full_trace:
         return CandidateAttempt(candidate, rolled, legs, last_reached, False, margin, cur_positions, reasons)
 
     # Step 5: Cartesian retract (only attempted once the whole trace is reached).
+    retract_leg_start = cur_positions
     cart_resp = moveit.call(moveit.clients["cartesian"], build_cartesian_request(cur_positions, [rolled.retract], LINK, cfg))
     retract_configs, fraction, err = parse_cartesian(cart_resp)
     if err is not None or fraction < 1.0:
-        return CandidateAttempt(candidate, rolled, legs, last_reached, False, margin, cur_positions, reasons | {err or "cartesian_incomplete"})
+        reason = _classify_shortfall(moveit, cfg, retract_leg_start, rolled.retract)
+        return CandidateAttempt(candidate, rolled, legs, last_reached, False, margin, cur_positions, reasons | {reason})
     fk_poses = _fk_poses(moveit, retract_configs)
     r_idx_map, r_pos_err, r_ang_err = _index_map_and_errors(fk_poses, [rolled.retract], tol_m, tol_deg)
     if _last_reached(r_idx_map) != 0:
@@ -850,6 +898,7 @@ def _run(args: argparse.Namespace, log, summary: RunSummary) -> Dict[str, str]:
 
             leg_specs, report_specs, cur_positions = run_segment_splits(
                 task, cur_positions, cfg["splitting"]["max_splits_per_segment"], attempt_fn, synth_retract_fn,
+                min_waypoints_per_remainder=cfg["splitting"]["min_waypoints_per_remainder"],
             )
             for spec in leg_specs:
                 add_leg(plan, **spec)
