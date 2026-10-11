@@ -77,3 +77,6 @@ Do not touch any other file, and do not start/stop the llama-server yourself —
 
 ## Debugger note (D0002, 2026-10-11T00:19:15Z)
 Debugger D0002: plan/ is read-only to agents. Do NOT edit plan/cards/*.md directly. Return the routing edits as plan_patch entries, e.g. [{"card": "X", "field": "routing.task_class", "value": "script"}, {"card": "X", "field": "routing.local_ok", "value": true}]. The scheduler applies and commits them with your docs/llm/CANARY.md change, and reverts them if the checks fail. Re-do the selection: HOST-05 (chosen in partial commit 04551f9) is now ACCEPTED and no longer eligible. GEOM-04.1 is blocked on an operator-only OpenCV swap, so re-check whether it is still a sensible canary. Update CANARY.md's selected_cards/pre_state to match. If fewer than 2 real candidates qualify, report that honestly.
+
+## Debugger note (D0007, 2026-10-11T06:17:03Z)
+Debugger D0007: two attempts (00604, 00605) and an independent debugger re-scan all found 0 qualifying canary cards as of 2026-10-11. The `selection` check cannot pass with an empty selection, so do not resume this card on the same backlog. Wait for the operator's decision (defer, nominate candidates, or redefine the card). On resume, first check for an operator note naming candidates. If there is none and the backlog has not changed, report blocked again rather than force-fitting.
