@@ -246,3 +246,49 @@ this repository that can send a `FollowJointTrajectory` goal, mock or real, gate
 `scripts/ros/test_execution.sh` is the headless, no-hardware verification of the whole mock→dry progression
 (including refusals, collision and e-stop injection); run it after any `crackvision_motion` rebuild that
 touches execution.
+
+## 9. Cartesian crack-path and view-pose planning CLIs (MOT-06, ADR-017)
+
+Both console scripts below are untimed geometric planners: neither ever creates a ROS action
+client, so neither can command or execute motion — see `docs/motion/CARTESIAN_PLANNING.md` for the
+end-to-end synthetic demonstration (`scripts/ros/run_cartesian_synthetic.sh`) and MOT-07's handoff.
+
+### `plan_view` (`crackvision_motion.plan_view`, docs/INTERFACES.md §13.14)
+
+- **Command:** `ros2 run crackvision_motion plan_view [--scene-config PATH] [--planning-config PATH]
+  [--center X Y] [--out PATH] [--root PATH] [--dry-run] [--skip-existing] [-v|-q]`
+- **Inputs:** `config/scene/scene.yaml` (or `--scene-config`) for the specimen's centre/footprint
+  (unless `--center X Y` is given, which always takes precedence), `config/motion/cartesian_planning.yaml`
+  (or `--planning-config`) for the `(tilt_deg, yaw_deg)` candidate grid and FOV/reachability
+  tolerances, `config/robot/end_effector.yaml` and `config/robot/b601_dm_limits.yaml` under
+  `--root`. Needs a running mock/real MoveIt stack (`/compute_ik`, `/compute_fk`,
+  `/plan_kinematic_path`, `/check_state_validity`, `/get_planning_scene`, `/apply_planning_scene`).
+- **Output:** `crackvision.view_plan/1` at `--out` (default `data/plans/view_plan.json`): every
+  candidate tried with its FOV check and reachability/re-check result, the chosen candidate (if
+  any) and its `transit_leg` from the SRDF home state.
+- **Exit codes:** `0` chosen and written; `2` (`EXIT_USAGE`) invalid config/scene; `3`
+  (`EXIT_PRECONDITION`) no candidate passed FOV+reachability+re-check (reasons logged per
+  candidate) or a required file is missing. `--dry-run` validates inputs and lists candidates
+  without touching ROS or writing a file.
+
+### `plan_crack_path` (`crackvision_motion.plan_crack_path`, docs/INTERFACES.md §13)
+
+- **Command:** `ros2 run crackvision_motion plan_crack_path --paths3d PATH [--scene-config PATH]
+  [--planning-config PATH] [--out PATH] [--start-joints J1..J6] [--require-full-coverage]
+  [--root PATH] [--dry-run] [--skip-existing] [-v|-q]`
+- **Inputs:** a `crackvision.paths3d/1` file (`--paths3d`, required — `crackvision.path3d`'s
+  output, §10), `config/scene/scene.yaml` (or `--scene-config`), `config/motion/cartesian_planning.yaml`
+  (or `--planning-config`), `config/robot/end_effector.yaml` and `config/robot/b601_dm_limits.yaml`
+  under `--root`, plus (unless `--start-joints` overrides it) the `--paths3d` file's own
+  `sources.capture_record` joint state. Needs the same running MoveIt stack as `plan_view`, plus
+  `/compute_cartesian_path`.
+- **Output:** `crackvision.cartesian_plan/1` at `--out` (default
+  `data/plans/{case_id}_cartesian_plan.json`): a `full`/`failed`/`surface_scene_mismatch` report per
+  segment, the continuous joint-space `legs[]` (never a valid `execute_trajectory --trajectory`
+  input on its own — untimed, MOT-07 retimes it per §11.2), and `coverage` (`trace_waypoints_planned`
+  / `_total`, `fraction_by_length`, `complete`).
+- **Exit codes:** `0` written (coverage may be partial unless `--require-full-coverage`); `2`
+  invalid config; `3` zero waypoints planned at all, `--require-full-coverage` given but
+  `coverage.complete` is false, or a required file/capture-record sha mismatch. `--dry-run`
+  validates inputs and lists per-segment candidate counts/mismatches without touching ROS or
+  writing a file.
