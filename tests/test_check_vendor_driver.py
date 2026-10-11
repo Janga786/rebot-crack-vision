@@ -17,6 +17,7 @@ sys.path.insert(0, str(REPO_ROOT / "scripts" / "motion"))
 import check_vendor_driver as cvd  # noqa: E402
 
 FIXTURES = REPO_ROOT / "tests" / "fixtures" / "vendor_driver" / "good"
+PINNED_SDK_FIXTURE = REPO_ROOT / "tests" / "fixtures" / "vendor_driver" / "pinned_sdk"
 
 
 def _hash_tree(root: Path) -> dict[str, str]:
@@ -31,6 +32,15 @@ def _make_tree(tmp_path: Path) -> Path:
     dest = tmp_path / "rebot_ws"
     shutil.copytree(FIXTURES / "rebot_ws", dest)
     return dest
+
+
+def _make_pinned_sdk_tree(tmp_path: Path) -> Path:
+    """The good fixture tree with the SDK replaced by the 8427281 (actuator/arm.py) layout."""
+    rebot_ws = _make_tree(tmp_path)
+    sdk_root = rebot_ws / "third_party/reBotArm_control_py"
+    shutil.rmtree(sdk_root)
+    shutil.copytree(PINNED_SDK_FIXTURE, sdk_root)
+    return rebot_ws
 
 
 def _run(tmp_path: Path, rebot_ws: Path, json_out: Path | None = None, **overrides):
@@ -142,6 +152,47 @@ def test_missing_sdk_export_fails_v_sdk_api(tmp_path):
     assert _fail_ids(result["report"]) == ["V-SDK-API"]
     sdk = next(c for c in result["report"]["checks"] if c["id"] == "V-SDK-API")
     assert "8427281" in sdk["citation"] and "8427281" in sdk["remedy"]
+
+
+def test_pinned_sdk_layout_exits_zero(tmp_path):
+    rebot_ws = _make_pinned_sdk_tree(tmp_path)
+    result = _run_capture(tmp_path, rebot_ws)
+    assert result["rc"] == cvd.EXIT_OK
+    assert _fail_ids(result["report"]) == []
+    baud = next(c for c in result["report"]["checks"] if c["id"] == "V-BAUD")
+    assert "/actuator/arm.py:" in baud["citation"]
+
+
+def test_pinned_sdk_layout_does_not_modify_vendor_tree(tmp_path):
+    rebot_ws = _make_pinned_sdk_tree(tmp_path)
+    before = _hash_tree(rebot_ws)
+    _run(tmp_path, rebot_ws)
+    after = _hash_tree(rebot_ws)
+    assert before == after
+
+
+def test_pinned_sdk_detached_head_reported_as_sdk_head(tmp_path):
+    rebot_ws = _make_pinned_sdk_tree(tmp_path)
+    result = _run_capture(tmp_path, rebot_ws)
+    sdk = next(c for c in result["report"]["checks"] if c["id"] == "V-SDK-API")
+    assert sdk["compared"]["sdk_head"] == "8427281aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+
+def test_pinned_sdk_missing_arm_endpos_export_fails_v_sdk_api(tmp_path):
+    rebot_ws = _make_pinned_sdk_tree(tmp_path)
+    controllers_init = rebot_ws / "third_party/reBotArm_control_py/reBotArm_control_py/controllers/__init__.py"
+    controllers_init.write_text("__all__ = []\n")
+    result = _run_capture(tmp_path, rebot_ws)
+    assert result["rc"] == cvd.EXIT_NOT_READY
+    assert _fail_ids(result["report"]) == ["V-SDK-API"]
+
+
+def test_pinned_sdk_neither_arm_module_exits_usage_error(tmp_path):
+    rebot_ws = _make_pinned_sdk_tree(tmp_path)
+    arm_py = rebot_ws / "third_party/reBotArm_control_py/reBotArm_control_py/actuator/arm.py"
+    arm_py.unlink()
+    rc = _run(tmp_path, rebot_ws)
+    assert rc == cvd.EXIT_USAGE
 
 
 def test_missing_deps_fails_v_pydeps(tmp_path):

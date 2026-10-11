@@ -18,6 +18,20 @@ a required input file is missing. `scripts/motion/check_vendor_driver.py --help`
 `--format json`/`--json-out PATH` give a machine-readable report. The tool is read-only: it never
 writes under `~/rebot_ws`, only `logs/` (docs/INTERFACES.md §0.4) and `--json-out`.
 
+- **After pinning the SDK.** `V-SDK-API`'s own remedy is to pin the vendored SDK, an operator
+  action outside this repo: `git -C ~/rebot_ws/third_party/reBotArm_control_py checkout 8427281`.
+  The same re-run command above then evaluates the pinned layout: up to and including `8427281`
+  the SDK's arm module is `actuator/arm.py` (not `actuator/rebotarm.py`), and `V-BAUD` reads the
+  baud and cites it from whichever of the two files is present.
+- **Out-of-tree driver dependencies.** If a dependency `V-PYDEPS` checks for was installed outside
+  the standard interpreter search dirs (for example `pip install --target DIR`), pass
+  `--driver-pythonpath DIR` so the checker finds it — and launch the real driver with that same
+  `DIR` on `PYTHONPATH`, or the checker's PASS will not match what actually runs.
+- **Config fixes apply to the vendor default files.** The checker reads the default config files
+  under `--rebot-ws` (`arm.yaml`, `gripper.yaml`, `driver_params.yaml`, `safe_park.yaml`), not any
+  launch-time override (`arm_config:=`, `safe_park_config:=`). A config remedy above must be
+  applied to those default files for a re-run to see it.
+
 ## What launching the vendor driver actually does
 
 - **At connect:** `HardwareManager.connect()` starts the end-position controller, seeds its
