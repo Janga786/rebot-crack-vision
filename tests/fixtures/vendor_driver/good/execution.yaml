@@ -1,0 +1,6 @@
+driver_profiles:
+  vendor:
+    action: /rebotarm/follow_joint_trajectory
+    joint_states_topic: /rebotarm/joint_states
+    expected_node: reBotArmController
+    arm_status_topic: /rebotarm/arm_status

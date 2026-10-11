@@ -1,0 +1,6 @@
+reBotArmController:
+  ros__parameters:
+    arm_namespace: rebotarm
+    joint_state_rate: 100.0
+    cmd_arbitration: reject
+    channel: ""

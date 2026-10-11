@@ -1,0 +1,14 @@
+reBotArmController:
+  ros__parameters:
+    safe_park_enabled: true
+    safe_park_on_shutdown: true
+    safe_park_q:
+      - -0.0001
+      - -0.01
+      - -0.01
+      - 0.01
+      - 0.01
+      - 0.0001
+    safe_park_tolerance_rad: 0.03
+    safe_park_timeout_s: 15.0
+    safe_park_vlim: 0.25
