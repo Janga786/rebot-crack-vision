@@ -2,7 +2,7 @@
 
 ```json card
 {
-  "kind": "impl",
+  "kind": "branch",
   "depends_on": [
     "GEOM-09.1",
     "GEOM-09.2"
@@ -10,7 +10,6 @@
   "requirements": [
     "REQ-GEOM-1"
   ],
-  "spec_state": "draft",
   "refine_after": [
     "GEOM-09.1"
   ],
@@ -64,3 +63,6 @@ Implement `crackvision/uncertainty_mc.py`: a Monte-Carlo cross-check of GEOM-09.
 For a given lifted point or tool waypoint and its input sigmas, draw N samples perturbing pixel location, depth, hand-eye extrinsic (rotation+translation) and TCP offset per §14's documented distributions; for each sample, recompute the point/waypoint by calling the real `lift3d`/`tool_waypoints`/`kinematics` functions with the perturbed inputs (not a simplified model). Accumulate the empirical covariance of the resulting 3D points/poses across samples, and compare it to `crackvision.uncertainty`'s analytic total via the §14 agreement statistic (e.g. eigenvalue or trace ratio).
 
 Keep this pure (no CLI, no file I/O) — GEOM-09.4 wires it into the CLI/report. Bound N so `tests/test_uncertainty_mc.py` runs quickly; use a fixed seed. Include both an agreeing case and a deliberately non-linear case that the statistic flags, so the check has discriminating power.
+
+## Decomposed 2026-10-11T14:41:44Z by L-GEOM (claude-sonnet-5, high)
+Children: GEOM-09.3.1
