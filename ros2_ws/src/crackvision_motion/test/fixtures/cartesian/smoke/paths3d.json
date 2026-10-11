@@ -1,0 +1,7029 @@
+{
+ "schema": "crackvision.paths3d/1",
+ "case_id": "mot067_smoke",
+ "frame": "base_link",
+ "image_height": 480,
+ "image_width": 640,
+ "sources": {
+  "paths_json": "ros2_ws/src/crackvision_motion/test/fixtures/cartesian/smoke/NONE_synthetic_fixture",
+  "paths_json_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "capture_record": "ros2_ws/src/crackvision_motion/test/fixtures/cartesian/smoke/capture_stub.json",
+  "capture_record_sha256": "66d9cc7c82a48706afdbcdb358977704f9183c512454acda7e5accbfbc10e2b3",
+  "mask": "ros2_ws/src/crackvision_motion/test/fixtures/cartesian/smoke/NONE_synthetic_fixture",
+  "mask_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "end_effector": {
+   "sha256_at_capture": "synthetic",
+   "sha256_now": "synthetic"
+  },
+  "urdf_sha256": "synthetic"
+ },
+ "parameters": {
+  "annulus_inner_px": 3,
+  "annulus_outer_px": 8,
+  "annulus_min_fraction_valid": 0.3,
+  "valid_depth_range_m": [
+   0.07,
+   0.5
+  ],
+  "max_gap_px": 5,
+  "sigma_px": 1.0,
+  "waypoint_spacing_m": 0.002,
+  "approach_retract_offset_m": 0.04,
+  "trace_clearance_m": 0.01,
+  "roll_free": true,
+  "max_clock_skew_s": 0.05
+ },
+ "calibration": {
+  "wrist_camera": {
+   "value_status": "nominal",
+   "position_sigma_m": 0.01,
+   "rotation_sigma_rad": 0.087266463,
+   "source": "\u00a710.4 nominal prior"
+  },
+  "tool": {
+   "value_status": "nominal",
+   "position_sigma_m": 0.005,
+   "source": "\u00a710.4 nominal prior"
+  }
+ },
+ "uncertainty_model": {
+  "terms": [
+   "pixel_sigma",
+   "depth_sigma",
+   "wrist_camera_pose",
+   "tool_position"
+  ],
+  "unmodelled": [
+   "joint_encoder_and_fk",
+   "depth_bias",
+   "distortion_jacobian",
+   "capture_time_skew_motion",
+   "thermal_drift"
+  ]
+ },
+ "execution_eligible": false,
+ "ineligible_reasons": [
+  "wrist_camera_nominal",
+  "tool_nominal",
+  "optical_frames_nominal",
+  "synthetic_capture",
+  "uncertainty_exceeds_clearance"
+ ],
+ "counts": {
+  "points": 91,
+  "valid": 91,
+  "interpolated": 0,
+  "invalid_by_reason": {}
+ },
+ "components": [
+  {
+   "order_index": 0,
+   "component_id": "crack_a",
+   "polylines": [
+    {
+     "kind": "main",
+     "branch_index": null,
+     "points": [
+      {
+       "row": 424,
+       "col": 302,
+       "u": 302,
+       "v": 424,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.02,
+        0.21,
+        0.49
+       ],
+       "p_base_m": [
+        0.23,
+        0.02,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002269782654,
+        -1.07731e-07,
+        2.639402e-06,
+        -1.07731e-07,
+        0.002268661742,
+        -2.51372e-07,
+        2.639402e-06,
+        -2.51372e-07,
+        0.002273511547
+       ],
+       "sigma_base_m": [
+        0.047642236,
+        0.047630471,
+        0.047681354
+       ]
+      },
+      {
+       "row": 423,
+       "col": 302,
+       "u": 302,
+       "v": 423,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.02,
+        0.208,
+        0.49
+       ],
+       "p_base_m": [
+        0.232,
+        0.02,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002263394706,
+        -1.06705e-07,
+        2.614265e-06,
+        -1.06705e-07,
+        0.002262295238,
+        -2.51372e-07,
+        2.614265e-06,
+        -2.51372e-07,
+        0.002267145043
+       ],
+       "sigma_base_m": [
+        0.047575148,
+        0.047563592,
+        0.047614547
+       ]
+      },
+      {
+       "row": 421,
+       "col": 302,
+       "u": 302,
+       "v": 421,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.02,
+        0.206,
+        0.49
+       ],
+       "p_base_m": [
+        0.234,
+        0.02,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002257067887,
+        -1.05679e-07,
+        2.589128e-06,
+        -1.05679e-07,
+        0.002255989657,
+        -2.51372e-07,
+        2.589128e-06,
+        -2.51372e-07,
+        0.002260839462
+       ],
+       "sigma_base_m": [
+        0.047508609,
+        0.047497259,
+        0.047548286
+       ]
+      },
+      {
+       "row": 419,
+       "col": 302,
+       "u": 302,
+       "v": 419,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.02,
+        0.204,
+        0.49
+       ],
+       "p_base_m": [
+        0.236,
+        0.02,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002250802197,
+        -1.04653e-07,
+        2.563991e-06,
+        -1.04653e-07,
+        0.002249745,
+        -2.51372e-07,
+        2.563991e-06,
+        -2.51372e-07,
+        0.002254594805
+       ],
+       "sigma_base_m": [
+        0.04744262,
+        0.047431477,
+        0.047482574
+       ]
+      },
+      {
+       "row": 417,
+       "col": 302,
+       "u": 302,
+       "v": 417,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.02,
+        0.202,
+        0.49
+       ],
+       "p_base_m": [
+        0.238,
+        0.02,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002244597636,
+        -1.03627e-07,
+        2.538854e-06,
+        -1.03627e-07,
+        0.002243561266,
+        -2.51372e-07,
+        2.538854e-06,
+        -2.51372e-07,
+        0.002248411072
+       ],
+       "sigma_base_m": [
+        0.047377185,
+        0.047366246,
+        0.047417413
+       ]
+      },
+      {
+       "row": 416,
+       "col": 302,
+       "u": 302,
+       "v": 416,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.02,
+        0.2,
+        0.49
+       ],
+       "p_base_m": [
+        0.24,
+        0.02,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002238454203,
+        -1.02601e-07,
+        2.513716e-06,
+        -1.02601e-07,
+        0.002237438456,
+        -2.51372e-07,
+        2.513716e-06,
+        -2.51372e-07,
+        0.002242288262
+       ],
+       "sigma_base_m": [
+        0.047312305,
+        0.047301569,
+        0.047352806
+       ]
+      },
+      {
+       "row": 414,
+       "col": 302,
+       "u": 302,
+       "v": 414,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.02,
+        0.198,
+        0.49
+       ],
+       "p_base_m": [
+        0.242,
+        0.02,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002232371899,
+        -1.01575e-07,
+        2.488579e-06,
+        -1.01575e-07,
+        0.002231376569,
+        -2.51372e-07,
+        2.488579e-06,
+        -2.51372e-07,
+        0.002236226375
+       ],
+       "sigma_base_m": [
+        0.047247983,
+        0.047237449,
+        0.047288755
+       ]
+      },
+      {
+       "row": 412,
+       "col": 302,
+       "u": 302,
+       "v": 412,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.02,
+        0.196,
+        0.49
+       ],
+       "p_base_m": [
+        0.244,
+        0.02,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002226350723,
+        -1.00549e-07,
+        2.463442e-06,
+        -1.00549e-07,
+        0.002225375606,
+        -2.51372e-07,
+        2.463442e-06,
+        -2.51372e-07,
+        0.002230225412
+       ],
+       "sigma_base_m": [
+        0.047184221,
+        0.047173887,
+        0.047225262
+       ]
+      },
+      {
+       "row": 410,
+       "col": 302,
+       "u": 302,
+       "v": 410,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.02,
+        0.194,
+        0.49
+       ],
+       "p_base_m": [
+        0.246,
+        0.02,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002220390676,
+        -9.9523e-08,
+        2.438305e-06,
+        -9.9523e-08,
+        0.002219435567,
+        -2.51372e-07,
+        2.438305e-06,
+        -2.51372e-07,
+        0.002224285372
+       ],
+       "sigma_base_m": [
+        0.047121022,
+        0.047110886,
+        0.04716233
+       ]
+      },
+      {
+       "row": 408,
+       "col": 302,
+       "u": 302,
+       "v": 408,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.02,
+        0.192,
+        0.49
+       ],
+       "p_base_m": [
+        0.248,
+        0.02,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002214491758,
+        -9.8497e-08,
+        2.413168e-06,
+        -9.8497e-08,
+        0.00221355645,
+        -2.51372e-07,
+        2.413168e-06,
+        -2.51372e-07,
+        0.002218406256
+       ],
+       "sigma_base_m": [
+        0.047058387,
+        0.047048448,
+        0.04709996
+       ]
+      },
+      {
+       "row": 407,
+       "col": 302,
+       "u": 302,
+       "v": 407,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.02,
+        0.19,
+        0.49
+       ],
+       "p_base_m": [
+        0.25,
+        0.02,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002208653969,
+        -9.7471e-08,
+        2.388031e-06,
+        -9.7471e-08,
+        0.002207738258,
+        -2.51372e-07,
+        2.388031e-06,
+        -2.51372e-07,
+        0.002212588063
+       ],
+       "sigma_base_m": [
+        0.046996319,
+        0.046986575,
+        0.047038155
+       ]
+      },
+      {
+       "row": 405,
+       "col": 302,
+       "u": 302,
+       "v": 405,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.02,
+        0.188,
+        0.49
+       ],
+       "p_base_m": [
+        0.252,
+        0.02,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002202877308,
+        -9.6445e-08,
+        2.362893e-06,
+        -9.6445e-08,
+        0.002201980988,
+        -2.51372e-07,
+        2.362893e-06,
+        -2.51372e-07,
+        0.002206830794
+       ],
+       "sigma_base_m": [
+        0.04693482,
+        0.04692527,
+        0.046976918
+       ]
+      },
+      {
+       "row": 403,
+       "col": 302,
+       "u": 302,
+       "v": 403,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.02,
+        0.186,
+        0.49
+       ],
+       "p_base_m": [
+        0.254,
+        0.02,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002197161776,
+        -9.5419e-08,
+        2.337756e-06,
+        -9.5419e-08,
+        0.002196284643,
+        -2.51372e-07,
+        2.337756e-06,
+        -2.51372e-07,
+        0.002201134448
+       ],
+       "sigma_base_m": [
+        0.046873892,
+        0.046864535,
+        0.046916249
+       ]
+      },
+      {
+       "row": 401,
+       "col": 302,
+       "u": 302,
+       "v": 401,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.02,
+        0.184,
+        0.49
+       ],
+       "p_base_m": [
+        0.256,
+        0.02,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002191507372,
+        -9.4393e-08,
+        2.312619e-06,
+        -9.4393e-08,
+        0.00219064922,
+        -2.51372e-07,
+        2.312619e-06,
+        -2.51372e-07,
+        0.002195499026
+       ],
+       "sigma_base_m": [
+        0.046813538,
+        0.046804372,
+        0.046856152
+       ]
+      },
+      {
+       "row": 400,
+       "col": 302,
+       "u": 302,
+       "v": 400,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.02,
+        0.182,
+        0.49
+       ],
+       "p_base_m": [
+        0.258,
+        0.02,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002185914098,
+        -9.3367e-08,
+        2.287482e-06,
+        -9.3367e-08,
+        0.002185074722,
+        -2.51372e-07,
+        2.287482e-06,
+        -2.51372e-07,
+        0.002189924527
+       ],
+       "sigma_base_m": [
+        0.04675376,
+        0.046744783,
+        0.046796629
+       ]
+      },
+      {
+       "row": 398,
+       "col": 302,
+       "u": 302,
+       "v": 398,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.02,
+        0.18,
+        0.49
+       ],
+       "p_base_m": [
+        0.26,
+        0.02,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002180381952,
+        -9.2341e-08,
+        2.262345e-06,
+        -9.2341e-08,
+        0.002179561146,
+        -2.51372e-07,
+        2.262345e-06,
+        -2.51372e-07,
+        0.002184410952
+       ],
+       "sigma_base_m": [
+        0.04669456,
+        0.04668577,
+        0.046737682
+       ]
+      },
+      {
+       "row": 396,
+       "col": 302,
+       "u": 302,
+       "v": 396,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.02,
+        0.178,
+        0.49
+       ],
+       "p_base_m": [
+        0.262,
+        0.02,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002174910934,
+        -9.1315e-08,
+        2.237208e-06,
+        -9.1315e-08,
+        0.002174108494,
+        -2.51372e-07,
+        2.237208e-06,
+        -2.51372e-07,
+        0.0021789583
+       ],
+       "sigma_base_m": [
+        0.04663594,
+        0.046627336,
+        0.046679313
+       ]
+      },
+      {
+       "row": 394,
+       "col": 302,
+       "u": 302,
+       "v": 394,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.02,
+        0.176,
+        0.49
+       ],
+       "p_base_m": [
+        0.264,
+        0.02,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002169501046,
+        -9.0289e-08,
+        2.21207e-06,
+        -9.0289e-08,
+        0.002168716766,
+        -2.51372e-07,
+        2.21207e-06,
+        -2.51372e-07,
+        0.002173566572
+       ],
+       "sigma_base_m": [
+        0.046577903,
+        0.046569483,
+        0.046621525
+       ]
+      },
+      {
+       "row": 393,
+       "col": 302,
+       "u": 302,
+       "v": 393,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.02,
+        0.174,
+        0.49
+       ],
+       "p_base_m": [
+        0.266,
+        0.02,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002164152286,
+        -8.9263e-08,
+        2.186933e-06,
+        -8.9263e-08,
+        0.002163385961,
+        -2.51372e-07,
+        2.186933e-06,
+        -2.51372e-07,
+        0.002168235767
+       ],
+       "sigma_base_m": [
+        0.04652045,
+        0.046512213,
+        0.046564319
+       ]
+      },
+      {
+       "row": 391,
+       "col": 302,
+       "u": 302,
+       "v": 391,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.02,
+        0.172,
+        0.49
+       ],
+       "p_base_m": [
+        0.268,
+        0.02,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002158864654,
+        -8.8237e-08,
+        2.161796e-06,
+        -8.8237e-08,
+        0.00215811608,
+        -2.51372e-07,
+        2.161796e-06,
+        -2.51372e-07,
+        0.002162965885
+       ],
+       "sigma_base_m": [
+        0.046463584,
+        0.046455528,
+        0.046507697
+       ]
+      },
+      {
+       "row": 389,
+       "col": 302,
+       "u": 302,
+       "v": 389,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.02,
+        0.17,
+        0.49
+       ],
+       "p_base_m": [
+        0.27,
+        0.02,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002153638152,
+        -8.7211e-08,
+        2.136659e-06,
+        -8.7211e-08,
+        0.002152907122,
+        -2.51372e-07,
+        2.136659e-06,
+        -2.51372e-07,
+        0.002157756928
+       ],
+       "sigma_base_m": [
+        0.046407307,
+        0.04639943,
+        0.046451662
+       ]
+      },
+      {
+       "row": 387,
+       "col": 302,
+       "u": 302,
+       "v": 387,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.02,
+        0.168,
+        0.49
+       ],
+       "p_base_m": [
+        0.272,
+        0.02,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002148472778,
+        -8.6185e-08,
+        2.111522e-06,
+        -8.6185e-08,
+        0.002147759088,
+        -2.51372e-07,
+        2.111522e-06,
+        -2.51372e-07,
+        0.002152608893
+       ],
+       "sigma_base_m": [
+        0.046351621,
+        0.046343922,
+        0.046396216
+       ]
+      },
+      {
+       "row": 386,
+       "col": 302,
+       "u": 302,
+       "v": 386,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.02,
+        0.166,
+        0.49
+       ],
+       "p_base_m": [
+        0.274,
+        0.02,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002143368533,
+        -8.5159e-08,
+        2.086385e-06,
+        -8.5159e-08,
+        0.002142671977,
+        -2.51372e-07,
+        2.086385e-06,
+        -2.51372e-07,
+        0.002147521782
+       ],
+       "sigma_base_m": [
+        0.046296528,
+        0.046289005,
+        0.046341361
+       ]
+      },
+      {
+       "row": 384,
+       "col": 302,
+       "u": 302,
+       "v": 384,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.02,
+        0.164,
+        0.49
+       ],
+       "p_base_m": [
+        0.276,
+        0.02,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002138325416,
+        -8.4133e-08,
+        2.061247e-06,
+        -8.4133e-08,
+        0.002137645789,
+        -2.51372e-07,
+        2.061247e-06,
+        -2.51372e-07,
+        0.002142495595
+       ],
+       "sigma_base_m": [
+        0.046242031,
+        0.046234682,
+        0.0462871
+       ]
+      },
+      {
+       "row": 382,
+       "col": 302,
+       "u": 302,
+       "v": 382,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.02,
+        0.162,
+        0.49
+       ],
+       "p_base_m": [
+        0.278,
+        0.02,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002133343428,
+        -8.3107e-08,
+        2.03611e-06,
+        -8.3107e-08,
+        0.002132680525,
+        -2.51372e-07,
+        2.03611e-06,
+        -2.51372e-07,
+        0.002137530331
+       ],
+       "sigma_base_m": [
+        0.046188131,
+        0.046180954,
+        0.046233433
+       ]
+      },
+      {
+       "row": 380,
+       "col": 302,
+       "u": 302,
+       "v": 380,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.02,
+        0.16,
+        0.49
+       ],
+       "p_base_m": [
+        0.28,
+        0.02,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002128422569,
+        -8.2081e-08,
+        2.010973e-06,
+        -8.2081e-08,
+        0.002127776185,
+        -2.51372e-07,
+        2.010973e-06,
+        -2.51372e-07,
+        0.00213262599
+       ],
+       "sigma_base_m": [
+        0.04613483,
+        0.046127824,
+        0.046180364
+       ]
+      },
+      {
+       "row": 379,
+       "col": 302,
+       "u": 302,
+       "v": 379,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.02,
+        0.158,
+        0.49
+       ],
+       "p_base_m": [
+        0.282,
+        0.02,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002123562839,
+        -8.1055e-08,
+        1.985836e-06,
+        -8.1055e-08,
+        0.002122932768,
+        -2.51372e-07,
+        1.985836e-06,
+        -2.51372e-07,
+        0.002127782573
+       ],
+       "sigma_base_m": [
+        0.046082131,
+        0.046075295,
+        0.046127894
+       ]
+      },
+      {
+       "row": 377,
+       "col": 302,
+       "u": 302,
+       "v": 377,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.02,
+        0.156,
+        0.49
+       ],
+       "p_base_m": [
+        0.284,
+        0.02,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002118764237,
+        -8.0029e-08,
+        1.960699e-06,
+        -8.0029e-08,
+        0.002118150274,
+        -2.51372e-07,
+        1.960699e-06,
+        -2.51372e-07,
+        0.00212300008
+       ],
+       "sigma_base_m": [
+        0.046030036,
+        0.046023367,
+        0.046076025
+       ]
+      },
+      {
+       "row": 375,
+       "col": 302,
+       "u": 302,
+       "v": 375,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.02,
+        0.154,
+        0.49
+       ],
+       "p_base_m": [
+        0.286,
+        0.02,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002114026764,
+        -7.9003e-08,
+        1.935562e-06,
+        -7.9003e-08,
+        0.002113428704,
+        -2.51372e-07,
+        1.935562e-06,
+        -2.51372e-07,
+        0.00211827851
+       ],
+       "sigma_base_m": [
+        0.045978547,
+        0.045972043,
+        0.04602476
+       ]
+      },
+      {
+       "row": 373,
+       "col": 302,
+       "u": 302,
+       "v": 373,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.02,
+        0.152,
+        0.49
+       ],
+       "p_base_m": [
+        0.288,
+        0.02,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002109350419,
+        -7.7977e-08,
+        1.910425e-06,
+        -7.7977e-08,
+        0.002108768058,
+        -2.51372e-07,
+        1.910425e-06,
+        -2.51372e-07,
+        0.002113617863
+       ],
+       "sigma_base_m": [
+        0.045927665,
+        0.045921325,
+        0.0459741
+       ]
+      },
+      {
+       "row": 372,
+       "col": 302,
+       "u": 302,
+       "v": 372,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.02,
+        0.15,
+        0.49
+       ],
+       "p_base_m": [
+        0.29,
+        0.02,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002104735204,
+        -7.6951e-08,
+        1.885287e-06,
+        -7.6951e-08,
+        0.002104168335,
+        -2.51372e-07,
+        1.885287e-06,
+        -2.51372e-07,
+        0.00210901814
+       ],
+       "sigma_base_m": [
+        0.045877393,
+        0.045871215,
+        0.045924048
+       ]
+      }
+     ],
+     "segments": [
+      {
+       "start_index": 0,
+       "end_index": 30,
+       "waypoints": [
+        {
+         "phase": "approach",
+         "position_m": [
+          0.23,
+          0.02,
+          0.05
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.23,
+          0.02,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.04,
+         "sigma_along_normal_m": 0.047942795,
+         "sigma_max_m": 0.047681354,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.23,
+          0.02,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.23,
+          0.02,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.047942795,
+         "sigma_max_m": 0.047681354,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.232,
+          0.02,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.232,
+          0.02,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.047876352,
+         "sigma_max_m": 0.047614547,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.234,
+          0.02,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.234,
+          0.02,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.047810453,
+         "sigma_max_m": 0.047548286,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.236,
+          0.02,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.236,
+          0.02,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.047745102,
+         "sigma_max_m": 0.047482574,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.238,
+          0.02,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.238,
+          0.02,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.047680301,
+         "sigma_max_m": 0.047417413,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.24,
+          0.02,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.24,
+          0.02,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.04761605,
+         "sigma_max_m": 0.047352806,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.242,
+          0.02,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.242,
+          0.02,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.047552354,
+         "sigma_max_m": 0.047288755,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.244,
+          0.02,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.244,
+          0.02,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.047489214,
+         "sigma_max_m": 0.047225262,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.246,
+          0.02,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.246,
+          0.02,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.047426631,
+         "sigma_max_m": 0.04716233,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.248,
+          0.02,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.248,
+          0.02,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.04736461,
+         "sigma_max_m": 0.04709996,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.25,
+          0.02,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.25,
+          0.02,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.047303151,
+         "sigma_max_m": 0.047038155,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.252,
+          0.02,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.252,
+          0.02,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.047242256,
+         "sigma_max_m": 0.046976918,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.254,
+          0.02,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.254,
+          0.02,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.047181929,
+         "sigma_max_m": 0.046916249,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.256,
+          0.02,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.256,
+          0.02,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.047122171,
+         "sigma_max_m": 0.046856152,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.258,
+          0.02,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.258,
+          0.02,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.047062985,
+         "sigma_max_m": 0.046796629,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.26,
+          0.02,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.26,
+          0.02,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.047004372,
+         "sigma_max_m": 0.046737682,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.262,
+          0.02,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.262,
+          0.02,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.046946334,
+         "sigma_max_m": 0.046679313,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.264,
+          0.02,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.264,
+          0.02,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.046888875,
+         "sigma_max_m": 0.046621525,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.266,
+          0.02,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.266,
+          0.02,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.046831995,
+         "sigma_max_m": 0.046564319,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.268,
+          0.02,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.268,
+          0.02,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.046775698,
+         "sigma_max_m": 0.046507697,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.27,
+          0.02,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.27,
+          0.02,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.046719984,
+         "sigma_max_m": 0.046451662,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.272,
+          0.02,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.272,
+          0.02,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.046664857,
+         "sigma_max_m": 0.046396216,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.274,
+          0.02,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.274,
+          0.02,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.046610318,
+         "sigma_max_m": 0.046341361,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.276,
+          0.02,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.276,
+          0.02,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.04655637,
+         "sigma_max_m": 0.0462871,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.278,
+          0.02,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.278,
+          0.02,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.046503014,
+         "sigma_max_m": 0.046233433,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.28,
+          0.02,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.28,
+          0.02,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.046450253,
+         "sigma_max_m": 0.046180364,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.282,
+          0.02,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.282,
+          0.02,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.046398088,
+         "sigma_max_m": 0.046127894,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.284,
+          0.02,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.284,
+          0.02,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.046346522,
+         "sigma_max_m": 0.046076025,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.286,
+          0.02,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.286,
+          0.02,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.046295556,
+         "sigma_max_m": 0.04602476,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.288,
+          0.02,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.288,
+          0.02,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.046245193,
+         "sigma_max_m": 0.0459741,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.29,
+          0.02,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.29,
+          0.02,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.046195434,
+         "sigma_max_m": 0.045924048,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "retract",
+         "position_m": [
+          0.29,
+          0.02,
+          0.05
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.29,
+          0.02,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.04,
+         "sigma_along_normal_m": 0.046195434,
+         "sigma_max_m": 0.045924048,
+         "interpolated": false,
+         "within_budget": false
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "kind": "branch",
+     "branch_index": 0,
+     "points": [
+      {
+       "row": 398,
+       "col": 302,
+       "u": 302,
+       "v": 398,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.02,
+        0.18,
+        0.49
+       ],
+       "p_base_m": [
+        0.26,
+        0.02,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002180381952,
+        -9.2341e-08,
+        2.262345e-06,
+        -9.2341e-08,
+        0.002179561146,
+        -2.51372e-07,
+        2.262345e-06,
+        -2.51372e-07,
+        0.002184410952
+       ],
+       "sigma_base_m": [
+        0.04669456,
+        0.04668577,
+        0.046737682
+       ]
+      },
+      {
+       "row": 396,
+       "col": 303,
+       "u": 303,
+       "v": 396,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.019933357,
+        0.178001481,
+        0.49
+       ],
+       "p_base_m": [
+        0.261998519,
+        0.019933357,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002174894697,
+        -9.1011e-08,
+        2.237226e-06,
+        -9.1011e-08,
+        0.002174092175,
+        -2.50534e-07,
+        2.237226e-06,
+        -2.50534e-07,
+        0.002178942049
+       ],
+       "sigma_base_m": [
+        0.046635766,
+        0.046627161,
+        0.046679139
+       ]
+      },
+      {
+       "row": 394,
+       "col": 303,
+       "u": 303,
+       "v": 394,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.019733727,
+        0.176011841,
+        0.49
+       ],
+       "p_base_m": [
+        0.263988159,
+        0.019733727,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002169452325,
+        -8.9093e-08,
+        2.212219e-06,
+        -8.9093e-08,
+        0.002168667667,
+        -2.48025e-07,
+        2.212219e-06,
+        -2.48025e-07,
+        0.002173517744
+       ],
+       "sigma_base_m": [
+        0.04657738,
+        0.046568956,
+        0.046621001
+       ]
+      },
+      {
+       "row": 393,
+       "col": 303,
+       "u": 303,
+       "v": 393,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.019401997,
+        0.17403992,
+        0.49
+       ],
+       "p_base_m": [
+        0.26596008,
+        0.019401997,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.00216407901,
+        -8.6613e-08,
+        2.187435e-06,
+        -8.6613e-08,
+        0.002163311725,
+        -2.43856e-07,
+        2.187435e-06,
+        -2.43856e-07,
+        0.002168162135
+       ],
+       "sigma_base_m": [
+        0.046519663,
+        0.046511415,
+        0.046563528
+       ]
+      },
+      {
+       "row": 391,
+       "col": 303,
+       "u": 303,
+       "v": 391,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.018939639,
+        0.172094478,
+        0.49
+       ],
+       "p_base_m": [
+        0.267905522,
+        0.018939639,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.00215879862,
+        -8.3604e-08,
+        2.162984e-06,
+        -8.3604e-08,
+        0.002158048153,
+        -2.38044e-07,
+        2.162984e-06,
+        -2.38044e-07,
+        0.002162899017
+       ],
+       "sigma_base_m": [
+        0.046462874,
+        0.046454797,
+        0.046506978
+       ]
+      },
+      {
+       "row": 389,
+       "col": 304,
+       "u": 304,
+       "v": 389,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.018348707,
+        0.170184159,
+        0.49
+       ],
+       "p_base_m": [
+        0.269815841,
+        0.018348707,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002153634604,
+        -8.0097e-08,
+        2.138974e-06,
+        -8.0097e-08,
+        0.002152900343,
+        -2.30617e-07,
+        2.138974e-06,
+        -2.30617e-07,
+        0.002157751773
+       ],
+       "sigma_base_m": [
+        0.046407269,
+        0.046399357,
+        0.046451607
+       ]
+      },
+      {
+       "row": 388,
+       "col": 305,
+       "u": 305,
+       "v": 388,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.01763183,
+        0.16831745,
+        0.49
+       ],
+       "p_base_m": [
+        0.27168255,
+        0.01763183,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002148609893,
+        -7.6123e-08,
+        2.115512e-06,
+        -7.6123e-08,
+        0.002147891178,
+        -2.21607e-07,
+        2.115512e-06,
+        -2.21607e-07,
+        0.00215274327
+       ],
+       "sigma_base_m": [
+        0.0463531,
+        0.046345347,
+        0.046397664
+       ]
+      },
+      {
+       "row": 386,
+       "col": 305,
+       "u": 305,
+       "v": 386,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.016792188,
+        0.166502644,
+        0.49
+       ],
+       "p_base_m": [
+        0.273497356,
+        0.016792188,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002143746798,
+        -7.1716e-08,
+        2.092702e-06,
+        -7.1716e-08,
+        0.002143042928,
+        -2.11054e-07,
+        2.092702e-06,
+        -2.11054e-07,
+        0.002147895761
+       ],
+       "sigma_base_m": [
+        0.046300613,
+        0.046293012,
+        0.046345396
+       ]
+      },
+      {
+       "row": 385,
+       "col": 306,
+       "u": 306,
+       "v": 385,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.015833514,
+        0.164747804,
+        0.49
+       ],
+       "p_base_m": [
+        0.275252196,
+        0.015833514,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002139066909,
+        -6.6909e-08,
+        2.070646e-06,
+        -6.6909e-08,
+        0.002138377147,
+        -1.99005e-07,
+        2.070646e-06,
+        -1.99005e-07,
+        0.002143230782
+       ],
+       "sigma_base_m": [
+        0.046250048,
+        0.04624259,
+        0.046295041
+       ]
+      },
+      {
+       "row": 383,
+       "col": 307,
+       "u": 307,
+       "v": 383,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.014760068,
+        0.163060726,
+        0.49
+       ],
+       "p_base_m": [
+        0.276939274,
+        0.014760068,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002134590999,
+        -6.1735e-08,
+        2.049442e-06,
+        -6.1735e-08,
+        0.00213391458,
+        -1.85513e-07,
+        2.049442e-06,
+        -1.85513e-07,
+        0.002138769057
+       ],
+       "sigma_base_m": [
+        0.046201634,
+        0.046194313,
+        0.046246828
+       ]
+      },
+      {
+       "row": 382,
+       "col": 308,
+       "u": 308,
+       "v": 382,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.013576617,
+        0.161448906,
+        0.49
+       ],
+       "p_base_m": [
+        0.278551094,
+        0.013576617,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002130338937,
+        -5.6223e-08,
+        2.029184e-06,
+        -5.6223e-08,
+        0.002129675074,
+        -1.70639e-07,
+        2.029184e-06,
+        -1.70639e-07,
+        0.002134530412
+       ],
+       "sigma_base_m": [
+        0.046155595,
+        0.046148403,
+        0.046200978
+       ]
+      },
+      {
+       "row": 380,
+       "col": 309,
+       "u": 309,
+       "v": 380,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.01228842,
+        0.159919505,
+        0.49
+       ],
+       "p_base_m": [
+        0.280080495,
+        0.01228842,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002126329594,
+        -5.0407e-08,
+        2.009961e-06,
+        -5.0407e-08,
+        0.002125677483,
+        -1.54448e-07,
+        2.009961e-06,
+        -1.54448e-07,
+        0.002130533676
+       ],
+       "sigma_base_m": [
+        0.046112142,
+        0.04610507,
+        0.046157704
+       ]
+      },
+      {
+       "row": 379,
+       "col": 310,
+       "u": 310,
+       "v": 379,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.010901201,
+        0.158479317,
+        0.49
+       ],
+       "p_base_m": [
+        0.281520683,
+        0.010901201,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002122580761,
+        -4.4314e-08,
+        1.99186e-06,
+        -4.4314e-08,
+        0.002121939587,
+        -1.37013e-07,
+        1.99186e-06,
+        -1.37013e-07,
+        0.002126796605
+       ],
+       "sigma_base_m": [
+        0.046071474,
+        0.046064515,
+        0.046117205
+       ]
+      },
+      {
+       "row": 378,
+       "col": 312,
+       "u": 312,
+       "v": 378,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.009421121,
+        0.157134742,
+        0.49
+       ],
+       "p_base_m": [
+        0.282865258,
+        0.009421121,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002119109075,
+        -3.7972e-08,
+        1.974961e-06,
+        -3.7972e-08,
+        0.002118478015,
+        -1.1841e-07,
+        1.974961e-06,
+        -1.1841e-07,
+        0.002123335804
+       ],
+       "sigma_base_m": [
+        0.046033782,
+        0.046026927,
+        0.046079668
+       ]
+      },
+      {
+       "row": 377,
+       "col": 313,
+       "u": 313,
+       "v": 377,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.007854757,
+        0.155891753,
+        0.49
+       ],
+       "p_base_m": [
+        0.284108247,
+        0.007854757,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.00211592994,
+        -3.1408e-08,
+        1.959338e-06,
+        -3.1408e-08,
+        0.002115308166,
+        -9.8723e-08,
+        1.959338e-06,
+        -9.8723e-08,
+        0.002120166649
+       ],
+       "sigma_base_m": [
+        0.045999238,
+        0.045992479,
+        0.046045267
+       ]
+      },
+      {
+       "row": 376,
+       "col": 315,
+       "u": 315,
+       "v": 376,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.006209069,
+        0.154755871,
+        0.49
+       ],
+       "p_base_m": [
+        0.285244129,
+        0.006209069,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002113057457,
+        -2.4647e-08,
+        1.945062e-06,
+        -2.4647e-08,
+        0.00211244414,
+        -7.8039e-08,
+        1.945062e-06,
+        -7.8039e-08,
+        0.002117303217
+       ],
+       "sigma_base_m": [
+        0.045968005,
+        0.045961333,
+        0.046014163
+       ]
+      },
+      {
+       "row": 375,
+       "col": 316,
+       "u": 316,
+       "v": 375,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.004491366,
+        0.153732144,
+        0.49
+       ],
+       "p_base_m": [
+        0.286267856,
+        0.004491366,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002110504372,
+        -1.7711e-08,
+        1.932195e-06,
+        -1.7711e-08,
+        0.002109898684,
+        -5.645e-08,
+        1.932195e-06,
+        -5.645e-08,
+        0.002114758232
+       ],
+       "sigma_base_m": [
+        0.045940226,
+        0.045933633,
+        0.045986501
+       ]
+      },
+      {
+       "row": 374,
+       "col": 318,
+       "u": 318,
+       "v": 374,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.002709281,
+        0.15282512,
+        0.49
+       ],
+       "p_base_m": [
+        0.28717488,
+        0.002709281,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002108282009,
+        -1.062e-08,
+        1.920795e-06,
+        -1.062e-08,
+        0.002107683124,
+        -3.4052e-08,
+        1.920795e-06,
+        -3.4052e-08,
+        0.002112543002
+       ],
+       "sigma_base_m": [
+        0.045916032,
+        0.04590951,
+        0.045962409
+       ]
+      },
+      {
+       "row": 373,
+       "col": 319,
+       "u": 319,
+       "v": 373,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        -0.000870732,
+        0.152038828,
+        0.49
+       ],
+       "p_base_m": [
+        0.287961172,
+        0.000870732,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002106400223,
+        -3.396e-09,
+        1.910913e-06,
+        -3.396e-09,
+        0.002105807318,
+        -1.0944e-08,
+        1.910913e-06,
+        -1.0944e-08,
+        0.002110667365
+       ],
+       "sigma_base_m": [
+        0.045895536,
+        0.045889076,
+        0.045942
+       ]
+      },
+      {
+       "row": 373,
+       "col": 321,
+       "u": 321,
+       "v": 373,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        0.001016114,
+        0.151376762,
+        0.49
+       ],
+       "p_base_m": [
+        0.288623238,
+        -0.001016114,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002104867363,
+        3.945e-09,
+        1.902591e-06,
+        3.945e-09,
+        0.002104279617,
+        1.2771e-08,
+        1.902591e-06,
+        1.2771e-08,
+        0.002109139656
+       ],
+       "sigma_base_m": [
+        0.045878833,
+        0.045872428,
+        0.045925371
+       ]
+      },
+      {
+       "row": 372,
+       "col": 323,
+       "u": 323,
+       "v": 372,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        0.002942873,
+        0.150841864,
+        0.49
+       ],
+       "p_base_m": [
+        0.289158136,
+        -0.002942873,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002103690225,
+        1.1386e-08,
+        1.895868e-06,
+        1.1386e-08,
+        0.002103106822,
+        3.6988e-08,
+        1.895868e-06,
+        3.6988e-08,
+        0.002107966665
+       ],
+       "sigma_base_m": [
+        0.045866003,
+        0.045859643,
+        0.045912598
+       ]
+      },
+      {
+       "row": 372,
+       "col": 324,
+       "u": 324,
+       "v": 372,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        0.004900986,
+        0.150436509,
+        0.49
+       ],
+       "p_base_m": [
+        0.289563491,
+        -0.004900986,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002102874026,
+        1.8912e-08,
+        1.890774e-06,
+        1.8912e-08,
+        0.002102294149,
+        6.1598e-08,
+        1.890774e-06,
+        6.1598e-08,
+        0.002107153599
+       ],
+       "sigma_base_m": [
+        0.045857104,
+        0.045850781,
+        0.045903743
+       ]
+      },
+      {
+       "row": 372,
+       "col": 326,
+       "u": 326,
+       "v": 372,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        0.006881753,
+        0.150162498,
+        0.49
+       ],
+       "p_base_m": [
+        0.289837502,
+        -0.006881753,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002102422386,
+        2.6506e-08,
+        1.88733e-06,
+        2.6506e-08,
+        0.002101845221,
+        8.6494e-08,
+        1.88733e-06,
+        8.6494e-08,
+        0.002106704072
+       ],
+       "sigma_base_m": [
+        0.04585218,
+        0.045845886,
+        0.045898846
+       ]
+      },
+      {
+       "row": 372,
+       "col": 328,
+       "u": 328,
+       "v": 372,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        0.008876374,
+        0.150021051,
+        0.49
+       ],
+       "p_base_m": [
+        0.289978949,
+        -0.008876374,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002102337308,
+        3.4157e-08,
+        1.885552e-06,
+        3.4157e-08,
+        0.002101762038,
+        1.11563e-07,
+        1.885552e-06,
+        1.11563e-07,
+        0.002106620083
+       ],
+       "sigma_base_m": [
+        0.045851252,
+        0.045844978,
+        0.045897931
+       ]
+      },
+      {
+       "row": 372,
+       "col": 330,
+       "u": 330,
+       "v": 372,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        0.010875986,
+        0.150012793,
+        0.49
+       ],
+       "p_base_m": [
+        0.289987207,
+        -0.010875986,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002102619163,
+        4.1849e-08,
+        1.885448e-06,
+        4.1849e-08,
+        0.00210204497,
+        1.36696e-07,
+        1.885448e-06,
+        1.36696e-07,
+        0.002106902002
+       ],
+       "sigma_base_m": [
+        0.045854325,
+        0.045848064,
+        0.045901002
+       ]
+      },
+      {
+       "row": 372,
+       "col": 331,
+       "u": 331,
+       "v": 372,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        0.012871707,
+        0.150137762,
+        0.49
+       ],
+       "p_base_m": [
+        0.289862238,
+        -0.012871707,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002103266701,
+        4.957e-08,
+        1.887019e-06,
+        4.957e-08,
+        0.002102692761,
+        1.61779e-07,
+        1.887019e-06,
+        1.61779e-07,
+        0.002107548577
+       ],
+       "sigma_base_m": [
+        0.045861386,
+        0.045855128,
+        0.045908045
+       ]
+      },
+      {
+       "row": 372,
+       "col": 333,
+       "u": 333,
+       "v": 372,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        0.014854669,
+        0.150395404,
+        0.49
+       ],
+       "p_base_m": [
+        0.289604596,
+        -0.014854669,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002104277049,
+        5.7304e-08,
+        1.890257e-06,
+        5.7304e-08,
+        0.002103702534,
+        1.86702e-07,
+        1.890257e-06,
+        1.86702e-07,
+        0.002108556939
+       ],
+       "sigma_base_m": [
+        0.0458724,
+        0.045866137,
+        0.045919026
+       ]
+      },
+      {
+       "row": 372,
+       "col": 335,
+       "u": 335,
+       "v": 372,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        0.016816063,
+        0.150784572,
+        0.49
+       ],
+       "p_base_m": [
+        0.289215428,
+        -0.016816063,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.00210564572,
+        6.5039e-08,
+        1.895148e-06,
+        6.5039e-08,
+        0.002105069792,
+        2.11354e-07,
+        1.895148e-06,
+        2.11354e-07,
+        0.002109922604
+       ],
+       "sigma_base_m": [
+        0.045887315,
+        0.04588104,
+        0.045933894
+       ]
+      },
+      {
+       "row": 373,
+       "col": 336,
+       "u": 336,
+       "v": 373,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        0.018747175,
+        0.151303538,
+        0.49
+       ],
+       "p_base_m": [
+        0.288696462,
+        -0.018747175,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002107366642,
+        7.2757e-08,
+        1.901671e-06,
+        7.2757e-08,
+        0.002106788454,
+        2.35625e-07,
+        1.901671e-06,
+        2.35625e-07,
+        0.002111639505
+       ],
+       "sigma_base_m": [
+        0.045906063,
+        0.045899765,
+        0.045952579
+       ]
+      },
+      {
+       "row": 373,
+       "col": 338,
+       "u": 338,
+       "v": 373,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        0.020639424,
+        0.151949998,
+        0.49
+       ],
+       "p_base_m": [
+        0.288050002,
+        -0.020639424,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002109432184,
+        8.0443e-08,
+        1.909796e-06,
+        8.0443e-08,
+        0.002108850879,
+        2.59408e-07,
+        1.909796e-06,
+        2.59408e-07,
+        0.002113700018
+       ],
+       "sigma_base_m": [
+        0.045928555,
+        0.045922226,
+        0.045974993
+       ]
+      },
+      {
+       "row": 374,
+       "col": 340,
+       "u": 340,
+       "v": 374,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        0.022484405,
+        0.152721078,
+        0.49
+       ],
+       "p_base_m": [
+        0.287278922,
+        -0.022484405,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002111833176,
+        8.8079e-08,
+        1.919487e-06,
+        8.8079e-08,
+        0.002111247885,
+        2.82597e-07,
+        1.919487e-06,
+        2.82597e-07,
+        0.002116094984
+       ],
+       "sigma_base_m": [
+        0.045954686,
+        0.045948318,
+        0.046001032
+       ]
+      },
+      {
+       "row": 375,
+       "col": 341,
+       "u": 341,
+       "v": 375,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        0.024273921,
+        0.153613352,
+        0.49
+       ],
+       "p_base_m": [
+        0.286386648,
+        -0.024273921,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002114558966,
+        9.5644e-08,
+        1.930702e-06,
+        9.5644e-08,
+        0.002113968811,
+        3.05089e-07,
+        1.930702e-06,
+        3.05089e-07,
+        0.002118813763
+       ],
+       "sigma_base_m": [
+        0.045984334,
+        0.045977917,
+        0.046030574
+       ]
+      },
+      {
+       "row": 375,
+       "col": 342,
+       "u": 342,
+       "v": 375,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        0.025,
+        0.154019238,
+        0.49
+       ],
+       "p_base_m": [
+        0.285980762,
+        -0.025,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002115785515,
+        9.8765e-08,
+        1.935803e-06,
+        9.8765e-08,
+        0.002115193075,
+        3.14215e-07,
+        1.935803e-06,
+        3.14215e-07,
+        0.002120037109
+       ],
+       "sigma_base_m": [
+        0.045997669,
+        0.045991228,
+        0.046043861
+       ]
+      }
+     ],
+     "segments": [
+      {
+       "start_index": 0,
+       "end_index": 32,
+       "waypoints": [
+        {
+         "phase": "approach",
+         "position_m": [
+          0.26,
+          0.02,
+          0.05
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.26,
+          0.02,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.04,
+         "sigma_along_normal_m": 0.047004372,
+         "sigma_max_m": 0.046737682,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.26,
+          0.02,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.26,
+          0.02,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.047004372,
+         "sigma_max_m": 0.046737682,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.261998519,
+          0.019933357,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.261998519,
+          0.019933357,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.046946161,
+         "sigma_max_m": 0.046679139,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.263988159,
+          0.019733727,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.263988159,
+          0.019733727,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.046888354,
+         "sigma_max_m": 0.046621001,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.26596008,
+          0.019401997,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.26596008,
+          0.019401997,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.046831209,
+         "sigma_max_m": 0.046563528,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.267905522,
+          0.018939639,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.267905522,
+          0.018939639,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.046774983,
+         "sigma_max_m": 0.046506978,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.269815841,
+          0.018348707,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.269815841,
+          0.018348707,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.046719929,
+         "sigma_max_m": 0.046451607,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.27168255,
+          0.01763183,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.27168255,
+          0.01763183,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.046666297,
+         "sigma_max_m": 0.046397664,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.273497356,
+          0.016792188,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.273497356,
+          0.016792188,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.04661433,
+         "sigma_max_m": 0.046345396,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.275252196,
+          0.015833514,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.275252196,
+          0.015833514,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.046564265,
+         "sigma_max_m": 0.046295041,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.276939274,
+          0.014760068,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.276939274,
+          0.014760068,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.046516331,
+         "sigma_max_m": 0.046246828,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.278551094,
+          0.013576617,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.278551094,
+          0.013576617,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.046470748,
+         "sigma_max_m": 0.046200978,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.280080495,
+          0.01228842,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.280080495,
+          0.01228842,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.046427725,
+         "sigma_max_m": 0.046157704,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.281520683,
+          0.010901201,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.281520683,
+          0.010901201,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.046387462,
+         "sigma_max_m": 0.046117205,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.282865258,
+          0.009421121,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.282865258,
+          0.009421121,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.046350144,
+         "sigma_max_m": 0.046079668,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.284108247,
+          0.007854757,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.284108247,
+          0.007854757,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.046315944,
+         "sigma_max_m": 0.046045267,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.285244129,
+          0.006209069,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.285244129,
+          0.006209069,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.046285022,
+         "sigma_max_m": 0.046014163,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.286267856,
+          0.004491366,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.286267856,
+          0.004491366,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.046257521,
+         "sigma_max_m": 0.045986501,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.28717488,
+          0.002709281,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.28717488,
+          0.002709281,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.04623357,
+         "sigma_max_m": 0.045962409,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.287961172,
+          0.000870732,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.287961172,
+          0.000870732,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.046213281,
+         "sigma_max_m": 0.045942,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.288623238,
+          -0.001016114,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.288623238,
+          -0.001016114,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.046196749,
+         "sigma_max_m": 0.045925371,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.289158136,
+          -0.002942873,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.289158136,
+          -0.002942873,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.046184052,
+         "sigma_max_m": 0.045912598,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.289563491,
+          -0.004900986,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.289563491,
+          -0.004900986,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.046175249,
+         "sigma_max_m": 0.045903743,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.289837502,
+          -0.006881753,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.289837502,
+          -0.006881753,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.046170381,
+         "sigma_max_m": 0.045898846,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.289978949,
+          -0.008876374,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.289978949,
+          -0.008876374,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.046169471,
+         "sigma_max_m": 0.045897931,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.289987207,
+          -0.010875986,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.289987207,
+          -0.010875986,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.046172524,
+         "sigma_max_m": 0.045901002,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.289862238,
+          -0.012871707,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.289862238,
+          -0.012871707,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.046179526,
+         "sigma_max_m": 0.045908045,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.289604596,
+          -0.014854669,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.289604596,
+          -0.014854669,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.046190442,
+         "sigma_max_m": 0.045919026,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.289215428,
+          -0.016816063,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.289215428,
+          -0.016816063,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.046205223,
+         "sigma_max_m": 0.045933894,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.288696462,
+          -0.018747175,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.288696462,
+          -0.018747175,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.046223798,
+         "sigma_max_m": 0.045952579,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.288050002,
+          -0.020639424,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.288050002,
+          -0.020639424,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.046246081,
+         "sigma_max_m": 0.045974993,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.287278922,
+          -0.022484405,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.287278922,
+          -0.022484405,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.046271968,
+         "sigma_max_m": 0.046001032,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.286386648,
+          -0.024273921,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.286386648,
+          -0.024273921,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.046301337,
+         "sigma_max_m": 0.046030574,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.285980762,
+          -0.025,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.285980762,
+          -0.025,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.046314545,
+         "sigma_max_m": 0.046043861,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "retract",
+         "position_m": [
+          0.285980762,
+          -0.025,
+          0.05
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.285980762,
+          -0.025,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.04,
+         "sigma_along_normal_m": 0.046314545,
+         "sigma_max_m": 0.046043861,
+         "interpolated": false,
+         "within_budget": false
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "order_index": 1,
+   "component_id": "crack_far",
+   "polylines": [
+    {
+     "kind": "main",
+     "branch_index": null,
+     "points": [
+      {
+       "row": 82,
+       "col": 320,
+       "u": 320,
+       "v": 82,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        0.0,
+        -0.18,
+        0.49
+       ],
+       "p_base_m": [
+        0.62,
+        0.0,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002177335777,
+        0.0,
+        -2.262345e-06,
+        0.0,
+        0.002176504712,
+        0.0,
+        -2.262345e-06,
+        0.0,
+        0.002181364778
+       ],
+       "sigma_base_m": [
+        0.046661931,
+        0.046653025,
+        0.046705083
+       ]
+      },
+      {
+       "row": 80,
+       "col": 320,
+       "u": 320,
+       "v": 80,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        0.0,
+        -0.182,
+        0.49
+       ],
+       "p_base_m": [
+        0.622,
+        0.0,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002182867924,
+        0.0,
+        -2.287482e-06,
+        0.0,
+        0.002182018287,
+        0.0,
+        -2.287482e-06,
+        0.0,
+        0.002186878353
+       ],
+       "sigma_base_m": [
+        0.046721172,
+        0.046712079,
+        0.046764071
+       ]
+      },
+      {
+       "row": 79,
+       "col": 320,
+       "u": 320,
+       "v": 79,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        0.0,
+        -0.184,
+        0.49
+       ],
+       "p_base_m": [
+        0.624,
+        0.0,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002188461198,
+        0.0,
+        -2.312619e-06,
+        0.0,
+        0.002187592786,
+        0.0,
+        -2.312619e-06,
+        0.0,
+        0.002192452852
+       ],
+       "sigma_base_m": [
+        0.046780992,
+        0.046771709,
+        0.046823636
+       ]
+      },
+      {
+       "row": 77,
+       "col": 320,
+       "u": 320,
+       "v": 77,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        0.0,
+        -0.186,
+        0.49
+       ],
+       "p_base_m": [
+        0.626,
+        0.0,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002194115602,
+        0.0,
+        -2.337756e-06,
+        0.0,
+        0.002193228208,
+        0.0,
+        -2.337756e-06,
+        0.0,
+        0.002198088274
+       ],
+       "sigma_base_m": [
+        0.046841388,
+        0.046831914,
+        0.046883774
+       ]
+      },
+      {
+       "row": 75,
+       "col": 320,
+       "u": 320,
+       "v": 75,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        0.0,
+        -0.188,
+        0.49
+       ],
+       "p_base_m": [
+        0.628,
+        0.0,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002199831134,
+        0.0,
+        -2.362893e-06,
+        0.0,
+        0.002198924554,
+        0.0,
+        -2.362893e-06,
+        0.0,
+        0.00220378462
+       ],
+       "sigma_base_m": [
+        0.046902357,
+        0.046892692,
+        0.046944484
+       ]
+      },
+      {
+       "row": 73,
+       "col": 320,
+       "u": 320,
+       "v": 73,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        0.0,
+        -0.19,
+        0.49
+       ],
+       "p_base_m": [
+        0.63,
+        0.0,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002205607794,
+        0.0,
+        -2.388031e-06,
+        0.0,
+        0.002204681823,
+        0.0,
+        -2.388031e-06,
+        0.0,
+        0.002209541889
+       ],
+       "sigma_base_m": [
+        0.046963899,
+        0.046954039,
+        0.047005764
+       ]
+      },
+      {
+       "row": 72,
+       "col": 320,
+       "u": 320,
+       "v": 72,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        0.0,
+        -0.192,
+        0.49
+       ],
+       "p_base_m": [
+        0.632,
+        0.0,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002211445584,
+        0.0,
+        -2.413168e-06,
+        0.0,
+        0.002210500016,
+        0.0,
+        -2.413168e-06,
+        0.0,
+        0.002215360082
+       ],
+       "sigma_base_m": [
+        0.04702601,
+        0.047015955,
+        0.047067612
+       ]
+      },
+      {
+       "row": 70,
+       "col": 320,
+       "u": 320,
+       "v": 70,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        0.0,
+        -0.194,
+        0.49
+       ],
+       "p_base_m": [
+        0.634,
+        0.0,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002217344502,
+        0.0,
+        -2.438305e-06,
+        0.0,
+        0.002216379132,
+        0.0,
+        -2.438305e-06,
+        0.0,
+        0.002221239198
+       ],
+       "sigma_base_m": [
+        0.047088688,
+        0.047078436,
+        0.047130024
+       ]
+      },
+      {
+       "row": 68,
+       "col": 320,
+       "u": 320,
+       "v": 68,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        0.0,
+        -0.196,
+        0.49
+       ],
+       "p_base_m": [
+        0.636,
+        0.0,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002223304549,
+        0.0,
+        -2.463442e-06,
+        0.0,
+        0.002222319172,
+        0.0,
+        -2.463442e-06,
+        0.0,
+        0.002227179238
+       ],
+       "sigma_base_m": [
+        0.04715193,
+        0.04714148,
+        0.047193
+       ]
+      },
+      {
+       "row": 66,
+       "col": 320,
+       "u": 320,
+       "v": 66,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        0.0,
+        -0.198,
+        0.49
+       ],
+       "p_base_m": [
+        0.638,
+        0.0,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002229325724,
+        0.0,
+        -2.488579e-06,
+        0.0,
+        0.002228320135,
+        0.0,
+        -2.488579e-06,
+        0.0,
+        0.002233180201
+       ],
+       "sigma_base_m": [
+        0.047215736,
+        0.047205086,
+        0.047256536
+       ]
+      },
+      {
+       "row": 64,
+       "col": 320,
+       "u": 320,
+       "v": 64,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        0.0,
+        -0.2,
+        0.49
+       ],
+       "p_base_m": [
+        0.64,
+        0.0,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002235408029,
+        0.0,
+        -2.513716e-06,
+        0.0,
+        0.002234382022,
+        0.0,
+        -2.513716e-06,
+        0.0,
+        0.002239242087
+       ],
+       "sigma_base_m": [
+        0.047280102,
+        0.04726925,
+        0.047320631
+       ]
+      },
+      {
+       "row": 63,
+       "col": 320,
+       "u": 320,
+       "v": 63,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        0.0,
+        -0.202,
+        0.49
+       ],
+       "p_base_m": [
+        0.642,
+        0.0,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002241551461,
+        0.0,
+        -2.538854e-06,
+        0.0,
+        0.002240504832,
+        0.0,
+        -2.538854e-06,
+        0.0,
+        0.002245364898
+       ],
+       "sigma_base_m": [
+        0.047345026,
+        0.047333971,
+        0.047385281
+       ]
+      },
+      {
+       "row": 61,
+       "col": 320,
+       "u": 320,
+       "v": 61,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        0.0,
+        -0.204,
+        0.49
+       ],
+       "p_base_m": [
+        0.644,
+        0.0,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002247756023,
+        0.0,
+        -2.563991e-06,
+        0.0,
+        0.002246688566,
+        0.0,
+        -2.563991e-06,
+        0.0,
+        0.002251548631
+       ],
+       "sigma_base_m": [
+        0.047410505,
+        0.047399246,
+        0.047450486
+       ]
+      },
+      {
+       "row": 59,
+       "col": 320,
+       "u": 320,
+       "v": 59,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        0.0,
+        -0.206,
+        0.49
+       ],
+       "p_base_m": [
+        0.646,
+        0.0,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002254021713,
+        0.0,
+        -2.589128e-06,
+        0.0,
+        0.002252933223,
+        0.0,
+        -2.589128e-06,
+        0.0,
+        0.002257793288
+       ],
+       "sigma_base_m": [
+        0.047476539,
+        0.047465074,
+        0.047516242
+       ]
+      },
+      {
+       "row": 57,
+       "col": 320,
+       "u": 320,
+       "v": 57,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        0.0,
+        -0.208,
+        0.49
+       ],
+       "p_base_m": [
+        0.648,
+        0.0,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002260348532,
+        0.0,
+        -2.614265e-06,
+        0.0,
+        0.002259238803,
+        0.0,
+        -2.614265e-06,
+        0.0,
+        0.002264098869
+       ],
+       "sigma_base_m": [
+        0.047543123,
+        0.047531451,
+        0.047582548
+       ]
+      },
+      {
+       "row": 56,
+       "col": 320,
+       "u": 320,
+       "v": 56,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        0.0,
+        -0.21,
+        0.49
+       ],
+       "p_base_m": [
+        0.65,
+        0.0,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.00226673648,
+        0.0,
+        -2.639402e-06,
+        0.0,
+        0.002265605307,
+        0.0,
+        -2.639402e-06,
+        0.0,
+        0.002270465373
+       ],
+       "sigma_base_m": [
+        0.047610256,
+        0.047598375,
+        0.047649401
+       ]
+      },
+      {
+       "row": 54,
+       "col": 320,
+       "u": 320,
+       "v": 54,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        0.0,
+        -0.212,
+        0.49
+       ],
+       "p_base_m": [
+        0.652,
+        0.0,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002273185556,
+        0.0,
+        -2.664539e-06,
+        0.0,
+        0.002272032735,
+        0.0,
+        -2.664539e-06,
+        0.0,
+        0.0022768928
+       ],
+       "sigma_base_m": [
+        0.047677936,
+        0.047665845,
+        0.047716798
+       ]
+      },
+      {
+       "row": 52,
+       "col": 320,
+       "u": 320,
+       "v": 52,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        0.0,
+        -0.214,
+        0.49
+       ],
+       "p_base_m": [
+        0.654,
+        0.0,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002279695761,
+        0.0,
+        -2.689677e-06,
+        0.0,
+        0.002278521086,
+        0.0,
+        -2.689677e-06,
+        0.0,
+        0.002283381152
+       ],
+       "sigma_base_m": [
+        0.04774616,
+        0.047733857,
+        0.047784738
+       ]
+      },
+      {
+       "row": 50,
+       "col": 320,
+       "u": 320,
+       "v": 50,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        0.0,
+        -0.216,
+        0.49
+       ],
+       "p_base_m": [
+        0.656,
+        0.0,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002286267095,
+        0.0,
+        -2.714814e-06,
+        0.0,
+        0.00228507036,
+        0.0,
+        -2.714814e-06,
+        0.0,
+        0.002289930426
+       ],
+       "sigma_base_m": [
+        0.047814925,
+        0.04780241,
+        0.047853218
+       ]
+      },
+      {
+       "row": 49,
+       "col": 320,
+       "u": 320,
+       "v": 49,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        0.0,
+        -0.218,
+        0.49
+       ],
+       "p_base_m": [
+        0.658,
+        0.0,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002292899557,
+        0.0,
+        -2.739951e-06,
+        0.0,
+        0.002291680558,
+        0.0,
+        -2.739951e-06,
+        0.0,
+        0.002296540624
+       ],
+       "sigma_base_m": [
+        0.047884231,
+        0.0478715,
+        0.047922235
+       ]
+      },
+      {
+       "row": 47,
+       "col": 320,
+       "u": 320,
+       "v": 47,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.49,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        0.0,
+        -0.22,
+        0.49
+       ],
+       "p_base_m": [
+        0.66,
+        0.0,
+        0.01
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002299593148,
+        0.0,
+        -2.765088e-06,
+        0.0,
+        0.00229835168,
+        0.0,
+        -2.765088e-06,
+        0.0,
+        0.002303211746
+       ],
+       "sigma_base_m": [
+        0.047954073,
+        0.047941127,
+        0.047991788
+       ]
+      }
+     ],
+     "segments": [
+      {
+       "start_index": 0,
+       "end_index": 20,
+       "waypoints": [
+        {
+         "phase": "approach",
+         "position_m": [
+          0.62,
+          0.0,
+          0.05
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.62,
+          0.0,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.04,
+         "sigma_along_normal_m": 0.046971957,
+         "sigma_max_m": 0.046705083,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.62,
+          0.0,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.62,
+          0.0,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.046971957,
+         "sigma_max_m": 0.046705083,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.622,
+          0.0,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.622,
+          0.0,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.047030611,
+         "sigma_max_m": 0.046764071,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.624,
+          0.0,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.624,
+          0.0,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.047089838,
+         "sigma_max_m": 0.046823636,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.626,
+          0.0,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.626,
+          0.0,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.047149637,
+         "sigma_max_m": 0.046883774,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.628,
+          0.0,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.628,
+          0.0,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.047210006,
+         "sigma_max_m": 0.046944484,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.63,
+          0.0,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.63,
+          0.0,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.047270941,
+         "sigma_max_m": 0.047005764,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.632,
+          0.0,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.632,
+          0.0,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.047332442,
+         "sigma_max_m": 0.047067612,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.634,
+          0.0,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.634,
+          0.0,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.047394506,
+         "sigma_max_m": 0.047130024,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.636,
+          0.0,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.636,
+          0.0,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.047457131,
+         "sigma_max_m": 0.047193,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.638,
+          0.0,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.638,
+          0.0,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.047520314,
+         "sigma_max_m": 0.047256536,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.64,
+          0.0,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.64,
+          0.0,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.047584053,
+         "sigma_max_m": 0.047320631,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.642,
+          0.0,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.642,
+          0.0,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.047648346,
+         "sigma_max_m": 0.047385281,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.644,
+          0.0,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.644,
+          0.0,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.047713191,
+         "sigma_max_m": 0.047450486,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.646,
+          0.0,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.646,
+          0.0,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.047778586,
+         "sigma_max_m": 0.047516242,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.648,
+          0.0,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.648,
+          0.0,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.047844528,
+         "sigma_max_m": 0.047582548,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.65,
+          0.0,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.65,
+          0.0,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.047911015,
+         "sigma_max_m": 0.047649401,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.652,
+          0.0,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.652,
+          0.0,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.047978045,
+         "sigma_max_m": 0.047716798,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.654,
+          0.0,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.654,
+          0.0,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.048045615,
+         "sigma_max_m": 0.047784738,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.656,
+          0.0,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.656,
+          0.0,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.048113724,
+         "sigma_max_m": 0.047853218,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.658,
+          0.0,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.658,
+          0.0,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.048182368,
+         "sigma_max_m": 0.047922235,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.66,
+          0.0,
+          0.02
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.66,
+          0.0,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.048251547,
+         "sigma_max_m": 0.047991788,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "retract",
+         "position_m": [
+          0.66,
+          0.0,
+          0.05
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.66,
+          0.0,
+          0.01
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.04,
+         "sigma_along_normal_m": 0.048251547,
+         "sigma_max_m": 0.047991788,
+         "interpolated": false,
+         "within_budget": false
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "order_index": 2,
+   "component_id": "crack_sunk",
+   "polylines": [
+    {
+     "kind": "main",
+     "branch_index": null,
+     "points": [
+      {
+       "row": 448,
+       "col": 381,
+       "u": 381,
+       "v": 448,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.495,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        0.07,
+        0.24,
+        0.495
+       ],
+       "p_base_m": [
+        0.2,
+        -0.07,
+        0.005
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002444769732,
+        4.39762e-07,
+        3.109746e-06,
+        4.39762e-07,
+        0.00244339024,
+        9.07009e-07,
+        3.109746e-06,
+        9.07009e-07,
+        0.002448350651
+       ],
+       "sigma_base_m": [
+        0.049444613,
+        0.049430661,
+        0.049480811
+       ]
+      },
+      {
+       "row": 447,
+       "col": 381,
+       "u": 381,
+       "v": 447,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.495,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        0.07,
+        0.238,
+        0.495
+       ],
+       "p_base_m": [
+        0.202,
+        -0.07,
+        0.005
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002437464351,
+        4.36097e-07,
+        3.083831e-06,
+        4.36097e-07,
+        0.002436109884,
+        9.07009e-07,
+        3.083831e-06,
+        9.07009e-07,
+        0.002441070295
+       ],
+       "sigma_base_m": [
+        0.049370683,
+        0.049356964,
+        0.049407189
+       ]
+      },
+      {
+       "row": 445,
+       "col": 381,
+       "u": 381,
+       "v": 445,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.495,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        0.07,
+        0.236,
+        0.495
+       ],
+       "p_base_m": [
+        0.204,
+        -0.07,
+        0.005
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002430220103,
+        4.32433e-07,
+        3.057917e-06,
+        4.32433e-07,
+        0.002428890451,
+        9.07009e-07,
+        3.057917e-06,
+        9.07009e-07,
+        0.002433850862
+       ],
+       "sigma_base_m": [
+        0.049297263,
+        0.049283775,
+        0.049334074
+       ]
+      },
+      {
+       "row": 443,
+       "col": 381,
+       "u": 381,
+       "v": 443,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.495,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        0.07,
+        0.234,
+        0.495
+       ],
+       "p_base_m": [
+        0.206,
+        -0.07,
+        0.005
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002423036988,
+        4.28768e-07,
+        3.032002e-06,
+        4.28768e-07,
+        0.002421731942,
+        9.07009e-07,
+        3.032002e-06,
+        9.07009e-07,
+        0.002426692353
+       ],
+       "sigma_base_m": [
+        0.049224354,
+        0.049211096,
+        0.049261469
+       ]
+      },
+      {
+       "row": 442,
+       "col": 381,
+       "u": 381,
+       "v": 442,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.495,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        0.07,
+        0.232,
+        0.495
+       ],
+       "p_base_m": [
+        0.208,
+        -0.07,
+        0.005
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002415915006,
+        4.25103e-07,
+        3.006088e-06,
+        4.25103e-07,
+        0.002414634356,
+        9.07009e-07,
+        3.006088e-06,
+        9.07009e-07,
+        0.002419594767
+       ],
+       "sigma_base_m": [
+        0.049151958,
+        0.049138929,
+        0.049189377
+       ]
+      },
+      {
+       "row": 440,
+       "col": 381,
+       "u": 381,
+       "v": 440,
+       "valid": true,
+       "reason": null,
+       "interpolated": false,
+       "depth_m": 0.495,
+       "fraction_valid": 1.0,
+       "p_optical_m": [
+        0.07,
+        0.23,
+        0.495
+       ],
+       "p_base_m": [
+        0.21,
+        -0.07,
+        0.005
+       ],
+       "n_base": [
+        0.0,
+        0.0,
+        1.0
+       ],
+       "normal_rms_m": 0.0,
+       "sigma_normal_rad": 0.0,
+       "cov_base_m2": [
+        0.002408854156,
+        4.21439e-07,
+        2.980173e-06,
+        4.21439e-07,
+        0.002407597693,
+        9.07009e-07,
+        2.980173e-06,
+        9.07009e-07,
+        0.002412558104
+       ],
+       "sigma_base_m": [
+        0.049080079,
+        0.049067277,
+        0.049117798
+       ]
+      }
+     ],
+     "segments": [
+      {
+       "start_index": 0,
+       "end_index": 5,
+       "waypoints": [
+        {
+         "phase": "approach",
+         "position_m": [
+          0.2,
+          -0.07,
+          0.045
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.2,
+          -0.07,
+          0.005
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.04,
+         "sigma_along_normal_m": 0.049732793,
+         "sigma_max_m": 0.049480811,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.2,
+          -0.07,
+          0.015
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.2,
+          -0.07,
+          0.005
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.049732793,
+         "sigma_max_m": 0.049480811,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.202,
+          -0.07,
+          0.015
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.202,
+          -0.07,
+          0.005
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.049659544,
+         "sigma_max_m": 0.049407189,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.204,
+          -0.07,
+          0.015
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.204,
+          -0.07,
+          0.005
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.049586801,
+         "sigma_max_m": 0.049334074,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.206,
+          -0.07,
+          0.015
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.206,
+          -0.07,
+          0.005
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.049514567,
+         "sigma_max_m": 0.049261469,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.208,
+          -0.07,
+          0.015
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.208,
+          -0.07,
+          0.005
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.049442843,
+         "sigma_max_m": 0.049189377,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "trace",
+         "position_m": [
+          0.21,
+          -0.07,
+          0.015
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.21,
+          -0.07,
+          0.005
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.01,
+         "sigma_along_normal_m": 0.049371633,
+         "sigma_max_m": 0.049117798,
+         "interpolated": false,
+         "within_budget": false
+        },
+        {
+         "phase": "retract",
+         "position_m": [
+          0.21,
+          -0.07,
+          0.045
+         ],
+         "quat_xyzw": [
+          0.0,
+          0.707106781,
+          0.0,
+          0.707106781
+         ],
+         "surface_point_m": [
+          0.21,
+          -0.07,
+          0.005
+         ],
+         "normal_base": [
+          0.0,
+          0.0,
+          1.0
+         ],
+         "clearance_m": 0.04,
+         "sigma_along_normal_m": 0.049371633,
+         "sigma_max_m": 0.049117798,
+         "interpolated": false,
+         "within_budget": false
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

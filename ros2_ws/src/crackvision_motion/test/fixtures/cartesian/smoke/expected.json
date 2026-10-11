@@ -1,0 +1,78 @@
+{
+ "surface_z_m": 0.01,
+ "trace_clearance_m": 0.01,
+ "approach_retract_offset_m": 0.04,
+ "specimen": {
+  "position_m": [
+   0.26,
+   0.0,
+   0.005
+  ],
+  "dimensions_m": [
+   0.2,
+   0.2,
+   0.01
+  ]
+ },
+ "start_joints": [
+  0.0,
+  0.0,
+  0.0,
+  0.0,
+  0.0,
+  0.0
+ ],
+ "segments": [
+  {
+   "segment_ref": {
+    "component_id": "crack_a",
+    "polyline_kind": "main",
+    "branch_index": null,
+    "segment_index": 0,
+    "sub_segment": null
+   },
+   "expected_status": "full",
+   "trace_waypoints": 31,
+   "trace_length_m": 0.05999999999999997
+  },
+  {
+   "segment_ref": {
+    "component_id": "crack_a",
+    "polyline_kind": "branch",
+    "branch_index": 0,
+    "segment_index": 0,
+    "sub_segment": null
+   },
+   "expected_status": "full",
+   "trace_waypoints": 33,
+   "trace_length_m": 0.06282034411478958
+  },
+  {
+   "segment_ref": {
+    "component_id": "crack_far",
+    "polyline_kind": "main",
+    "branch_index": null,
+    "segment_index": 0,
+    "sub_segment": null
+   },
+   "expected_status": "failed",
+   "trace_waypoints": 21,
+   "trace_length_m": 0.040000000000000036
+  },
+  {
+   "segment_ref": {
+    "component_id": "crack_sunk",
+    "polyline_kind": "main",
+    "branch_index": null,
+    "segment_index": 0,
+    "sub_segment": null
+   },
+   "expected_status": "surface_scene_mismatch",
+   "trace_waypoints": 6,
+   "trace_length_m": 0.009999999999999981
+  }
+ ],
+ "trace_waypoints_total": 91,
+ "length_m_total": 0.17282034411478955,
+ "fraction_by_length": 0.7106822101523571
+}

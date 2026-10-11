@@ -1,0 +1,26 @@
+{
+ "schema": "crackvision.capture_3d/1",
+ "case_id": "mot067_smoke",
+ "synthetic": true,
+ "note": "TEST-ONLY stub for MOT-06.7: only the robot block (the \u00a713.1 start state) is meaningful.",
+ "robot": {
+  "joint_names": [
+   "joint1",
+   "joint2",
+   "joint3",
+   "joint4",
+   "joint5",
+   "joint6"
+  ],
+  "positions_rad": [
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "stamp_ns": 0,
+  "stamp_source": "synthetic"
+ }
+}
