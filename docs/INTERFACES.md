@@ -2066,7 +2066,7 @@ the planning calls, not to the plan.
 | `direction` | str\|null | `forward \| reverse`; `null` for the trailing `end_state` transit leg |
 | `roll_offset_rad` | float\|null | the owning candidate's roll offset; `null` for the trailing `end_state` transit leg |
 | `positions[][6]` | list[list[float]] | joint configurations in travel order, `joint1..6` |
-| `waypoint_index_map` | list[int\|null] | per `positions[]` entry: the index into this leg's own target-pose list (the single approach/retract target = `0`; the segment's trace waypoint index for a `trace` leg) that configuration FK-matches (§13.7's matching rule), or `null` for an unmatched intermediate/resampled configuration. All `null` for a transit leg whose goal has no Cartesian pose (§13.8) |
+| `waypoint_index_map` | list[int\|null] | per `positions[]` entry: the index into this leg's own target-pose list (the single approach/retract target = `0`; the segment's trace waypoint index for a `trace` leg) that configuration FK-matches (§13.7's matching rule), or `null` for an unmatched intermediate/resampled configuration. All `null` for a transit leg whose goal has no Cartesian pose (§13.8). For a `fraction == 1.0` trace leg, §15.2 amends this definition instead (never `null`) |
 | `recheck.max_pos_err_m` | float | max FK position error over this leg's FK-checked configurations |
 | `recheck.max_ang_err_rad` | float | max FK angular error, same set |
 | `recheck.all_valid` | bool | every configuration passed `/check_state_validity` |
@@ -2345,9 +2345,11 @@ present (unknown key or out-of-range value → exit 2, same convention as §13.2
 `/compute_ik` solver budget (MOT-06.11)
 
 **Normative source:** the ADR-017 addendum (debugger D0010). This section **amends** §13.5 step 4,
-§13.7 and §13.8 as stated below — §13 itself is not edited in place, matching how this section's own
-convention (§8 amending §6) works elsewhere in this file. Nothing here changes §13.1–§13.4, §13.6,
-§13.9–§13.14 or §13.17.
+§13.7, §13.8 and, for the `fraction == 1.0` trace-leg case only (§15.2's final paragraph),
+§13.11.2's `waypoint_index_map` definition — §13 itself is not edited in place, matching how this
+section's own convention (§8 amending §6) works elsewhere in this file. Nothing here changes
+§13.1–§13.4, §13.6, §13.9, §13.10, §13.12–§13.14 or §13.17; §13.11.2 is unchanged for every leg
+*except* a `fraction == 1.0` trace leg, where §15.2 governs instead.
 
 ### 15.1 §13.5 step 4 full-ness is `fraction == 1.0` itself
 
