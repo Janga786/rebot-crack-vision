@@ -1,6 +1,6 @@
 # Progress — week of Mon Oct 05 – Sun Oct 11, 2026
 
-**31 task(s) completed and independently audited this week** · project total **74/123** accepted
+**32 task(s) completed and independently audited this week** · project total **75/123** accepted
 
 ## Notes
 
@@ -67,10 +67,12 @@
 …[452 chars clipped]
 - **MOT-06.2 — Decision + contract: Cartesian crack-path planning (ADR-017, INTERFACES §13)** ([details](MOT-06.2.md)): Wrote ADR-017 (Cartesian crack-path planning: candidate search over direction x uniform roll offset, selection rule, partial-trace FK-matching/splitting, independent re-check with jump_threshold disab
 …[577 chars clipped]
+- **MOT-12 — Vendor checker: evaluate the SDK layout its own V-SDK-API remedy produces (SDK pinned at 8427281, actuator/arm.py)** ([details](MOT-12.md)): The vendor-driver readiness checker (check_vendor_driver.py) now correctly evaluates the exact SDK layout its own fix recommends (pinning to commit 8427281), instead of erroring out before it could re
+…[364 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 64 / 237
+- Implementation/review sessions run: 65 / 238
 - Audits that rejected work with evidence-backed findings: 20 (repairs created: 15)
 - Re-verified after an upstream change: CAM-02, CAM-05.1, CAM-05.2, GEOM-01, GEOM-01.R1, GEOM-08.1, GEOM-08.2, GEOM-08.2.R1, GEOM-08.5, GEOM-08.5.R1, GEOM-08.6, GEOM-08.7, GEOM-08.8, GEOM-08.8.R1, GEOM-10, MOT-02, MOT-03, MOT-04.1, MOT-04.1.R1, MOT-04.2, MOT-04.3, MOT-04.3.R1, MOT-04.4, MOT-04.4.R1, MOT-04.6, MOT-04.6.R1, MOT-05.1, MOT-05.1.R1, MOT-05.2, MOT-05.4, MOT-05.4.R1, MOT-10.1, MOT-10.1.R1, MOT-10.1.R2, MOT-10.2, MOT-10.3, PERC-03, PERC-03.R1, TC-011, TC-016
 
@@ -92,7 +94,7 @@
 | D405 capture (L-CAM) | 7 | 9 |
 | Perception (L-PERC) | 13 | 16 |
 | Geometry & calibration (L-GEOM) | 15 | 28 |
-| Motion planning (L-MOTION) | 21 | 40 |
+| Motion planning (L-MOTION) | 22 | 40 |
 | Integration & commissioning (L-INT) | 1 | 6 |
 | Operator workflow & handoff (L-OPS) | 1 | 4 |
 | Imitation learning (later phase) (L-IL) | 0 | 1 |
