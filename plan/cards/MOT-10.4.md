@@ -62,7 +62,8 @@
   "id": "MOT-10.4",
   "parent": "MOT-10",
   "title": "Operator: place the specimen at the recommended pose and perform the workcell survey (no motion)",
-  "outcome": "config/scene/workcell_survey.yaml holds the operator's real raw measurements (table, base mounting, as-placed specimen, clearance obstacles, ACM observations), with uncertainties, operator, date, and photo evidence kept under data/workcell_survey/. The survey validates with survey_to_scene."
+  "outcome": "config/scene/workcell_survey.yaml holds the operator's real raw measurements (table, base mounting, as-placed specimen, clearance obstacles, ACM observations), with uncertainties, operator, date, and photo evidence kept under data/workcell_survey/. The survey validates with survey_to_scene.",
+  "operator_procedure": true
 }
 ```
 

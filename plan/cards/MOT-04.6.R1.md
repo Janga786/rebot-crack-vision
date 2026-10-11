@@ -20,7 +20,8 @@
       "ros2_ws/src/crackvision_motion/test/fixtures/scene_table.yaml",
       "ros2_ws/src/crackvision_motion/test/test_placement.py",
       "ros2_ws/src/crackvision_motion/test/test_reachability_core.py",
-      "scripts/ros/test_reachability_task_frames.sh"
+      "scripts/ros/test_reachability_task_frames.sh",
+      "ros2_ws/src/crackvision_motion/test/conftest.py"
     ]
   },
   "inputs": [
@@ -108,3 +109,6 @@ ros2_ws
 - Consequence: previously accepted behaviour regressed
 - Affected: ros2_ws/src/crackvision_motion/crackvision_motion/reachability_core.py, ros2_ws/src/crackvision_motion/crackvision_motion/reachability_sweep.py, ros2_ws/src/crackvision_motion/crackvision_motion/placement.py, ros2_ws/src/crackvision_motion/crackvision_motion/recommend_placement.py, ros2_ws/src/crackvision_motion/test/test_reachability_core.py
 - Acceptance condition: `bash scripts/ros/env_ros.sh python3 -m pytest ros2_ws/src/crackvision_motion/test -q -p no:cacheprovider` exits 0
+
+## Debugger note (D0002, 2026-10-11T00:19:14Z)
+Root cause (debugger D0002): the unit check fails while collecting test_execute_trajectory.py (MOT-05.4/05.7), which imports crackvision_description without putting ros2_ws/src/crackvision_description on sys.path. The check does not source install/setup.bash. Fix: create ros2_ws/src/crackvision_motion/test/conftest.py that inserts str(Path(__file__).resolve().parents[2] / 'crackvision_description') into sys.path, plus parents[1] for crackvision_motion, mirroring test_execution_gate.py:17-18. Do not edit test_execute_trajectory.py or any other MOT-05.x file. Then run all five acceptance checks.
