@@ -1,6 +1,6 @@
 # Progress — week of Mon Oct 05 – Sun Oct 11, 2026
 
-**26 task(s) completed and independently audited this week** · project total **69/108** accepted
+**27 task(s) completed and independently audited this week** · project total **69/108** accepted
 
 ## Notes
 
@@ -59,10 +59,12 @@
 …[211 chars clipped]
 - **HOST-03 — RealSense udev rules via a reviewed privileged action** ([details](HOST-03.md)): marked implemented by debugger D0002: Deliverables complete; only the owner-name check was sandbox-unprovable (replaced by an equivalent content+mode+uid-match check). Review the existing commits bc5b
 …[33 chars clipped]
+- **MOT-04.6 — Reachability on task frames (tool_tip / camera_link) with a workcell-faithful specimen proxy + camera view check** ([details](MOT-04.6-v2.md)): Implemented interactively by the technical-lead recovery session (Claude Opus 5.5, operator-authorised, 2026-09-30); commit 54e522e. Fixes MOT-04.5's frame error (standoffs meant as tool-tip clearance
+…[217 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 54 / 186
+- Implementation/review sessions run: 55 / 187
 - Audits that rejected work with evidence-backed findings: 14 (repairs created: 11)
 - Re-verified after an upstream change: CAM-02, CAM-05.1, CAM-05.2, GEOM-01, GEOM-01.R1, GEOM-08.1, GEOM-08.2, GEOM-08.2.R1, GEOM-08.5, GEOM-08.5.R1, GEOM-08.6, GEOM-08.7, GEOM-08.8, GEOM-08.8.R1, GEOM-10, MOT-02, MOT-03, MOT-04.1, MOT-04.1.R1, MOT-04.2, MOT-04.3, MOT-04.3.R1, MOT-04.4, MOT-04.4.R1, MOT-04.6, MOT-05.1, MOT-05.1.R1, MOT-05.2, MOT-05.4, MOT-05.4.R1, MOT-10.1, MOT-10.1.R1, MOT-10.2, MOT-10.3, PERC-03, PERC-03.R1, TC-011, TC-016
 
@@ -89,6 +91,7 @@
 
 ## Waiting on the operator / hardware (snapshot)
 
+- CAM-01: hardware — operator must declare: d405_connected
 - GEOM-04.1: privilege_denied — Denied. This request fails criteria 1, 2, 3 and 5.
 
 (1) Root isn't needed. The target is /home/boosterk1/miniconda3/envs
