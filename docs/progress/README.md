@@ -14,8 +14,8 @@ One folder per week: a summary (`README.md`) plus one page per completed task de
 | Track | Accepted | Total |
 |---|---|---|
 | automation | 5 | 8 |
-| calibration | 11 | 27 |
+| calibration | 12 | 27 |
 | camera | 8 | 12 |
 | physical | 1 | 6 |
-| simulation | 19 | 37 |
+| simulation | 18 | 37 |
 | software | 27 | 35 |
