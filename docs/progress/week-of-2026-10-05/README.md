@@ -1,6 +1,6 @@
 # Progress — week of Mon Oct 05 – Sun Oct 11, 2026
 
-**38 task(s) completed and independently audited this week** · project total **81/124** accepted
+**39 task(s) completed and independently audited this week** · project total **81/124** accepted
 
 ## Notes
 
@@ -81,10 +81,12 @@
 …[556 chars clipped]
 - **MOT-06.8 — View-phase core: camera_link view-pose candidates and D405 FOV coverage check (pure Python)** ([details](MOT-06.8.md)): Added the pure-Python geometry core for the robot's camera "view phase": given the specimen's position (from the scene file or a manual center), it generates candidate camera poses at 0° and 15° tilt 
 …[353 chars clipped]
+- **MOT-05.5 — Headless mock verification of the execution gate: dry/mock execution, refusals, collision, e-stop injection, vendor-interface mock** ([details](MOT-05.5.md)): scripts/ros/test_execution.sh now checks the commissioning-gated trajectory executor end to end with no hardware, using both the MoveIt mock stack and the vendor-interface mock_driver. All 9 cases pas
+…[387 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 77 / 315
+- Implementation/review sessions run: 80 / 316
 - Audits that rejected work with evidence-backed findings: 26 (repairs created: 20)
 - Re-verified after an upstream change: CAM-02, CAM-05.1, CAM-05.2, GEOM-01, GEOM-01.R1, GEOM-08.1, GEOM-08.2, GEOM-08.2.R1, GEOM-08.5, GEOM-08.5.R1, GEOM-08.6, GEOM-08.7, GEOM-08.8, GEOM-08.8.R1, GEOM-10, MOT-02, MOT-03, MOT-04.1, MOT-04.1.R1, MOT-04.2, MOT-04.3, MOT-04.3.R1, MOT-04.4, MOT-04.4.R1, MOT-04.6, MOT-04.6.R1, MOT-05.1, MOT-05.1.R1, MOT-05.2, MOT-05.4, MOT-05.4.R1, MOT-06.2, MOT-06.2.R1, MOT-06.3, MOT-06.3.R1, MOT-06.4, MOT-06.4.R1, MOT-06.5, MOT-06.5.R1, MOT-10.1, MOT-10.1.R1, MOT-10.1.R2, MOT-10.2, MOT-10.3, PERC-03, PERC-03.R1, TC-011, TC-016
 
@@ -118,4 +120,6 @@
 
 (1) Root isn't needed. The target is /home/boosterk1/miniconda3/envs
 …[2288 chars clipped]
+- LLM-06.1: dependency — The backlog currently has zero cards that are simultaneously unaccepted/ready, non-hardware, motion!=true, routing.conse
+…[181 chars clipped]
 - MOT-10.4: hardware — operator must declare: workcell_measured
