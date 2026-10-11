@@ -1,6 +1,6 @@
 # Progress — week of Mon Oct 05 – Sun Oct 11, 2026
 
-**41 task(s) completed and independently audited this week** · project total **83/125** accepted
+**42 task(s) completed and independently audited this week** · project total **82/125** accepted
 
 ## Notes
 
@@ -85,10 +85,12 @@
 …[387 chars clipped]
 - **MOT-06.11 — plan_crack_path: fraction==1.0 traces are full (no pointer-walk stall on resampled trajectories) + decouple IK solver budget from service-call waits** ([details](MOT-06.11.md)): Fixed the two defects debugger D0010 identified in plan_crack_path's Cartesian trace planning: (1) step-4 full-ness now follows §13.5 literally (fraction == 1.0 from /compute_cartesian_path itself), w
 …[956 chars clipped]
+- **MOT-06.7 — Headless mock-stack smoke test of plan_crack_path with consistent scene + paths3d fixtures** ([details](MOT-06.7.md)): A headless smoke test (scripts/ros/test_cartesian_plan.sh) now plans a test-only crack-path fixture with four segments against a matching fixture scene on the MoveIt mock stack. It checks the result w
+…[506 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 86 / 411
+- Implementation/review sessions run: 87 / 412
 - Audits that rejected work with evidence-backed findings: 27 (repairs created: 21)
 - Re-verified after an upstream change: CAM-02, CAM-05.1, CAM-05.2, GEOM-01, GEOM-01.R1, GEOM-08.1, GEOM-08.2, GEOM-08.2.R1, GEOM-08.5, GEOM-08.5.R1, GEOM-08.6, GEOM-08.7, GEOM-08.8, GEOM-08.8.R1, GEOM-09.1, GEOM-09.1.R1, GEOM-10, MOT-02, MOT-03, MOT-04.1, MOT-04.1.R1, MOT-04.2, MOT-04.3, MOT-04.3.R1, MOT-04.4, MOT-04.4.R1, MOT-04.6, MOT-04.6.R1, MOT-05.1, MOT-05.1.R1, MOT-05.2, MOT-05.4, MOT-05.4.R1, MOT-06.2, MOT-06.2.R1, MOT-06.3, MOT-06.3.R1, MOT-06.4, MOT-06.4.R1, MOT-06.5, MOT-06.5.R1, MOT-06.6, MOT-06.6.R1, MOT-06.8, MOT-10.1, MOT-10.1.R1, MOT-10.1.R2, MOT-10.2, MOT-10.3, PERC-03, PERC-03.R1, TC-011, TC-016
 
@@ -110,7 +112,7 @@
 | D405 capture (L-CAM) | 7 | 9 |
 | Perception (L-PERC) | 13 | 16 |
 | Geometry & calibration (L-GEOM) | 16 | 29 |
-| Motion planning (L-MOTION) | 29 | 41 |
+| Motion planning (L-MOTION) | 28 | 41 |
 | Integration & commissioning (L-INT) | 1 | 6 |
 | Operator workflow & handoff (L-OPS) | 1 | 4 |
 | Imitation learning (later phase) (L-IL) | 0 | 1 |
