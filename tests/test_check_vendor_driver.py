@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import shutil
 import sys
 from pathlib import Path
@@ -184,6 +185,13 @@ def test_bad_channel_fails_v_port(tmp_path):
     result = _run_capture(tmp_path, rebot_ws)
     assert result["rc"] == cvd.EXIT_NOT_READY
     assert _fail_ids(result["report"]) == ["V-PORT"]
+
+
+def test_every_check_citation_has_a_line_number(tmp_path):
+    rebot_ws = _make_tree(tmp_path)
+    result = _run_capture(tmp_path, rebot_ws)
+    for check in result["report"]["checks"]:
+        assert re.search(r":\d+", check["citation"]), f"{check['id']} citation lacks a line number: {check['citation']!r}"
 
 
 def test_text_format_lists_every_check_id(tmp_path, capsys):

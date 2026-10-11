@@ -30,27 +30,31 @@ writes under `~/rebot_ws`, only `logs/` (docs/INTERFACES.md §0.4) and `--json-o
 
 ## Current findings against `~/rebot_ws@2ebc4b8` / SDK `0324b73` (2026-10-10)
 
+Every citation below is computed by the checker from the vendor file's own content (never
+hard-coded), so it stays correct as the vendor tree changes — re-run the command above to refresh
+this table.
+
 | id | status | citation | remedy |
 |---|---|---|---|
-| V-PORT | PASS | `arm.yaml:4`, `gripper.yaml:3` | — |
-| V-BAUD | PASS | `rebotarm.py:485-487` | — |
-| V-IDS | PASS | `arm.yaml`/`gripper.yaml` vs facts | — |
-| V-ORDER | PASS | `arm.yaml` joints | — |
+| V-PORT | PASS | `arm.yaml:4`, `gripper.yaml:3`, `driver_params.yaml:6` | — |
+| V-BAUD | PASS | `rebotarm.py:486` | — |
+| V-IDS | PASS | `arm.yaml:9`, `gripper.yaml:5` vs facts | — |
+| V-ORDER | PASS | `arm.yaml:9` joints | — |
 | V-DIRECTION | PASS | no sign/direction/offset/invert keys; every facts sign check `match` | — |
 | V-ZERO | PASS | facts `zero.consistent_with_urdf_home` | — |
-| V-GRIPPER-SIGN | PASS | `ros_services.py:16-17`, `ros_publishers.py:7-8` | — |
-| V-GRIPPER-RANGE | WARN | facts `full_open_rad` is `null`; largest observed opening -1.776 rad vs the -4.9/-5.0 rad constants | measure the true full-open motor angle before trusting these constants |
-| V-GRIPPER-WIDTH | WARN | `ros_publishers.py:9,15` (0.045 m) vs URDF gripper upper (0.0715 m) | reconcile or document the discrepancy |
-| V-GRIPPER-UNITS | WARN | `ros_actions.py:213` passes `goal.position` (metres) straight to `set_gripper_target` (motor radians) | add a metres→motor-radians conversion in the `GripperCommand` handler |
-| V-SAFE-PARK | **FAIL** | `safe_park.yaml` `safe_park_q` puts joint2 (+0.011253) and joint3 (+0.135614) above their URDF upper limit 0.0 — into the folded contact on this unit | fix `safe_park_q` so every joint is within `b601_dm_limits.yaml`, or disable `safe_park_enabled` until it is |
-| V-STARTUP | WARN | `hardware_manager.py:190-197,572-600` | confirm with the operator that energising every motor at launch is intended |
-| V-GAINS | WARN | POS_VEL `vlim` 5.0/3.0 rad/s vs the 1.0 rad/s planning limit; MIT kp/kd 120/10 vs the bring-up caps (kp≤10, kd≤1) | lower `arm.yaml`'s POS_VEL `vlim` and MIT `kp`/`kd` before any real run |
-| V-SDK-API | **FAIL** | `hardware_manager.py:38-39,573` imports `RobotArm`/`ArmEndPos`/`actuator.gripper.load_cfg`; the vendored SDK (`0324b73`) exports only `RebotArm`/`RebotArmEndPose` | pin the SDK submodule to a commit that still exports `RobotArm`/`ArmEndPos` (last known: `8427281`), or update `hardware_manager.py`'s imports to the SDK's current API |
+| V-GRIPPER-SIGN | PASS | `ros_services.py:16,17`, `ros_publishers.py:7,8` | — |
+| V-GRIPPER-RANGE | WARN | facts `full_open_rad` is `null`; largest observed opening -1.776 rad vs the -4.9/-5.0 rad constants (`ros_services.py:16`, `ros_publishers.py:7`) | measure the true full-open motor angle before trusting these constants |
+| V-GRIPPER-WIDTH | WARN | `ros_publishers.py:9` (0.045 m) vs URDF gripper upper (0.0715 m) | reconcile or document the discrepancy |
+| V-GRIPPER-UNITS | WARN | `ros_actions.py:213` passes `goal.position` (metres) straight to `set_gripper_target` (`hardware_manager.py:610`, motor radians) | add a metres→motor-radians conversion in the `GripperCommand` handler |
+| V-SAFE-PARK | **FAIL** | `safe_park.yaml:5` `safe_park_q` puts joint2 (+0.011253) and joint3 (+0.135614) above their URDF upper limit 0.0; `hardware_manager.py:190,194` seeds this target at connect, `hardware_manager.py:199,211` parks to it on shutdown | fix `safe_park_q` so every joint is within `b601_dm_limits.yaml`, or disable `safe_park_enabled` until it is |
+| V-STARTUP | WARN | `hardware_manager.py:190,572` connect()/init_gripper(), `hardware_manager.py:193` SDK `ArmEndPos.start()` | confirm with the operator that energising every motor at launch is intended |
+| V-GAINS | WARN | `arm.yaml:16,19` POS_VEL `vlim` 5.0/3.0 rad/s vs the 1.0 rad/s planning limit; MIT kp/kd 120/10 vs the bring-up caps (kp≤10, kd≤1) | lower `arm.yaml`'s POS_VEL `vlim` and MIT `kp`/`kd` before any real run |
+| V-SDK-API | **FAIL** | `hardware_manager.py:38,39,40,41,436,573` imports `RobotArm`/`ArmEndPos`/`actuator.gripper.load_cfg`; the vendored SDK (`0324b73`) exports only `RebotArm`/`RebotArmEndPose` | pin the SDK submodule to a commit that still exports `RobotArm`/`ArmEndPos`, or update `hardware_manager.py`'s imports to the SDK's current API |
 | V-PYDEPS | **FAIL** | `motorbridge`/`pinocchio` not found under `/usr/bin/python3`'s standard dist-packages/site-packages | install both into the interpreter the driver actually runs under |
-| V-QOS | PASS (since MOT-05.7) | `execute_trajectory.py` subscribes `joint_states` with `qos_profile_sensor_data`, matching `ros_publishers.py:22-27` | — |
-| V-PROFILE | PASS | `execution.yaml` `driver_profiles.vendor` matches the driver's node/namespace/topics | — |
-| V-ARBITRATION | PASS | `driver_params.yaml` `cmd_arbitration: reject` | — |
-| V-URDF | WARN | `bringup.launch.py` publishes the gripper-less `reBot-DevArm_fixend.urdf` (`docs/motion/ROBOT_MODEL.md` §3) | repoint at the gripper URDF if a real session needs the gripper in TF |
+| V-QOS | PASS (since MOT-05.7) | `execute_trajectory.py:569` subscribes `joint_states` with `qos_profile_sensor_data` | — |
+| V-PROFILE | PASS | `rebotarm_controller.py:18,30`, `ros_actions.py:30`, `ros_publishers.py:24,44` match `execution.yaml` `driver_profiles.vendor` | — |
+| V-ARBITRATION | PASS | `driver_params.yaml:5` `cmd_arbitration: reject` | — |
+| V-URDF | WARN | `bringup.launch.py:26` publishes the gripper-less `reBot-DevArm_fixend.urdf` (`docs/motion/ROBOT_MODEL.md` §3) | repoint at the gripper URDF if a real session needs the gripper in TF |
 
 **Three FAILs as of 2026-10-10: the vendor driver cannot be launched against this `~/rebot_ws` and
 SDK state.** `V-SDK-API` means `HardwareManager.__init__` cannot even import the SDK; `V-PYDEPS`
