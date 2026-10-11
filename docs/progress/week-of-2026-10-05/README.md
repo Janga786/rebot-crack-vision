@@ -1,6 +1,6 @@
 # Progress — week of Mon Oct 05 – Sun Oct 11, 2026
 
-**25 task(s) completed and independently audited this week** · project total **68/108** accepted
+**26 task(s) completed and independently audited this week** · project total **69/108** accepted
 
 ## Notes
 
@@ -57,11 +57,13 @@
 …[553 chars clipped]
 - **HOST-04 — Arm USB adapter access via least-privilege udev rule** ([details](HOST-04.md)): The B601-DM arm's USB-to-CAN adapter now has its own least-privilege udev rule (matched by its specific USB vendor/product ID) installed on the workstation, replacing the operator's manual chmod 666 w
 …[211 chars clipped]
+- **HOST-03 — RealSense udev rules via a reviewed privileged action** ([details](HOST-03.md)): marked implemented by debugger D0002: Deliverables complete; only the owner-name check was sandbox-unprovable (replaced by an equivalent content+mode+uid-match check). Review the existing commits bc5b
+…[33 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 53 / 184
-- Audits that rejected work with evidence-backed findings: 13 (repairs created: 10)
+- Implementation/review sessions run: 54 / 186
+- Audits that rejected work with evidence-backed findings: 14 (repairs created: 11)
 - Re-verified after an upstream change: CAM-02, CAM-05.1, CAM-05.2, GEOM-01, GEOM-01.R1, GEOM-08.1, GEOM-08.2, GEOM-08.2.R1, GEOM-08.5, GEOM-08.5.R1, GEOM-08.6, GEOM-08.7, GEOM-08.8, GEOM-08.8.R1, GEOM-10, MOT-02, MOT-03, MOT-04.1, MOT-04.1.R1, MOT-04.2, MOT-04.3, MOT-04.3.R1, MOT-04.4, MOT-04.4.R1, MOT-04.6, MOT-05.1, MOT-05.1.R1, MOT-05.2, MOT-05.4, MOT-05.4.R1, MOT-10.1, MOT-10.1.R1, MOT-10.2, MOT-10.3, PERC-03, PERC-03.R1, TC-011, TC-016
 
 ## Planning changes
@@ -75,7 +77,7 @@
 
 | Work package | Accepted | Total |
 |---|---|---|
-| Host platform & reproducibility (L-HOST) | 9 | 10 |
+| Host platform & reproducibility (L-HOST) | 10 | 10 |
 | Local coding model (L-LLM) | 5 | 8 |
 | D405 capture (L-CAM) | 7 | 9 |
 | Perception (L-PERC) | 13 | 16 |
@@ -91,10 +93,4 @@
 
 (1) Root isn't needed. The target is /home/boosterk1/miniconda3/envs
 …[2288 chars clipped]
-- GEOM-09: escalation — lead decomposition failed twice: card GEOM-09.1: missing outcome; card GEOM-09.2: missing outcome; card GEOM-09.3: missing outcome
-- HOST-03: escalation — lead decomposition failed twice: card HOST-03.1: missing outcome
-- LLM-06.1: other — This implementer's sandbox session mounts plan/ (and task_cards/, .claude-auto/) read-only per its own environment instr
-…[181 chars clipped]
-- MOT-04.6.R1: operator_decision — The fix needs a file outside this card's scope.write. Either (a) add `sys.path.insert(0, str(Path(__file__).resolve().pa
-…[181 chars clipped]
 - MOT-10.4: hardware — operator must declare: workcell_measured
