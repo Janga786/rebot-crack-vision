@@ -6,7 +6,12 @@ Read-only research probe against the headless mock MoveIt stack (scripts/ros/moc
 via scripts/ros/probe_cartesian_path.sh). It only ever calls /apply_planning_scene,
 /get_planning_scene, /compute_ik, /compute_fk, /compute_cartesian_path and /plan_kinematic_path --
 never an action client, so nothing here can move the mock (let alone real) arm. It never sets
-avoid_collisions to false.
+avoid_collisions to false on a /compute_cartesian_path call; the one exception is the
+singularity_seed_sweep() diagnostic, which also tries avoid_collisions=False /compute_ik calls
+(still just IK -- no path, no motion) to confirm the roll=0 IK failure is not a collision artifact.
+
+If the IK fallback used to seed steps 3-7 also fails (see SINGULARITY_FALLBACK_ROLL_DEG), the probe
+writes its partial JSON and exits 1 (EXIT_RUNTIME) rather than 0, since steps 3-7 never ran.
 
 Applies a probe-local scene (table top at z=0 + a 0.20x0.20 m specimen box, top face z=0.010, at
 the recommended placement centre from config/motion/specimen_placement.yaml), IKs a tool_tip pose
@@ -207,7 +212,7 @@ def _pose(x: float, y: float, z: float, quat) -> Pose:
 
 
 def compute_ik(node: Node, client, link_name: str, x: float, y: float, z: float, quat,
-                avoid_collisions: bool = True):
+                avoid_collisions: bool = True, seed: Dict[str, float] = None):
     req = GetPositionIK.Request()
     req.ik_request.group_name = GROUP
     req.ik_request.ik_link_name = link_name
@@ -217,11 +222,44 @@ def compute_ik(node: Node, client, link_name: str, x: float, y: float, z: float,
     ps.pose = _pose(x, y, z, quat)
     req.ik_request.pose_stamped = ps
     req.ik_request.timeout.sec = 5
+    seed = seed if seed is not None else HOME_SEED
     rs = RobotState()
-    rs.joint_state.name = list(HOME_SEED.keys())
-    rs.joint_state.position = [float(v) for v in HOME_SEED.values()]
+    rs.joint_state.name = list(seed.keys())
+    rs.joint_state.position = [float(v) for v in seed.values()]
     req.ik_request.robot_state = rs
     return _call(node, client, req)
+
+
+def singularity_seed_sweep(node: Node, ik_client, link_name: str, x: float, y: float, z: float,
+                            quat) -> dict:
+    """Systematic recheck of the roll=0 IK failure: home seed plus 10 fixed (reproducible, not
+    interactively-picked) random seeds, each tried with avoid_collisions both True and False.
+    Logged in full so the doc's seed/collision-independence claim is reproducible from the JSON,
+    not just asserted."""
+    rng = __import__("random").Random(20261010)
+    seeds = [dict(HOME_SEED)]
+    for _ in range(10):
+        seed = dict(HOME_SEED)
+        for j in ARM_JOINTS:
+            seed[j] = rng.uniform(-math.pi, math.pi)
+        seeds.append(seed)
+    trials = []
+    for avoid_collisions in (True, False):
+        for seed_index, seed in enumerate(seeds):
+            resp = compute_ik(node, ik_client, link_name, x, y, z, quat,
+                               avoid_collisions=avoid_collisions, seed=seed)
+            trials.append({
+                "seed_index": seed_index,
+                "avoid_collisions": avoid_collisions,
+                "error_code": None if resp is None else resp.error_code.val,
+                "success": resp is not None and resp.error_code.val == MoveItErrorCodes.SUCCESS,
+            })
+    return {
+        "num_trials": len(trials),
+        "num_seeds": len(seeds),
+        "all_no_ik_solution": all(not t["success"] for t in trials),
+        "trials": trials,
+    }
 
 
 def compute_fk(node: Node, client, link_name: str, robot_state: RobotState):
@@ -395,11 +433,16 @@ def main(argv=None) -> int:
                 "error_code": None if fallback_resp is None else fallback_resp.error_code.val,
                 "success": fallback_resp is not None and fallback_resp.error_code.val == MoveItErrorCodes.SUCCESS,
             }
+            # Systematic recheck (not just the single home seed above): home + 10 fixed seeds,
+            # each with avoid_collisions both True and False, logged in full.
+            result["queries"]["compute_ik_tool_tip_singularity_seed_sweep"] = singularity_seed_sweep(
+                node, clients["ik"], "tool_tip", approach_x, approach_y, ik_z, quat_down_literal
+            )
             if fallback_resp is None or fallback_resp.error_code.val != MoveItErrorCodes.SUCCESS:
                 print("probe_cartesian_path: fallback IK also failed; writing partial results and stopping",
                       file=sys.stderr)
                 _write(args.out, result)
-                return EXIT_OK
+                return EXIT_RUNTIME
             ik_state = fallback_resp.solution
             quat_down = quat_fallback
 
@@ -433,16 +476,37 @@ def main(argv=None) -> int:
             for pt in pts
         ]
         ok_errors = [e for e in fk_errors if e.get("ok")]
+        # The trajectory's leading points are still en route along the initial ramp segment from
+        # start_state's pose to waypoints_a[0] (the "descend" pose): their nearest requested
+        # waypoint is necessarily waypoints_a[0] (index 0) because nothing closer exists yet, but
+        # the point itself is not there yet, so each reports a large "error" that is actually ramp
+        # transit position, not tracking error. Exclude every leading point that still maps to
+        # that same nearest index before measuring real per-point tracking error.
+        ramp_nearest_index = ok_errors[0]["nearest_waypoint_index"] if ok_errors else None
+        first_non_ramp = next(
+            (i for i, e in enumerate(ok_errors) if e["nearest_waypoint_index"] != ramp_nearest_index),
+            len(ok_errors),
+        )
+        ok_errors_excl_ramp = ok_errors[first_non_ramp:]
         result["queries"]["fk_check_line_no_roll"] = {
             "num_points_checked": len(fk_errors),
             "max_pos_error_m": max((e["pos_error_m"] for e in ok_errors), default=None),
             "max_angle_error_deg": max((e["angle_error_deg"] for e in ok_errors), default=None),
+            "max_pos_error_m_excluding_ramp_segment": max(
+                (e["pos_error_m"] for e in ok_errors_excl_ramp), default=None
+            ),
+            "max_angle_error_deg_excluding_ramp_segment": max(
+                (e["angle_error_deg"] for e in ok_errors_excl_ramp), default=None
+            ),
             "last_fk_point_nearest_waypoint_index": ok_errors[-1]["nearest_waypoint_index"] if ok_errors else None,
             "last_reached_waypoint_index_from_fraction": round(resp_a.fraction * (len(waypoints_a) - 1)),
             "note": (
                 "trajectory.num_points != num_requested_waypoints (resampled by time parameterization); "
                 "map fraction to the last reached requested waypoint via "
-                "round(fraction * (len(waypoints) - 1)), not via trajectory point count or index."
+                "round(fraction * (len(waypoints) - 1)), not via trajectory point count or index. "
+                "max_pos_error_m includes the first trajectory point, which is still on the ramp from "
+                "start_state's pose to waypoints_a[0] and so is not a tracking-error sample; "
+                "max_pos_error_m_excluding_ramp_segment drops it."
             ),
         }
 
