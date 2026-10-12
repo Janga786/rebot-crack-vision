@@ -2658,8 +2658,38 @@ convention):
 | `C-REST` | G-REST, independently recomputed |
 | `C-SAMPLING` | G-STEP (per-joint step `≤ retime.yaml`'s `sampling.max_joint_step_rad`) and G-PERIOD (`τ_i ≤ sampling.max_period_s`), independently recomputed |
 | `C-PATH` | G-PATH, independently recomputed: every plan configuration (`P`, §16.2 Step 1, recomputed from the given `--plan` the same way `retime_plan` does) is present, bit-exact, in the trajectory's `positions`, in order; every trajectory point lies within `1e-6` rad of the plan polyline formed by `P` (perpendicular distance to the nearest segment, mirroring §15.2 point 1's own nearest-segment construction); progress along the polyline is monotone; the trajectory's first point equals `P`'s first and its last equals `P`'s last |
-| `C-TOOLSPEED` | leg membership is derived **geometrically** from the plan (each trajectory point is assigned to the plan leg owning the nearest plan-polyline segment it lies on, via the same projection `C-PATH` already computes — never read from the report or from any trajectory field, since §11.2 carries no leg field). The checker gets `v_c` **the same way `retime_plan` does, independently**: for each trace leg it runs the identical bisection described at §16.2 Step 4 — "the largest `v_c ≤ retime.yaml`'s `trace.tool_speed_m_s` for which that leg's own segments satisfy G-TOOLSPEED rules 1–3" — against the trajectory's *own* segment speeds (recomputed via `crackvision.kinematics`-based `tool_fk`, never `crackvision_motion.tool_fk`). This is an existence statement, not a read: *a `v_c` satisfying rules 1–3 is asserted to exist for a passing trajectory, and the checker's own bisection is how it finds one* — it need not reproduce `retime_plan`'s exact chosen value bit-for-bit (floating-point bisection paths can differ), only find *some* `v_c ≤ trace.tool_speed_m_s` for which 1–3 hold; finding none is `C-TOOLSPEED` `fail`, mirroring G-TOOLSPEED point 4's refusal |
-| `C-REPORT` | only when `--report` is given (§16.5 outcome vocabulary below covers the absent case): the report's declared per-leg `point_range` (§16.4's shared-boundary convention) must match C-PATH's own geometric leg assignment **exactly** (integer indices, zero tolerance). The report's declared per-leg `duration_s` must be within `1e-6 s` (absolute) of `t_s[point_range.last] - t_s[point_range.first]` as read directly from the trajectory. For each trace leg, the report's declared `tool_speed.constant` (its `v_c`) must be within `1e-3 m/s` (absolute) of *some* `v_c` that `C-TOOLSPEED`'s own bisection finds to satisfy G-TOOLSPEED rules 1–3 for that leg (same existence semantics as `C-TOOLSPEED` above — not bit-exact equality to one canonical bisection result), and the report's declared `tool_speed.min`/`tool_speed.max` must each be within `1e-3 m/s` (absolute) of the corresponding extremum the checker itself recomputes over that leg's segments. Any single comparison outside its stated tolerance is `C-REPORT` `fail` |
+| `C-TOOLSPEED` | leg membership is derived **geometrically** from the plan (each trajectory point is assigned to the plan leg owning the nearest plan-polyline segment it lies on, via the same projection `C-PATH` already computes — never read from the report or from any trajectory field, since §11.2 carries no leg field). Segment speeds `s_i` (§16.2 Step 4 formula) are recomputed from the trajectory's own `positions`/`t_s` via `crackvision.kinematics`-based `tool_fk`, never `crackvision_motion.tool_fk`. `v_c` is **not read and not bisected**: on a finished trajectory the `s_i` are fixed, so the checker decides *existence* — C-TOOLSPEED passes for a trace leg iff the **feasible set** `F` (defined in "C-TOOLSPEED `v_c` inference" below) is non-empty, i.e. some `v_c ∈ [trace.min_tool_speed_m_s, trace.tool_speed_m_s]` makes that leg's segments satisfy G-TOOLSPEED rules 1–3. `F` empty is `C-TOOLSPEED` `fail`, mirroring G-TOOLSPEED point 4's refusal |
+| `C-REPORT` | only when `--report` is given (§16.5 outcome vocabulary below covers the absent case): the report's declared per-leg `point_range` (§16.4's shared-boundary convention) must match C-PATH's own geometric leg assignment **exactly** (integer indices, zero tolerance). The report's declared per-leg `duration_s` must be within `1e-6 s` (absolute) of `t_s[point_range.last] - t_s[point_range.first]` as read directly from the trajectory. For each trace leg, the report's declared `tool_speed.constant` (its `v_c`) passes iff its distance to that leg's feasible set `F` (below) is `≤ 1e-3 m/s` — i.e. it lies inside `F` or within `1e-3 m/s` of one of `F`'s pieces; it is **never** compared against a single bisection result or any other single canonical `v_c`. The report's declared `tool_speed.min`/`tool_speed.max` must each be within `1e-3 m/s` (absolute) of `min_i s_i`/`max_i s_i` the checker itself recomputes over that leg's segments. Any single comparison outside its stated tolerance is `C-REPORT` `fail` |
+
+**C-TOOLSPEED `v_c` inference (normative; shared by C-TOOLSPEED and C-REPORT).** For one trace leg
+with fixed segment speeds `s_1 … s_n` (segments between consecutive points of the leg's
+`point_range`, §16.4 inclusive convention), `tol = trace.speed_tolerance`, `v_min =
+trace.min_tool_speed_m_s` (the **floor**: G-TOOLSPEED point 4 — no `v_c` below it is ever
+admissible), `v_max = trace.tool_speed_m_s`:
+
+1. **Rule 1 lower bound.** Rule 1 (`s_i ≤ v_c·(1+tol)` for all `i`) holds iff `v_c ≥ L`, with
+   `L = max_i s_i / (1 + tol)`. Let `v_0 = max(L, v_min)`. If `v_0 > v_max`, `F = ∅` (fail).
+2. **Rules 2–3 depend on `v_c` only through the below-band set** `B(v_c) = {i : s_i < v_c·(1−tol)}`
+   (rule 2's upper band edge is already implied by rule 1). Rule 2 holds iff `B(v_c)` is exactly
+   the union of a (possibly empty) leading run `{1..a}` and a (possibly empty) trailing run
+   `{b..n}` of consecutive segments — the leading and trailing ramps; if `B(v_c)` is the whole leg,
+   the whole leg is one ramp and counts as both. Rule 3 holds iff each ramp's tool arc length
+   (`Σ s_i·τ_i` over its segments) is `≤ trace.max_ramp_m`.
+3. **Exact enumeration.** `B(v_c)` only changes at the breakpoints `t_i = s_i / (1 − tol)` (segment
+   `i` enters `B` for `v_c > t_i`). Sort the distinct values of `{v_0, v_max} ∪ {t_i : v_0 < t_i <
+   v_max}` as `v_0 = u_0 < u_1 < … < u_k = v_max`. On each point `u_j` and each open piece
+   `(u_j, u_{j+1})` `B` is constant; evaluate rules 2–3 once per point and once per open piece (at
+   any interior value, e.g. its midpoint). `F` is the union of the points/pieces that pass. If
+   `v_0 = v_max`, `F` is `{v_0}` or `∅` by evaluating that one value. A leg with `n = 0` segments
+   has `F = [v_min, v_max]`.
+
+Rules 2–3 are **not** monotone in `v_c` on fixed speeds (raising `v_c` can absorb an interior
+slow segment into a ramp by pulling the segments between it and the leg end below the band), so
+neither testing `v_c = v_0` alone nor a bisection is a valid substitute for this enumeration:
+`v_0 ∈ F` is sufficient for a pass but not necessary. The procedure is exact and costs
+`O(n²)` per leg, negligible at trajectory sizes. `numbers` for C-TOOLSPEED records, per trace leg,
+`L`, `v_0`, `v_max` and `F` as a list of `[lo, hi]` intervals (closed endpoints approximated to the
+evaluated values); for C-REPORT, each declared `tool_speed.constant` and its distance to `F`.
 
 **Outcome vocabulary.** Every check above resolves to exactly one of:
 
