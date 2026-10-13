@@ -44,6 +44,7 @@ from .joint_trajectory import (
     max_abs_velocity,
 )
 from .retime_core import (
+    SCHEMA as RETIME_CONFIG_SCHEMA,
     RetimeConfigError,
     RetimeError as _RetimeCoreError,
     load_retime_config,
@@ -487,6 +488,41 @@ _TOTALS_KEYS = frozenset({"n_points", "duration_s", "peak_velocity_fraction", "p
 _LEG_KINDS = frozenset({"transit", "approach", "trace", "retract"})
 
 
+_ISO8601_UTC_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
+
+
+def _check_iso8601_utc(v: object, ctx: str) -> None:
+    if not isinstance(v, str) or not _ISO8601_UTC_RE.match(v):
+        raise RetimeError(f"'{ctx}' must be an ISO-8601 UTC timestamp (YYYY-MM-DDTHH:MM:SSZ), got {v!r}")
+    try:
+        datetime.strptime(v, "%Y-%m-%dT%H:%M:%SZ")
+    except ValueError as exc:
+        raise RetimeError(
+            f"'{ctx}' must be an ISO-8601 UTC timestamp (YYYY-MM-DDTHH:MM:SSZ), got {v!r}"
+        ) from exc
+
+
+def _validate_parameters_echo(parameters: Dict[str, Any]) -> None:
+    """Round-trip `parameters` (minus `position_margin_rad`, which is `execution.yaml`'s field and
+    never a `retime.yaml` one, §16.1/§16.4) through the real `retime_core.load_retime_config`
+    schema validator -- never a hand-rolled approximation of `crackvision.retime_config/1`."""
+    echo = {k: v for k, v in parameters.items() if k != "position_margin_rad"}
+    fd, tmp_name = tempfile.mkstemp(suffix=".yaml")
+    try:
+        with os.fdopen(fd, "w") as fh:
+            yaml.safe_dump(echo, fh)
+        load_retime_config(tmp_name)
+    except RetimeConfigError as exc:
+        raise RetimeError(
+            f"'parameters' is not a valid {RETIME_CONFIG_SCHEMA} echo: {exc}"
+        ) from exc
+    finally:
+        try:
+            os.remove(tmp_name)
+        except OSError:
+            pass
+
+
 def _check_sha(v: object, ctx: str) -> None:
     if not isinstance(v, str) or not _SHA256_RE.match(v):
         raise RetimeError(f"'{ctx}' must be a 64-hex-char sha256 digest, got {v!r}")
@@ -515,8 +551,7 @@ def validate_retime_report(doc: object) -> Dict[str, Any]:
 
     if doc["schema"] != REPORT_SCHEMA:
         raise RetimeError(f"'schema' must be {REPORT_SCHEMA!r}, got {doc['schema']!r}")
-    if not isinstance(doc["created_utc"], str) or not doc["created_utc"]:
-        raise RetimeError("'created_utc' must be a non-empty string")
+    _check_iso8601_utc(doc["created_utc"], "created_utc")
     _check_sha(doc["trajectory_sha256"], "trajectory_sha256")
 
     input_shas = doc["input_shas"]
@@ -531,6 +566,21 @@ def validate_retime_report(doc: object) -> Dict[str, Any]:
     _check_number(parameters["position_margin_rad"], "parameters.position_margin_rad")
     if parameters["position_margin_rad"] <= 0:
         raise RetimeError("'parameters.position_margin_rad' must be > 0")
+    _validate_parameters_echo(parameters)
+
+    totals = doc["totals"]
+    if not isinstance(totals, dict) or set(totals) != _TOTALS_KEYS:
+        raise RetimeError(f"'totals' must have exactly keys {sorted(_TOTALS_KEYS)}")
+    n_points = totals["n_points"]
+    if isinstance(n_points, bool) or not isinstance(n_points, int) or n_points < 2:
+        raise RetimeError("'totals.n_points' must be an int >= 2")
+    _check_number(totals["duration_s"], "totals.duration_s")
+    for key in ("peak_velocity_fraction", "peak_acceleration_fraction"):
+        vec = totals[key]
+        if not isinstance(vec, list) or len(vec) != _N_JOINTS:
+            raise RetimeError(f"'totals.{key}' must be a list of {_N_JOINTS} numbers")
+        for j, v in enumerate(vec):
+            _check_number(v, f"totals.{key}[{j}]")
 
     legs_raw = doc["legs"]
     if not isinstance(legs_raw, list) or not legs_raw:
@@ -557,6 +607,10 @@ def validate_retime_report(doc: object) -> Dict[str, Any]:
             or point_range[0] < 0 or point_range[1] < point_range[0]
         ):
             raise RetimeError(f"'{ctx}.point_range' must be [first, last] non-negative ints with first <= last")
+        if point_range[1] >= n_points:
+            raise RetimeError(
+                f"'{ctx}.point_range' last index {point_range[1]} must be < totals.n_points ({n_points})"
+            )
 
         _check_number(leg["duration_s"], f"{ctx}.duration_s")
 
@@ -568,20 +622,6 @@ def validate_retime_report(doc: object) -> Dict[str, Any]:
                 _check_number(ts[key], f"{ctx}.tool_speed.{key}")
             if ts["constant"] <= 0:
                 raise RetimeError(f"'{ctx}.tool_speed.constant' must be > 0")
-
-    totals = doc["totals"]
-    if not isinstance(totals, dict) or set(totals) != _TOTALS_KEYS:
-        raise RetimeError(f"'totals' must have exactly keys {sorted(_TOTALS_KEYS)}")
-    n_points = totals["n_points"]
-    if isinstance(n_points, bool) or not isinstance(n_points, int) or n_points < 2:
-        raise RetimeError("'totals.n_points' must be an int >= 2")
-    _check_number(totals["duration_s"], "totals.duration_s")
-    for key in ("peak_velocity_fraction", "peak_acceleration_fraction"):
-        vec = totals[key]
-        if not isinstance(vec, list) or len(vec) != _N_JOINTS:
-            raise RetimeError(f"'totals.{key}' must be a list of {_N_JOINTS} numbers")
-        for j, v in enumerate(vec):
-            _check_number(v, f"totals.{key}[{j}]")
 
     self_check = doc["self_check"]
     if not isinstance(self_check, dict) or set(self_check) != {"violations"} or self_check["violations"] != 0:
