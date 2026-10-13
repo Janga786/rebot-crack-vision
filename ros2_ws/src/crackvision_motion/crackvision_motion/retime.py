@@ -291,11 +291,21 @@ def _self_validate_trajectory(doc: Dict[str, Any]) -> None:
 
 
 # --------------------------------------------------------------------------------------
-# retime_plan_doc (§16.2-16.4)
+# retime_plan_doc (§16.2-16.4) / retime_view_plan_doc (§17.3)
 # --------------------------------------------------------------------------------------
 
-def retime_plan_doc(
-    plan: Dict[str, Any],
+def _relpath(path: Path, root: Path) -> str:
+    """`path` as repo-relative POSIX text when it lies under `root`, else absolute (§17.1's
+    `source.paths3d.path` convention, reused for `source.view_plan.path`)."""
+    try:
+        return str(path.resolve().relative_to(root.resolve()))
+    except ValueError:
+        return str(path)
+
+
+def _retime_legs_doc(
+    legs: List[Dict[str, Any]],
+    sources: Dict[str, Any],
     *,
     limits_path: Union[str, Path],
     end_effector_path: Union[str, Path],
@@ -304,15 +314,18 @@ def retime_plan_doc(
     execution_config_path: Union[str, Path],
     purpose: str,
     plan_path: Union[str, Path],
+    source_field: Dict[str, Any],
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-    """Retime an already-validated `crackvision.cartesian_plan/1` document (`plan`, as returned by
-    `cartesian_plan.load_plan`) into a `(trajectory_doc, report_doc)` pair (§11.2/§16.4). Raises
+    """Shared §16.2-16.4 body for both `retime_plan_doc` (a `cartesian_plan`'s `legs[]`) and
+    `retime_view_plan_doc` (a one-leg `[transit_leg]`, §17.3): the algorithm itself never
+    distinguishes the two, only the caller-supplied `sources` (for the §16.3 sha-agreement
+    checks), `purpose` and `source_field` (the trajectory document's own `source` key) do. Raises
     `RetimeError` for any refusal condition in §16.2/§16.3 -- never a partially-converged or
     silently-non-compliant result. Writes nothing; see `write_outputs`."""
     # Step 1 (§16.3): the plan and the retimer must agree on which limits/end-effector files were
     # in force.
     limits_sha = file_sha256(limits_path)
-    plan_limits_sha = plan["sources"]["limits"]["sha256"]
+    plan_limits_sha = sources["limits"]["sha256"]
     if limits_sha != plan_limits_sha:
         raise RetimeError(
             f"limits file sha256 mismatch: '{limits_path}' hashes to {limits_sha}, but "
@@ -320,7 +333,7 @@ def retime_plan_doc(
         )
 
     end_effector_sha = file_sha256(end_effector_path)
-    plan_ee_sha = plan["sources"]["end_effector"]["sha256"]
+    plan_ee_sha = sources["end_effector"]["sha256"]
     if end_effector_sha != plan_ee_sha:
         raise RetimeError(
             f"end_effector config sha256 mismatch: '{end_effector_path}' hashes to "
@@ -352,7 +365,7 @@ def retime_plan_doc(
 
     # Step 2 (§16.2 Steps 1-2): plan polyline + refinement.
     try:
-        configs, plan_spans = plan_polyline(plan)
+        configs, plan_spans = plan_polyline({"legs": legs})
         refined, spans = refine(configs, plan_spans, max_joint_step_rad)
     except _RetimeCoreError as exc:
         raise RetimeError(str(exc)) from exc
@@ -486,8 +499,8 @@ def retime_plan_doc(
         "points": final_points,
         "limits_file": {"path": str(limits_path), "sha256": limits_sha},
         "end_effector_config_sha256": plan_ee_sha,
-        "scene_config_sha256": plan["sources"]["scene"]["sha256"],
-        "source": {"paths3d": dict(plan["sources"]["paths3d"])},
+        "scene_config_sha256": sources["scene"]["sha256"],
+        "source": source_field,
     }
 
     # Step 5 (G-SELFCHECK): full, unscaled limits, no explicit velocities/accelerations (G8), so
@@ -558,6 +571,60 @@ def retime_plan_doc(
 
     validate_retime_report(report_doc)
     return trajectory_doc, report_doc
+
+
+def retime_plan_doc(
+    plan: Dict[str, Any],
+    *,
+    limits_path: Union[str, Path],
+    end_effector_path: Union[str, Path],
+    urdf_path: Union[str, Path],
+    retime_config_path: Union[str, Path],
+    execution_config_path: Union[str, Path],
+    purpose: str,
+    plan_path: Union[str, Path],
+) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    """Retime an already-validated `crackvision.cartesian_plan/1` document (`plan`, as returned by
+    `cartesian_plan.load_plan`) into a `(trajectory_doc, report_doc)` pair (§11.2/§16.4)."""
+    return _retime_legs_doc(
+        plan["legs"], plan["sources"],
+        limits_path=limits_path, end_effector_path=end_effector_path, urdf_path=urdf_path,
+        retime_config_path=retime_config_path, execution_config_path=execution_config_path,
+        purpose=purpose, plan_path=plan_path,
+        source_field={"paths3d": dict(plan["sources"]["paths3d"])},
+    )
+
+
+def retime_view_plan_doc(
+    view_plan: Dict[str, Any],
+    view_plan_path: Union[str, Path],
+    root: Union[str, Path],
+    *,
+    limits_path: Union[str, Path],
+    end_effector_path: Union[str, Path],
+    urdf_path: Union[str, Path],
+    retime_config_path: Union[str, Path],
+    execution_config_path: Union[str, Path],
+) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    """Retime an already-validated `crackvision.view_plan/1` document's `transit_leg` (`view_plan`,
+    as returned by `cartesian_plan.load_view_plan`) into a `(trajectory_doc, report_doc)` pair with
+    `purpose: "view_move"` (§17.3). Raises `RetimeError` if `transit_leg` is `null` (a view plan
+    written on a `plan_view` refusal, §13.14.1) -- there is nothing to retime."""
+    transit_leg = view_plan["transit_leg"]
+    if transit_leg is None:
+        raise RetimeError("view plan's transit_leg is null; nothing to retime")
+
+    view_plan_path = Path(view_plan_path)
+    view_plan_sha = file_sha256(view_plan_path)
+    path_str = _relpath(view_plan_path, Path(root))
+
+    return _retime_legs_doc(
+        [transit_leg], view_plan["sources"],
+        limits_path=limits_path, end_effector_path=end_effector_path, urdf_path=urdf_path,
+        retime_config_path=retime_config_path, execution_config_path=execution_config_path,
+        purpose="view_move", plan_path=view_plan_path,
+        source_field={"paths3d": None, "view_plan": {"path": path_str, "sha256": view_plan_sha}},
+    )
 
 
 # --------------------------------------------------------------------------------------

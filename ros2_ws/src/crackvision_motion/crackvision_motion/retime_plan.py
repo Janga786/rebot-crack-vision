@@ -15,13 +15,13 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
-from .cartesian_plan import CartesianPlanError, load_plan
+from .cartesian_plan import CartesianPlanError, load_plan, load_view_plan
 from .cli_common import EXIT_OK, PreconditionError, RunSummary, add_common_args, find_root, run_cli
 from .joint_trajectory import TrajectoryError
 from .reachability_core import ConfigError
-from .retime import RetimeError, retime_plan_doc, write_outputs
+from .retime import RetimeError, retime_plan_doc, retime_view_plan_doc, write_outputs
 from .retime_core import RetimeConfigError, load_retime_config
 
 TOOL = "retime_plan"
@@ -32,6 +32,7 @@ DEFAULT_END_EFFECTOR_CONFIG = "config/robot/end_effector.yaml"
 DEFAULT_EXECUTION_CONFIG = "config/motion/execution.yaml"
 DEFAULT_URDF = "presentation/sim/reBot_B601_DM_with_gripper.urdf"
 DEFAULT_OUT_DIR = "data/trajectories"
+DEFAULT_VIEW_OUT = "data/trajectories/view_trajectory.json"
 
 # `cli_common.run_cli` hardcodes which exception types map to which exit code (§0.2): this
 # module's own refusal/config-error types are not among them, so `_retime` translates them into
@@ -44,9 +45,20 @@ _PRECONDITION_ERRORS = (RetimeError, CartesianPlanError)
 
 
 def _extra_args(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--plan", required=True, help="crackvision.cartesian_plan/1 file to retime")
-    parser.add_argument("--out", default=None, help=f"default: {DEFAULT_OUT_DIR}/{{case_id}}_trajectory.json under --root")
-    parser.add_argument("--purpose", choices=["crack_task", "test"], default="crack_task", help="§11.2 purpose field")
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("--plan", default=None, help="crackvision.cartesian_plan/1 file to retime")
+    group.add_argument("--view-plan", default=None, help="crackvision.view_plan/1 file to retime (§17.3)")
+    parser.add_argument(
+        "--out", default=None,
+        help=(
+            f"default: {DEFAULT_OUT_DIR}/{{case_id}}_trajectory.json under --root (--plan), or "
+            f"{DEFAULT_VIEW_OUT} under --root (--view-plan)"
+        ),
+    )
+    parser.add_argument(
+        "--purpose", choices=["crack_task", "test"], default=None,
+        help="§11.2 purpose field; --plan only (default crack_task), exit 2 with --view-plan",
+    )
     parser.add_argument("--retime-config", default=None, help=f"default: {DEFAULT_RETIME_CONFIG} under --root")
     parser.add_argument("--limits", default=None, help=f"default: {DEFAULT_LIMITS} under --root")
     parser.add_argument("--end-effector-config", default=None, help=f"default: {DEFAULT_END_EFFECTOR_CONFIG} under --root")
@@ -70,31 +82,62 @@ def _resolve_paths(args: argparse.Namespace, root: Path) -> Dict[str, Path]:
     }
 
 
-def _out_path(root: Path, args: argparse.Namespace, case_id: str) -> Path:
+def _out_path(root: Path, args: argparse.Namespace, case_id: Optional[str]) -> Path:
     if args.out is not None:
         return Path(args.out).expanduser().resolve()
-    return (root / DEFAULT_OUT_DIR / f"{case_id}_trajectory.json").resolve()
+    if case_id is not None:
+        return (root / DEFAULT_OUT_DIR / f"{case_id}_trajectory.json").resolve()
+    return (root / DEFAULT_VIEW_OUT).resolve()
 
 
 def _retime(args: argparse.Namespace, root: Path):
-    plan_path = Path(args.plan).expanduser().resolve()
+    """Run the whole retime pipeline for either `--plan` or `--view-plan` and return
+    `(kind, doc, trajectory_doc, report_doc)`, `kind` one of `"plan"`/`"view"` and `doc` the
+    loaded `cartesian_plan`/`view_plan` document (used by both `_print_leg_summary` and `_run`'s
+    `--out` default)."""
     paths = _resolve_paths(args, root)
-    if not plan_path.is_file():
-        raise PreconditionError(f"plan file not found: {plan_path}")
     for key in ("retime_config", "limits", "end_effector_config", "execution_config", "urdf"):
         if not paths[key].is_file():
             raise PreconditionError(f"{key} file not found: {paths[key]}")
 
-    # `retime_plan_doc` itself converts a `RetimeConfigError` from `load_retime_config` into a
-    # `RetimeError` (an exit-3 refusal, §16.2 Step 5's error-handling convention for everything
-    # downstream of a loaded config) -- so an unknown `retime.yaml` key is validated here, first,
-    # against the raw `RetimeConfigError`, to land on exit 2 (§16.6's own worked example) rather
-    # than exit 3.
+    # `retime_plan_doc`/`retime_view_plan_doc` themselves convert a `RetimeConfigError` from
+    # `load_retime_config` into a `RetimeError` (an exit-3 refusal, §16.2 Step 5's error-handling
+    # convention for everything downstream of a loaded config) -- so an unknown `retime.yaml` key
+    # is validated here, first, against the raw `RetimeConfigError`, to land on exit 2 (§16.6's
+    # own worked example) rather than exit 3.
     try:
         load_retime_config(paths["retime_config"])
     except RetimeConfigError as exc:
         raise ConfigError(str(exc)) from exc
 
+    if args.view_plan is not None:
+        if args.purpose is not None:
+            raise ConfigError("--purpose may not be given together with --view-plan (§17.3)")
+        view_plan_path = Path(args.view_plan).expanduser().resolve()
+        if not view_plan_path.is_file():
+            raise PreconditionError(f"view plan file not found: {view_plan_path}")
+        try:
+            view_plan = load_view_plan(view_plan_path, paths["limits"])
+            trajectory_doc, report_doc = retime_view_plan_doc(
+                view_plan,
+                view_plan_path,
+                root,
+                limits_path=paths["limits"],
+                end_effector_path=paths["end_effector_config"],
+                urdf_path=paths["urdf"],
+                retime_config_path=paths["retime_config"],
+                execution_config_path=paths["execution_config"],
+            )
+        except _CONFIG_ERRORS as exc:
+            raise ConfigError(str(exc)) from exc
+        except _PRECONDITION_ERRORS as exc:
+            raise PreconditionError(str(exc)) from exc
+        return "view", view_plan, trajectory_doc, report_doc
+
+    plan_path = Path(args.plan).expanduser().resolve()
+    if not plan_path.is_file():
+        raise PreconditionError(f"plan file not found: {plan_path}")
+    purpose = args.purpose if args.purpose is not None else "crack_task"
     try:
         plan = load_plan(plan_path, paths["limits"])
         trajectory_doc, report_doc = retime_plan_doc(
@@ -104,20 +147,22 @@ def _retime(args: argparse.Namespace, root: Path):
             urdf_path=paths["urdf"],
             retime_config_path=paths["retime_config"],
             execution_config_path=paths["execution_config"],
-            purpose=args.purpose,
+            purpose=purpose,
             plan_path=plan_path,
         )
     except _CONFIG_ERRORS as exc:
         raise ConfigError(str(exc)) from exc
     except _PRECONDITION_ERRORS as exc:
         raise PreconditionError(str(exc)) from exc
-    return plan, trajectory_doc, report_doc
+    return "plan", plan, trajectory_doc, report_doc
 
 
-def _print_leg_summary(plan: Dict[str, Any], report_doc: Dict[str, Any]) -> None:
-    plan_legs = plan["legs"]
+def _print_leg_summary(kind: str, doc: Dict[str, Any], report_doc: Dict[str, Any]) -> None:
     for leg in report_doc["legs"]:
-        n_configurations = len(plan_legs[leg["leg_index"]]["positions"])
+        if kind == "plan":
+            n_configurations = len(doc["legs"][leg["leg_index"]]["positions"])
+        else:
+            n_configurations = len(doc["transit_leg"]["positions"])
         first, last = leg["point_range"]
         n_refined_points = last - first + 1
         line = (
@@ -135,18 +180,18 @@ def _dry_run(args: argparse.Namespace) -> int:
     nothing -- exit 0 regardless of the outcome."""
     root = Path(args.root).expanduser().resolve() if args.root is not None else find_root()
     try:
-        plan, _trajectory_doc, report_doc = _retime(args, root)
+        kind, doc, _trajectory_doc, report_doc = _retime(args, root)
     except (PreconditionError, ConfigError) as exc:
         print(f"retime_plan --dry-run: refused: {exc}", file=sys.stderr)
         return EXIT_OK
-    _print_leg_summary(plan, report_doc)
+    _print_leg_summary(kind, doc, report_doc)
     return EXIT_OK
 
 
 def _run(args: argparse.Namespace, log, summary: RunSummary) -> Dict[str, str]:
     root = Path(args.root).expanduser().resolve() if args.root is not None else find_root()
-    plan, trajectory_doc, report_doc = _retime(args, root)
-    out_path = _out_path(root, args, plan["case_id"])
+    kind, doc, trajectory_doc, report_doc = _retime(args, root)
+    out_path = _out_path(root, args, doc["case_id"] if kind == "plan" else None)
 
     if args.skip_existing and out_path.is_file():
         log.info("--skip-existing: %s already exists, skipping", out_path)
