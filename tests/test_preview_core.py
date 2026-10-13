@@ -226,13 +226,16 @@ def test_bind_inputs_refuses_retime_report_sha_mismatch(tmp_path):
     plan = _cartesian_plan([{"leg_index": 0, "kind": "trace", "positions": [[0.0] * 6, [0.1] * 6]}])
     traj_path = _write(tmp_path / "traj.json", traj)
     plan_path = _write(tmp_path / "plan.json", plan)
-    retime_path = _write(tmp_path / "traj.json.retime.json", _retime_report("0" * 64, []))
+    retime_path = _write(
+        tmp_path / "traj.json.retime.json",
+        _retime_report("0" * 64, [{"leg_index": 0, "kind": "trace", "point_range": [0, 1], "duration_s": 1.0}]),
+    )
     check_path = _write(
         tmp_path / "traj.json.check.json",
         _check_report(file_sha256(traj_path), [{"check": "C-SCHEMA", "outcome": "pass"}]),
     )
 
-    with pytest.raises(PreviewRefusal, match="retime report"):
+    with pytest.raises(PreviewRefusal, match=r"trajectory_sha256 .* != current trajectory sha256"):
         bind_inputs(traj_path, plan_path, retime_path, check_path, root=tmp_path)
 
 
