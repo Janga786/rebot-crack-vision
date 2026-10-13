@@ -171,3 +171,105 @@ unchanged.
   unacceptable for some class of path, prompting a bounded corner-rounding amendment that keeps the
   independent re-check's role intact.
 - MOT-07.10 settles the `purpose: "view_move"` gap named in Decision/§16.8.
+
+## Addendum (MOT-07.11, debugger D0012): vertex-tied tool-speed dips on real trace legs
+
+**Status:** accepted (MOT-07.11). Amends INTERFACES §16.1 (field descriptions), §16.2 (G-TOOLSPEED
+rules 2-3), §16.5 (C-TOOLSPEED `v_c` inference, leg-range slack) and §16.7 (table rows).
+
+### Context
+
+MOT-07.8 ran `retime_plan` on the committed MOT-06.10 fixture
+(`ros2_ws/src/crackvision_motion/test/fixtures/retime/synth_plan/cartesian_plan.json`, a verbatim
+`run_cartesian_synthetic.sh` plan) with the committed `config/motion/retime.yaml`. It refused with
+`trace leg 2: no constant tool speed in [0.005, 0.05] m/s satisfies G-TOOLSPEED` (exit 3). Earlier
+MOT-07 tests only used smooth synthetic trace legs.
+
+### Measured evidence
+
+Reproduced with the fixture, its `b601_dm_limits.yaml`/`end_effector.yaml` copies and the committed
+`retime.yaml`/`execution.yaml`, profiling the trace leg at fixed `v_c` exactly as one bisection trial
+does. Throwaway script, not committed.
+
+- **Joint-space turns.** The trace leg has 21 plan points and 64.4 mm of tool travel (chords
+  0.61-4.85 mm, mean 3.2 mm). Every one of its 19 interior vertices turns in joint space by
+  1.35°-18.28° (median 6.07°). This is IK/Cartesian-interpolation jitter, not a planning defect;
+  §13.8's re-check already certified this polyline.
+- **The dips.** G-PATH forbids corner blending, so the joint velocity changes direction within one
+  sample at each vertex, and G-ACC (1.0 rad/s² × 0.95) forces Step 3 to slow down there. Interior
+  below-band runs (outside the leading/trailing ramps), by `v_c`:
+
+  | `v_c` (m/s) | interior dips | deepest (`s/v_c`) | longest dip (mm) | share of leg arc | all vertex-tied |
+  |---|---|---|---|---|---|
+  | 0.002 | 0 | — | — | 0 | — |
+  | 0.005 | 2 | 0.899 | 0.06 | 0.2% | yes |
+  | 0.006 | 4 | 0.809 | 0.08 | 0.4% | yes |
+  | 0.008 | 5 | 0.728 | 0.18 | 1.0% | yes |
+  | 0.009 | 10 | 0.478 | 0.26 | 2.6% | yes |
+  | 0.010 | 10 | 0.478 | 0.35 | 3.4% | yes |
+  | 0.012 | 13 | 0.430 | 0.55 | 6.0% | yes |
+  | 0.015 | 14 | 0.387 | 0.86 | 11.2% | yes |
+  | 0.020 | 15 | 0.254 | 1.60 | 28.3% | yes |
+  | 0.030 | 11 | 0.185 | 8.05 | 69.1% | yes |
+  | 0.050 | whole leg below band (one 64 mm "ramp") | | | | |
+
+  At 0.005 m/s the two dips are samples 7007-7008 and 7919-7920 of that trial's output (D0012
+  quoted 479-480/1391-1392 relative to its own leg range). Every dip at every `v_c` contains a
+  segment adjacent to a turning plan vertex. Rule 1 (above band) never binds: `max s_i / v_c =
+  1.0009`.
+- **Why the old rule refused.** Old rule 2 refused any interior below-band segment, so only
+  `v_c ≤ ~0.002` passed, below `min_tool_speed_m_s = 0.005`. D0012 found that raising
+  `speed_tolerance` to 0.09/0.10 still failed and 0.12 passed. Those dips are as deep as 0.48·v_c,
+  so tolerance alone would have to widen the band to roughly ±50% to absorb them, and the claim
+  would mean little.
+
+### Decision: option (b), a G-TOOLSPEED amendment with explicit bounds
+
+Option (a), profiling through a vertex without slowing down, is not available without leaving the
+plan polyline: G-PATH forbids blending, and the discrete G-ACC check sees the direction change at
+the vertex sample. Option (c), changing §16.7 values, was rejected: `speed_tolerance` would have to
+roughly double, loosening the band everywhere rather than only at vertices.
+
+G-TOOLSPEED rule 2 now also permits a **vertex-tied dip**: an interior maximal below-band run that
+contains a segment ending or starting at the bit-exact copy of an interior plan vertex whose joint
+direction changes (turn > 1e-9 rad, computed as `2·atan2(‖û−ŵ‖, ‖û+ŵ‖)`, which is accurate near zero
+where `acos` of a rounded dot product is not). Two explicit bounds:
+
+- **3a (per dip):** the dip's tool arc length is `≤ trace.max_ramp_m` (5 mm), the same bound as a
+  ramp.
+- **3b (per leg, new):** all vertex-tied dips of the leg together cover `≤ trace.speed_tolerance`
+  (5%) of the leg's tool arc length. This reuses the existing number instead of adding a
+  `retime.yaml` key. The claim becomes "within ±5% of `v_c`, and never above that band, over at
+  least 95% of the leg (ramps aside); every slower stretch is ≤ 5 mm and sits at a plan vertex".
+  Without 3b, rule 3a alone accepted the fixture at `v_c ≈ 0.027` m/s, where dips cover well over a
+  quarter of the leg. Rule 3b keeps the bisection where dips stay local.
+
+Not changed: `b601_dm_limits.yaml`, `limit_fraction.*`, `sampling.*`, every `trace.*` value,
+G-LIMITS and G-SELFCHECK. There is no clamping and no uniform slowdown: `v_c` is still the largest
+value the bisection finds. No plan configuration moves: G-PATH is untouched and every plan
+configuration still appears bit-exact, in order. Dip depth is not bounded. A dip only ever makes
+the tool slower than commanded, which is never a safety concern, and its extent is bounded by 3a/3b.
+A below-band run that touches no turning vertex is still refused, as is any segment above the band.
+
+### Result
+
+With the committed configs, `retime_plan_doc` retimes the fixture with exit 0: trace leg 2 gets
+`v_c = 0.011152` m/s (≥ 0.005), min segment speed 0.00136 m/s, max 0.011162 m/s, ramps 1.34 mm in
+and 0.80 mm out. Peak velocity fraction is 0.663 and peak acceleration fraction 0.950. G-SELFCHECK
+and `joint_trajectory.check_limits` at full limits with `execution.yaml`'s margin report zero
+violations (`test_retime.py::test_retime_plan_doc_real_synthetic_fixture`).
+
+### Independent checker
+
+`src/crackvision/trajectory_check.py` C-TOOLSPEED (and C-REPORT's feasible-set test) applies the
+same rules 2/3a/3b. It derives `V` from the plan's own polyline and the trajectory's bit-exact
+points; it still does not import `crackvision_motion`. On the fixture's retimed trajectory it
+computes `F = [0.010631, 0.011156]` m/s, which contains the retimer's `v_c`, and all nine checks
+pass.
+
+That run also exposed an unrelated C-REPORT disagreement. The checker's leg-range slack was
+`1e-5` rad of polyline progress, and the fixture's trajectory has a point `9.4e-6` rad before the
+retract→transit rest vertex. So the checker also gave that point to the transit leg (`[8491, …]`
+vs the retimer's `[8492, …]`). The slack is now float noise (`1e-9`), matching §16.5's
+"leg owning the segment the point lies on". Both fixes are covered by
+`tests/test_trajectory_check_path.py`.

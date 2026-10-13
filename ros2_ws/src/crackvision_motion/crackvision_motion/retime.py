@@ -28,7 +28,7 @@ import re
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, FrozenSet, List, Optional, Tuple, Union
 
 import numpy as np
 import yaml
@@ -67,6 +67,12 @@ _BISECT_TOL_M_S = 1e-4
 _BISECT_MAX_ITERS = 40
 _CHORD_EPS_M = 1e-9
 _SPEED_EPS = 1e-9
+
+# G-TOOLSPEED's vertex-dip amendment (MOT-07.11, ADR-019 addendum, §16.2/§16.7): the fixed (never
+# configurable) joint-space turn angle above which an interior plan vertex counts as a real corner.
+# It only excludes an exactly collinear, redundant waypoint; how much a corner may slow the tool is
+# bounded by rules 3a/3b (`max_ramp_m` per dip, `speed_tolerance` share per leg), not by this value.
+_VERTEX_DIR_EPS_RAD = 1e-9
 
 
 class RetimeError(ValueError):
@@ -159,12 +165,59 @@ def _leg_tool_speeds(chain, configs, t_s, first: int, last: int) -> Tuple[np.nda
     return chords / tau, chords
 
 
+def _interior_vertices_with_turn(configs: np.ndarray, first: int, last: int) -> List[np.ndarray]:
+    """Bit-exact copies of this trace leg's own interior plan vertices (`configs[first:last+1]`,
+    pre-refine §16.2 Step 1 output) whose joint-space direction genuinely changes -- i.e. excludes a
+    redundant, collinear waypoint (`_VERTEX_DIR_EPS_RAD`). Used only to locate where a G-TOOLSPEED
+    vertex-tied dip (below) is allowed to occur; never consulted for anything else."""
+    vertices: List[np.ndarray] = []
+    for k in range(first + 1, last):
+        seg_prev = configs[k] - configs[k - 1]
+        seg_next = configs[k + 1] - configs[k]
+        n_prev = float(np.linalg.norm(seg_prev))
+        n_next = float(np.linalg.norm(seg_next))
+        if n_prev <= _VERTEX_DIR_EPS_RAD or n_next <= _VERTEX_DIR_EPS_RAD:
+            continue
+        u = seg_prev / n_prev
+        w = seg_next / n_next
+        # 2*atan2(|u-w|, |u+w|), not acos(u.w): stays accurate for near-zero turns, where acos of a
+        # rounded dot product would report ~1e-8 rad for an exactly collinear waypoint.
+        turn = 2.0 * math.atan2(float(np.linalg.norm(u - w)), float(np.linalg.norm(u + w)))
+        if turn > _VERTEX_DIR_EPS_RAD:
+            vertices.append(configs[k].copy())
+    return vertices
+
+
+def _vertex_segments_for_leg(vertices: List[np.ndarray], leg_points: np.ndarray) -> FrozenSet[int]:
+    """Segment indices local to one trace leg's own profiled point range (`leg_points`, one trial's
+    `out_configs[out_first:out_last+1]`) that are adjacent to a bit-exact match of one of
+    `vertices` -- i.e. the set of segments G-TOOLSPEED's vertex-dip amendment may excuse."""
+    n_points = leg_points.shape[0]
+    segments: set = set()
+    for vertex in vertices:
+        matches = np.where(np.all(leg_points == vertex, axis=1))[0]
+        for m in matches:
+            if m - 1 >= 0:
+                segments.add(int(m - 1))
+            if m <= n_points - 2:
+                segments.add(int(m))
+    return frozenset(segments)
+
+
 def _check_toolspeed(
     speeds: np.ndarray, chords: np.ndarray, v_c: float, tol: float, max_ramp_m: float,
+    vertex_segments: FrozenSet[int] = frozenset(),
 ) -> Tuple[bool, Optional[float], Optional[float], Optional[float], Optional[float]]:
     """G-TOOLSPEED rules 1-3 (§16.2 Step 4) for one trace leg's segments at a candidate `v_c`.
     Returns `(ok, ramp_in_m, ramp_out_m, min_speed, max_speed)`; the last four are `None` when
-    `ok` is `False`."""
+    `ok` is `False`.
+
+    Rule 2 amendment (MOT-07.11, ADR-019 addendum): besides the leading/trailing ramp, an interior
+    maximal below-band run (a *vertex-tied dip*) is also permitted when it overlaps a segment in
+    `vertex_segments` (a genuine interior plan vertex) and is bounded (rule 3): its own tool arc
+    length is `<= max_ramp_m`, and all vertex-tied dips together cover at most `tol` of the leg's
+    tool arc length. Any below-band run that is neither a ramp nor vertex-tied still fails this
+    rule, exactly as before this amendment."""
     n = len(speeds)
     if n == 0:
         return True, 0.0, 0.0, 0.0, 0.0
@@ -189,8 +242,25 @@ def _check_toolspeed(
     trail = 0
     while trail < n - lead and below[n - 1 - trail]:
         trail += 1
-    middle = below[lead:n - trail]
-    if np.any(middle):
+
+    i = lead
+    interior_end = n - trail
+    dip_total_m = 0.0
+    while i < interior_end:
+        if not below[i]:
+            i += 1
+            continue
+        j = i
+        while j < interior_end and below[j]:
+            j += 1
+        if not any(seg in vertex_segments for seg in range(i, j)):
+            return False, None, None, None, None
+        run_len_m = float(np.sum(chords[i:j]))
+        if run_len_m > max_ramp_m + 1e-12:
+            return False, None, None, None, None
+        dip_total_m += run_len_m
+        i = j
+    if dip_total_m > tol * float(np.sum(chords)) + 1e-12:
         return False, None, None, None, None
 
     ramp_in = float(np.sum(chords[:lead])) if lead else 0.0
@@ -282,8 +352,8 @@ def retime_plan_doc(
 
     # Step 2 (§16.2 Steps 1-2): plan polyline + refinement.
     try:
-        configs, spans = plan_polyline(plan)
-        refined, spans = refine(configs, spans, max_joint_step_rad)
+        configs, plan_spans = plan_polyline(plan)
+        refined, spans = refine(configs, plan_spans, max_joint_step_rad)
     except _RetimeCoreError as exc:
         raise RetimeError(str(exc)) from exc
 
@@ -296,6 +366,15 @@ def retime_plan_doc(
 
     trace_v_c: Dict[int, float] = {
         li: target_v_c for (li, kind, _first, _last) in spans if kind == "trace"
+    }
+
+    # G-TOOLSPEED's vertex-dip amendment: each trace leg's own interior, genuinely-turning plan
+    # vertices (`plan_spans`/`configs`, pre-refine, §16.2 Step 1), computed once -- geometry that
+    # does not change across bisection trials, unlike the trial's own (possibly re-subdivided)
+    # output mesh, which is why `_vertex_segments_for_leg` is instead recomputed per trial below.
+    leg_vertices: Dict[int, List[np.ndarray]] = {
+        li: _interior_vertices_with_turn(configs, first, last)
+        for (li, kind, first, last) in plan_spans if kind == "trace"
     }
 
     def build_caps() -> np.ndarray:
@@ -331,7 +410,12 @@ def retime_plan_doc(
         out_configs, out_t_s, out_spans = result
         out_first, out_last = _leg_range(out_spans, leg_index)
         speeds, chords = _leg_tool_speeds(chain, out_configs, out_t_s, out_first, out_last)
-        ok, ramp_in, ramp_out, smin, smax = _check_toolspeed(speeds, chords, v_c, tol, max_ramp_m)
+        vertex_segments = _vertex_segments_for_leg(
+            leg_vertices[leg_index], out_configs[out_first:out_last + 1]
+        )
+        ok, ramp_in, ramp_out, smin, smax = _check_toolspeed(
+            speeds, chords, v_c, tol, max_ramp_m, vertex_segments
+        )
         if not ok:
             return None
         return ramp_in, ramp_out, smin, smax
@@ -375,8 +459,11 @@ def retime_plan_doc(
         if len(speeds) == 0:
             leg_stats[leg_index] = (0.0, 0.0, 0.0, 0.0)
             continue
+        vertex_segments = _vertex_segments_for_leg(
+            leg_vertices[leg_index], final_configs[first:last + 1]
+        )
         ok, ramp_in, ramp_out, smin, smax = _check_toolspeed(
-            speeds, chords, trace_v_c[leg_index], tol, max_ramp_m
+            speeds, chords, trace_v_c[leg_index], tol, max_ramp_m, vertex_segments
         )
         if not ok:
             raise RetimeError(

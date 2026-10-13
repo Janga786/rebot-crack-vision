@@ -18,6 +18,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import math
 import os
 import tempfile
 from pathlib import Path
@@ -32,6 +33,7 @@ from crackvision_motion.cartesian_plan import (
     add_leg,
     add_segment_report,
     build_caveats,
+    load_plan,
     new_plan,
     validate_plan,
 )
@@ -39,6 +41,9 @@ from crackvision_motion.joint_trajectory import JOINT_NAMES, check_limits, file_
 from crackvision_motion.retime import (
     REPORT_SCHEMA,
     RetimeError,
+    _check_toolspeed,
+    _interior_vertices_with_turn,
+    _vertex_segments_for_leg,
     retime_plan_doc,
     validate_retime_report,
     write_outputs,
@@ -409,6 +414,202 @@ def test_retime_plan_doc_refuses_when_trace_leg_too_slow(tmp_path):
             retime_config_path=retime_cfg_path, execution_config_path=exec_cfg_path,
             purpose="test", plan_path=plan_path,
         )
+
+
+# --------------------------------------------------------------------------------------
+# G-TOOLSPEED vertex-dip amendment (MOT-07.11, ADR-019 addendum/D0012)
+# --------------------------------------------------------------------------------------
+
+def _sharp_turn_joint_path(n_side: int, step: float, theta_deg: float = 20.0) -> np.ndarray:
+    """Synthetic piecewise-linear joint path: three straight runs of `n_side` segments each, joined
+    by two sharp interior joint-space turns of `theta_deg` (D0012 measured 1-18 deg on the real
+    fixture) at local indices `n_side` and `2 * n_side`. Shared with
+    tests/test_trajectory_check_path.py's mirror of this case (same segment pattern)."""
+    theta = math.radians(theta_deg)
+    dirs = [
+        np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
+        np.array([math.cos(theta), 0.0, 0.0, math.sin(theta), 0.0, 0.0]),
+        np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
+    ]
+    pts = [np.zeros(6)]
+    for d in dirs:
+        for _ in range(n_side):
+            pts.append(pts[-1] + step * d)
+    return np.array(pts)
+
+
+def test_interior_vertices_with_turn_finds_sharp_turns_only():
+    configs = _sharp_turn_joint_path(n_side=60, step=0.005)
+    vertices = _interior_vertices_with_turn(configs, 0, len(configs) - 1)
+    # Floating-point accumulation along each straight run must not register as a turn.
+    assert len(vertices) == 2
+    assert np.array_equal(vertices[0], configs[60])
+    assert np.array_equal(vertices[1], configs[120])
+    assert _vertex_segments_for_leg(vertices, configs) == frozenset({59, 60, 119, 120})
+
+
+def test_check_toolspeed_vertex_tied_dips_bounded_and_unrelated_dip_refused():
+    """D0012: the acceleration-limited profiling pass slows down at sharp joint-space vertices,
+    producing short tool-speed dips strictly inside the trace leg. G-TOOLSPEED (MOT-07.11) accepts
+    such a dip only when it touches a turning plan vertex, is `<= max_ramp_m` long, and all such
+    dips together cover `<= speed_tolerance` of the leg's tool arc length. The same speed/chord
+    pattern is mirrored in tests/test_trajectory_check_path.py for C-TOOLSPEED."""
+    configs = _sharp_turn_joint_path(n_side=60, step=0.005)
+    vertex_segments = _vertex_segments_for_leg(
+        _interior_vertices_with_turn(configs, 0, len(configs) - 1), configs
+    )
+    n = len(configs) - 1  # 180 segments
+    v_c, tol, max_ramp_m = 0.02, 0.05, 0.005
+    chords = np.full(n, 0.0009)  # leg 0.162 m
+
+    def profile(dips):
+        speeds = np.full(n, v_c)
+        for seg in dips:
+            speeds[seg] = 0.5 * v_c
+        return speeds
+
+    # Two-segment dips at both vertices (1.8 mm each, 2.2% of the leg): accepted.
+    vertex_dips = profile([59, 60, 119, 120])
+    ok, ramp_in, ramp_out, smin, smax = _check_toolspeed(vertex_dips, chords, v_c, tol, max_ramp_m, vertex_segments)
+    assert ok
+    assert (ramp_in, ramp_out) == (0.0, 0.0)
+    assert smin == pytest.approx(0.5 * v_c)
+    assert smax == pytest.approx(v_c)
+    # The pre-MOT-07.11 rule (no vertex-tied dips) refuses the same profile.
+    assert not _check_toolspeed(vertex_dips, chords, v_c, tol, max_ramp_m, frozenset())[0]
+
+    # The same dip mid-way along a straight run (no vertex) is still a refusal.
+    assert not _check_toolspeed(profile([89, 90]), chords, v_c, tol, max_ramp_m, vertex_segments)[0]
+
+    # A vertex-tied dip longer than max_ramp_m (6 x 0.9 mm = 5.4 mm; share 3.3%) is refused.
+    assert not _check_toolspeed(profile(range(57, 63)), chords, v_c, tol, max_ramp_m, vertex_segments)[0]
+
+    # Vertex-tied dips each within max_ramp_m (5 x 0.9 mm = 4.5 mm) but together 10/180 = 5.6% of
+    # the leg (> speed_tolerance) are refused by the share bound.
+    share_dips = profile(list(range(58, 63)) + list(range(118, 123)))
+    assert not _check_toolspeed(share_dips, chords, v_c, tol, max_ramp_m, vertex_segments)[0]
+    assert _check_toolspeed(share_dips, chords, v_c, 0.06, max_ramp_m, vertex_segments)[0]
+
+    # Above the band is refused regardless of vertices: rule 1 is unchanged.
+    above = vertex_dips.copy()
+    above[60] = 2.0 * v_c
+    assert not _check_toolspeed(above, chords, v_c, tol, max_ramp_m, vertex_segments)[0]
+
+
+def test_retime_plan_doc_sharp_turn_trace_has_vertex_tied_dips(tmp_path):
+    """End to end: a trace leg with 30 deg interior joint-space turns, sampled at the committed
+    max_joint_step_rad (0.01) and tight tolerance (0.05) / max_ramp_m (0.005). The profile dips
+    below the band strictly inside the leg at each turn; G-TOOLSPEED accepts those dips (the old
+    rule would not), and the output still keeps every plan configuration bit-exact and in order."""
+    theta = math.radians(30.0)
+    d0 = np.array([0.0, 0.0, 1.0, 0.0, 0.0, 0.0])
+    d1 = np.array([0.0, 0.0, 0.0, 1.0, 0.0, 0.0])
+    pts = [np.array(Q_TRACE_FIRST)]
+    for k in range(4):
+        sign = 1.0 if k % 2 == 0 else -1.0
+        pts.append(pts[-1] + 0.02 * (math.cos(theta / 2) * d0 + sign * math.sin(theta / 2) * d1))
+    trace = [p.tolist() for p in pts]
+    plan, plan_path = _build_plan(tmp_path, trace, "sharp_turns")
+    tol, max_ramp = 0.05, 0.005
+    retime_cfg_path = _write_retime_config(tmp_path, tol=tol, max_ramp=max_ramp, max_step=0.01, max_period=0.05)
+    exec_cfg_path = _write_execution_config(tmp_path)
+
+    traj, report = retime_plan_doc(
+        plan, limits_path=LIMITS_PATH, end_effector_path=END_EFFECTOR_PATH, urdf_path=URDF_PATH,
+        retime_config_path=retime_cfg_path, execution_config_path=exec_cfg_path,
+        purpose="test", plan_path=plan_path,
+    )
+    validate_retime_report(report)
+    assert check_limits(traj, LIMITS, position_margin_rad=0.03) == []
+    _assert_plan_positions_bit_exact_in_order(plan, traj)
+
+    trace_entry = next(e for e in report["legs"] if e["kind"] == "trace")
+    v_c = trace_entry["tool_speed"]["constant"]
+    assert v_c >= 0.005
+    first, last = trace_entry["point_range"]
+    configs = np.array([p["positions"] for p in traj["points"][first:last + 1]])
+    t_s = np.array([p["t_s"] for p in traj["points"][first:last + 1]])
+    chain = load_tool_chain(URDF_PATH, END_EFFECTOR_PATH)
+    chords = np.linalg.norm(np.diff(chain.tool_positions(configs), axis=0), axis=1)
+    speeds = chords / np.diff(t_s)
+    assert np.all(speeds <= v_c * (1.0 + tol) + 1e-9)
+
+    # Independently locate each interior below-band run and the turning plan vertices in the output.
+    below = speeds < v_c * (1.0 - tol)
+    good = np.flatnonzero(~below)
+    interior = np.flatnonzero(below[good[0]:good[-1] + 1]) + good[0]
+    runs = np.split(interior, np.flatnonzero(np.diff(interior) > 1) + 1) if interior.size else []
+    vertex_rows = [
+        int(np.flatnonzero(np.all(configs == np.array(trace[k]), axis=1))[0]) for k in range(1, len(trace) - 1)
+    ]
+    assert len(runs) >= 1
+    for run in runs:
+        assert any(run[0] <= row <= run[-1] + 1 for row in vertex_rows), (run, vertex_rows)
+        assert float(np.sum(chords[run])) <= max_ramp + 1e-12
+    assert sum(float(np.sum(chords[run])) for run in runs) <= tol * float(np.sum(chords)) + 1e-12
+    # The pre-MOT-07.11 rule refuses this very trajectory: the dips are real, not hypothetical.
+    assert not _check_toolspeed(speeds, chords, v_c, tol, max_ramp, frozenset())[0]
+
+
+def test_interior_vertices_with_turn_ignores_collinear_waypoints():
+    # Three collinear segments (zero turn at indices 1, 2) then one real corner at index 3 (the
+    # direction changes leaving it): only index 3 qualifies.
+    configs = np.array([
+        [0.0, 0, 0, 0, 0, 0],
+        [0.01, 0, 0, 0, 0, 0],
+        [0.02, 0, 0, 0, 0, 0],
+        [0.03, 0, 0, 0, 0, 0],
+        [0.04, 0.01, 0, 0, 0, 0],
+    ])
+    vertices = _interior_vertices_with_turn(configs, 0, len(configs) - 1)
+    assert len(vertices) == 1
+    assert np.array_equal(vertices[0], configs[3])
+
+
+# --------------------------------------------------------------------------------------
+# real plan_crack_path fixture (MOT-07.8/MOT-07.11)
+# --------------------------------------------------------------------------------------
+
+FIXTURE_DIR = REPO_ROOT / "ros2_ws" / "src" / "crackvision_motion" / "test" / "fixtures" / "retime" / "synth_plan"
+
+
+def test_retime_plan_doc_real_synthetic_fixture():
+    """MOT-07.8's committed, verbatim `plan_crack_path` synthetic fixture (see that directory's own
+    README.md): previously refused with 'trace leg 2: no constant tool speed ... satisfies
+    G-TOOLSPEED' (D0012); this amendment must now retime it successfully, against the real,
+    committed `config/motion/retime.yaml`/`config/motion/execution.yaml` -- never the fixture's own
+    (relaxed) config, which does not exist here on purpose."""
+    plan_path = FIXTURE_DIR / "cartesian_plan.json"
+    fixture_limits_path = FIXTURE_DIR / "b601_dm_limits.yaml"
+    fixture_ee_path = FIXTURE_DIR / "end_effector.yaml"
+    retime_cfg_path = REPO_ROOT / "config" / "motion" / "retime.yaml"
+    exec_cfg_path = REPO_ROOT / "config" / "motion" / "execution.yaml"
+
+    before_shas = {
+        p: file_sha256(p) for p in (plan_path, fixture_limits_path, fixture_ee_path, retime_cfg_path, exec_cfg_path)
+    }
+
+    plan = load_plan(str(plan_path), str(fixture_limits_path))
+    traj, report = retime_plan_doc(
+        plan, limits_path=fixture_limits_path, end_effector_path=fixture_ee_path, urdf_path=URDF_PATH,
+        retime_config_path=retime_cfg_path, execution_config_path=exec_cfg_path,
+        purpose="crack_task", plan_path=plan_path,
+    )
+
+    for p, sha in before_shas.items():
+        assert file_sha256(p) == sha, f"{p} was modified by this test"
+
+    retime_cfg_raw = yaml.safe_load(retime_cfg_path.read_text())
+    min_tool_speed_m_s = retime_cfg_raw["trace"]["min_tool_speed_m_s"]
+    trace_entries = [leg for leg in report["legs"] if leg["kind"] == "trace"]
+    assert trace_entries
+    for entry in trace_entries:
+        assert entry["tool_speed"]["constant"] >= min_tool_speed_m_s - 1e-12
+
+    fixture_limits = load_limits(fixture_limits_path)
+    margin_rad = yaml.safe_load(exec_cfg_path.read_text())["position_margin_rad"]
+    assert check_limits(traj, fixture_limits, position_margin_rad=margin_rad) == []
+    _assert_plan_positions_bit_exact_in_order(plan, traj)
 
 
 # --------------------------------------------------------------------------------------

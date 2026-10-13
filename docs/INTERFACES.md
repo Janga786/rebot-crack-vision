@@ -2454,8 +2454,8 @@ convention.
 | `sampling.max_period_s` | float | `0.02` | max segment duration (G-PERIOD); must be `> 0` |
 | `trace.tool_speed_m_s` | float | `0.05` | target constant tool-tip speed on a trace leg, **unscaled** (§16.2 G-TOOLSPEED); must be `> trace.min_tool_speed_m_s` |
 | `trace.min_tool_speed_m_s` | float | `0.005` | refuse a trace leg whose bisected `v_c` falls below this; must be `> 0` |
-| `trace.speed_tolerance` | float | `0.05` | relative band half-width around `v_c` (G-TOOLSPEED); must lie in `(0, 1)` |
-| `trace.max_ramp_m` | float | `0.005` | max tool arc length of a leading/trailing ramp (G-TOOLSPEED); must be `> 0` |
+| `trace.speed_tolerance` | float | `0.05` | relative band half-width around `v_c` (G-TOOLSPEED), and the max share of a trace leg's tool arc length its vertex-tied dips may cover together (rule 3b, MOT-07.11); must lie in `(0, 1)` |
+| `trace.max_ramp_m` | float | `0.005` | max tool arc length of a leading/trailing ramp or of one vertex-tied dip (G-TOOLSPEED rule 3a); must be `> 0` |
 | `value_status` | str | `"nominal"` | file-wide, matching `cartesian_planning.yaml`'s own convention |
 | `sources` | map | — | one free-text rationale per block above, same convention as `cartesian_planning.yaml`'s `sources` |
 
@@ -2535,14 +2535,38 @@ restricted to within this leg) satisfy:
 > **G-TOOLSPEED.**
 > 1. **Never above band.** Every segment's tool speed `s_i ≤ v_c · (1 + trace.speed_tolerance)`,
 >    with no exception anywhere in the leg, ramps included.
-> 2. **Band outside ramps.** A **ramp** is a maximal prefix (*leading ramp*) or suffix (*trailing
->    ramp*) of the leg's own consecutive segments with `s_i < v_c · (1 - trace.speed_tolerance)`.
->    Every segment **outside** the leading and trailing ramps lies in
->    `[v_c · (1 - trace.speed_tolerance), v_c · (1 + trace.speed_tolerance)]`.
-> 3. **Ramp bound.** Each ramp's own tool arc length (`Σ ‖tool_fk(q_{i+1}) − tool_fk(q_i)‖` over
->    that ramp's segments) is `≤ trace.max_ramp_m`.
+> 2. **Band outside ramps and vertex-tied dips.** A **ramp** is a maximal prefix (*leading ramp*)
+>    or suffix (*trailing ramp*) of the leg's own consecutive segments with
+>    `s_i < v_c · (1 - trace.speed_tolerance)` (*below band*). A **vertex-tied dip** (MOT-07.11,
+>    ADR-019 addendum) is any other maximal run of consecutive below-band segments that contains a
+>    segment immediately adjacent to (ending or starting at) the bit-exact copy of an interior plan
+>    vertex `p_k` (`0 < k < K` within this leg's own Step 1 plan-polyline range) whose joint-space
+>    direction changes: the turn angle `2·atan2(‖û − ŵ‖, ‖û + ŵ‖)` between the unit directions `û`
+>    of `(p_{k-1}, p_k)` and `ŵ` of `(p_k, p_{k+1})` exceeds a fixed `1e-9` rad (not a `retime.yaml`
+>    field; it only excludes an exactly collinear, redundant waypoint). Every segment outside the
+>    leading ramp, the trailing ramp and every vertex-tied dip lies in
+>    `[v_c · (1 - trace.speed_tolerance), v_c · (1 + trace.speed_tolerance)]`: a below-band run
+>    touching no such vertex is still a refusal.
+> 3. **Ramp and dip bounds.** (a) Each ramp's and each vertex-tied dip's own tool arc length
+>    (`Σ ‖tool_fk(q_{i+1}) − tool_fk(q_i)‖` over that run's segments) is `≤ trace.max_ramp_m`.
+>    (b) The vertex-tied dips of one leg **together** cover at most `trace.speed_tolerance` of that
+>    leg's tool arc length (ramps are not counted here; rule 3a bounds them). So a passing leg is
+>    within `±speed_tolerance` of `v_c` over at least `(1 − speed_tolerance)` of its interior
+>    (non-ramp) length, never above the band anywhere, and every slower stretch is a short,
+>    vertex-localised dip.
 > 4. **Refusal below minimum.** If no `v_c ≥ trace.min_tool_speed_m_s` satisfies 1–3, the run
 >    refuses (exit 3) — a trace leg is never silently executed below the configured floor.
+>
+> **Why vertex-tied dips are tolerated (MOT-07.11, ADR-019 addendum).** G-PATH forbids corner
+> blending, so at an interior plan vertex the joint-space velocity changes direction within one
+> sample and G-ACC forces Step 3 to slow down there. A real `plan_crack_path` trace leg turns
+> 1.35–18.3° in joint space at every one of its 19 interior vertices (IK/Cartesian-interpolation
+> jitter, ~3.2 mm of tool travel apart). On that leg the old rule 2 (any interior below-band
+> segment refuses) admitted no `v_c ≥ 0.005` m/s. Rule 3b is the explicit bound that keeps
+> "constant tool speed" meaningful. It grows with `v_c` (measured on the MOT-07.8 fixture: 0.2% of
+> the leg at 0.005 m/s, 3.4% at 0.010, 6.0% at 0.012, 28% at 0.020), so the bisection settles where
+> the dips stop being a small, local effect. Dips only ever make the tool slower; rule 1 is
+> unchanged.
 
 The chosen `v_c` for each trace leg feeds back into Step 3 as an additional per-segment velocity cap
 on that leg's tool-tip translational speed (an external cap on top of G-VEL's own per-joint bound,
@@ -2658,7 +2682,7 @@ convention):
 | `C-REST` | G-REST, independently recomputed |
 | `C-SAMPLING` | G-STEP (per-joint step `≤ retime.yaml`'s `sampling.max_joint_step_rad`) and G-PERIOD (`τ_i ≤ sampling.max_period_s`), independently recomputed |
 | `C-PATH` | G-PATH, independently recomputed: every plan configuration (`P`, §16.2 Step 1, recomputed from the given `--plan` the same way `retime_plan` does) is present, bit-exact, in the trajectory's `positions`, in order; every trajectory point lies within `1e-6` rad of the plan polyline formed by `P` (perpendicular distance to the nearest segment, mirroring §15.2 point 1's own nearest-segment construction); progress along the polyline is monotone; the trajectory's first point equals `P`'s first and its last equals `P`'s last |
-| `C-TOOLSPEED` | leg membership is derived **geometrically** from the plan (each trajectory point is assigned to the plan leg owning the nearest plan-polyline segment it lies on, via the same projection `C-PATH` already computes — never read from the report or from any trajectory field, since §11.2 carries no leg field). Segment speeds `s_i` (§16.2 Step 4 formula) are recomputed from the trajectory's own `positions`/`t_s` via `crackvision.kinematics`-based `tool_fk`, never `crackvision_motion.tool_fk`. `v_c` is **not read and not bisected**: on a finished trajectory the `s_i` are fixed, so the checker decides *existence* — C-TOOLSPEED passes for a trace leg iff the **feasible set** `F` (defined in "C-TOOLSPEED `v_c` inference" below) is non-empty, i.e. some `v_c ∈ [trace.min_tool_speed_m_s, trace.tool_speed_m_s]` makes that leg's segments satisfy G-TOOLSPEED rules 1–3. `F` empty is `C-TOOLSPEED` `fail`, mirroring G-TOOLSPEED point 4's refusal |
+| `C-TOOLSPEED` | leg membership is derived **geometrically** from the plan (each trajectory point is assigned to the plan leg owning the nearest plan-polyline segment it lies on, via the same projection `C-PATH` already computes — never read from the report or from any trajectory field, since §11.2 carries no leg field). Segment speeds `s_i` (§16.2 Step 4 formula) are recomputed from the trajectory's own `positions`/`t_s` via `crackvision.kinematics`-based `tool_fk`, never `crackvision_motion.tool_fk`. `v_c` is **not read and not bisected**: on a finished trajectory the `s_i` are fixed, so the checker decides *existence* — C-TOOLSPEED passes for a trace leg iff the **feasible set** `F` (defined in "C-TOOLSPEED `v_c` inference" below) is non-empty, i.e. some `v_c ∈ [trace.min_tool_speed_m_s, trace.tool_speed_m_s]` makes that leg's segments satisfy G-TOOLSPEED rules 1–3 (rule 2's vertex-tied-dip set `V`, MOT-07.11, is derived from this same leg assignment's own plan-polyline slice, independently of `retime_plan`). `F` empty is `C-TOOLSPEED` `fail`, mirroring G-TOOLSPEED point 4's refusal |
 | `C-REPORT` | only when `--report` is given (§16.5 outcome vocabulary below covers the absent case): the report's declared per-leg `point_range` (§16.4's shared-boundary convention) must match C-PATH's own geometric leg assignment **exactly** (integer indices, zero tolerance). The report's declared per-leg `duration_s` must be within `1e-6 s` (absolute) of `t_s[point_range.last] - t_s[point_range.first]` as read directly from the trajectory. For each trace leg, the report's declared `tool_speed.constant` (its `v_c`) passes iff its distance to that leg's feasible set `F` (below) is `≤ 1e-3 m/s` — i.e. it lies inside `F` or within `1e-3 m/s` of one of `F`'s pieces; it is **never** compared against a single bisection result or any other single canonical `v_c`. The report's declared `tool_speed.min`/`tool_speed.max` must each be within `1e-3 m/s` (absolute) of `min_i s_i`/`max_i s_i` the checker itself recomputes over that leg's segments. Any single comparison outside its stated tolerance is `C-REPORT` `fail` |
 
 **C-TOOLSPEED `v_c` inference (normative; shared by C-TOOLSPEED and C-REPORT).** For one trace leg
@@ -2670,11 +2694,22 @@ admissible), `v_max = trace.tool_speed_m_s`:
 1. **Rule 1 lower bound.** Rule 1 (`s_i ≤ v_c·(1+tol)` for all `i`) holds iff `v_c ≥ L`, with
    `L = max_i s_i / (1 + tol)`. Let `v_0 = max(L, v_min)`. If `v_0 > v_max`, `F = ∅` (fail).
 2. **Rules 2–3 depend on `v_c` only through the below-band set** `B(v_c) = {i : s_i < v_c·(1−tol)}`
-   (rule 2's upper band edge is already implied by rule 1). Rule 2 holds iff `B(v_c)` is exactly
-   the union of a (possibly empty) leading run `{1..a}` and a (possibly empty) trailing run
-   `{b..n}` of consecutive segments — the leading and trailing ramps; if `B(v_c)` is the whole leg,
-   the whole leg is one ramp and counts as both. Rule 3 holds iff each ramp's tool arc length
-   (`Σ s_i·τ_i` over its segments) is `≤ trace.max_ramp_m`.
+   (rule 2's upper band edge is already implied by rule 1). Let `V` be this leg's own fixed set of
+   segment indices adjacent to an interior plan vertex whose joint-space direction genuinely
+   changes (MOT-07.11, ADR-019 addendum; `V` does not depend on `v_c` — it is recomputed once per
+   leg from the plan's own polyline, the same way C-PATH's leg assignment is). Rule 2 holds iff
+   `B(v_c)`, split into its maximal runs of consecutive segments, is covered by: a (possibly empty)
+   leading run `{1..a}`, a (possibly empty) trailing run `{b..n}`, and zero or more further runs
+   each of which overlaps `V` (a **vertex-tied dip**); if `B(v_c)` is the whole leg, the whole leg
+   is one ramp and counts as both leading and trailing. A run covered by none of these is a `fail`.
+   Rule 3 holds iff each such run's own tool arc length (`Σ s_i·τ_i` over its segments) is
+   `≤ trace.max_ramp_m` — ramp or vertex-tied dip alike — and the vertex-tied dips' summed arc
+   length is `≤ tol · Σ_i s_i·τ_i` (rule 3b, the whole leg's arc length; ramps excluded from the
+   sum). Like rule 3a this depends on `v_c` only through `B(v_c)`, so the enumeration below stays
+   exact. Leg point ranges for `V` and for this inference come from the geometric assignment with a
+   float-noise (`1e-9`) progress slack only: a point lying on a leg's last segment just short of a
+   boundary vertex (the MOT-07.8 fixture has one `9.4e-6` rad before a rest vertex) belongs to that
+   leg alone.
 3. **Exact enumeration.** `B(v_c)` only changes at the breakpoints `t_i = s_i / (1 − tol)` (segment
    `i` enters `B` for `v_c > t_i`). Sort the distinct values of `{v_0, v_max} ∪ {t_i : v_0 < t_i <
    v_max}` as `v_0 = u_0 < u_1 < … < u_k = v_max`. On each point `u_j` and each open piece
@@ -2688,8 +2723,8 @@ slow segment into a ramp by pulling the segments between it and the leg end belo
 neither testing `v_c = v_0` alone nor a bisection is a valid substitute for this enumeration:
 `v_0 ∈ F` is sufficient for a pass but not necessary. The procedure is exact and costs
 `O(n²)` per leg, negligible at trajectory sizes. `numbers` for C-TOOLSPEED records, per trace leg,
-`L`, `v_0`, `v_max` and `F` as a list of `[lo, hi]` intervals (closed endpoints approximated to the
-evaluated values); for C-REPORT, each declared `tool_speed.constant` and its distance to `F`.
+`L`, `v_0`, `v_max`, `F` as a list of `[lo, hi]` intervals (closed endpoints approximated to the
+evaluated values) and `vertex_segments` (the leg-local set `V`, MOT-07.11); for C-REPORT, each declared `tool_speed.constant` and its distance to `F`.
 
 **Outcome vocabulary.** Every check above resolves to exactly one of:
 
@@ -2767,8 +2802,9 @@ Exit codes for both CLIs follow §0.2 exactly, as restated in §16.3 (refusals) 
 | `sampling.max_period_s` | `0.02` s | Matches the vendor driver's own 20 ms control tick (§11.12) — a sample period at this scale is what makes a finite-difference acceleration value reflect a real commanded velocity step rather than an artifact of oversampling a coarser physical rate (ADR-019) |
 | `trace.tool_speed_m_s` | `0.05` m/s | Unscaled; at the real-mode default `speed_scale` (`execution.yaml`'s `speed_scale.real_default = 0.10`, §11.12), the effective tool speed is `0.005` m/s = 5 mm/s — a cautious first real-execution speed, well below the trace clearance scale (`trace_clearance_m`, §8.2/§10) |
 | `trace.min_tool_speed_m_s` | `0.005` m/s | An order of magnitude below the target; below this a trace leg is crawling slowly enough that refusing (rather than silently proceeding) is the honest answer — the operator should retune rather than execute an unintentionally crawling pass |
-| `trace.speed_tolerance` | `0.05` (relative, 5%) | Tight enough that "constant tool speed" is a meaningful claim (not a 50%-wide band), loose enough to absorb the discrete, bounded-iteration profiling pass's own numerical slack |
-| `trace.max_ramp_m` | `0.005` m | Half of `execution.yaml`'s `densify_step_m` (0.01 m, §11.12) and equal to `end_effector.yaml`'s own `collision_padding_m` (0.005 m) — a ramp this short cannot eat meaningfully into either margin |
+| `trace.speed_tolerance` | `0.05` (relative, 5%) | Tight enough that "constant tool speed" is a meaningful claim (not a 50%-wide band), loose enough to absorb the discrete, bounded-iteration profiling pass's own numerical slack; also caps the summed vertex-tied dips of one trace leg at 5% of its tool arc length (G-TOOLSPEED rule 3b, MOT-07.11). Reusing this number instead of adding a knob makes the claim read "within ±5% of `v_c` over at least 95% of the leg, ramps aside". On the MOT-07.8 fixture this selects `v_c ≈ 0.0112` m/s (ADR-019 addendum) |
+| `trace.max_ramp_m` | `0.005` m | Half of `execution.yaml`'s `densify_step_m` (0.01 m, §11.12) and equal to `end_effector.yaml`'s own `collision_padding_m` (0.005 m) — a ramp this short cannot eat meaningfully into either margin; also bounds a vertex-tied dip (G-TOOLSPEED rule 3, MOT-07.11), the same way it bounds a leading/trailing ramp |
+| G-TOOLSPEED's vertex-direction epsilon | `1e-9` rad, fixed | Not a `retime.yaml` field (MOT-07.11, ADR-019 addendum). It only tells an exactly collinear, redundant waypoint (turn computed as `2·atan2(‖û−ŵ‖, ‖û+ŵ‖)`, ~1e-16 rad from rounding) apart from a real turn. How much slowing a turn may cause is bounded by rules 3a/3b, not by a sharpness threshold. The fixture's smallest interior turn is 1.35° |
 
 ### 16.8 The view-plan / §11.2 `purpose` gap
 

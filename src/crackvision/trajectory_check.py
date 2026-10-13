@@ -56,6 +56,12 @@ _CONTINUITY_TOL_RAD = 1e-6
 _REPORT_DURATION_TOL_S = 1e-6
 _REPORT_SPEED_TOL_M_S = 1e-3
 
+# G-TOOLSPEED's vertex-dip amendment (MOT-07.11, ADR-019 addendum): the fixed joint-space turn angle
+# above which an interior plan vertex counts as a real corner. Mirrors
+# `crackvision_motion.retime._VERTEX_DIR_EPS_RAD` by hand (this checker never imports
+# `crackvision_motion`), kept in sync against §16.2/§16.5's own text.
+_VERTEX_DIR_EPS_RAD = 1e-9
+
 
 class UsageError(Exception):
     """A CLI/config input could not even be parsed or opened (§0.2 exit 2)."""
@@ -715,13 +721,61 @@ def _build_projection(traj_doc: dict, plan_doc: dict) -> dict:
     return {"P": P, "cumlen": cumlen, "leg_info": leg_info, "points": points, "positions": positions}
 
 
+def _interior_vertices_with_turn(P_slice: list[list[float]]) -> list[list[float]]:
+    """G-TOOLSPEED's vertex-dip amendment (§16.2/§16.5, MOT-07.11): this leg's own interior plan
+    vertices (`P_slice`, pre-refine, §16.2 Step 1) whose joint-space direction genuinely changes
+    (excludes a redundant, collinear waypoint, `_VERTEX_DIR_EPS_RAD`). Independently reimplemented
+    from `crackvision_motion.retime._interior_vertices_with_turn` by hand -- this checker never
+    imports `crackvision_motion`."""
+    vertices: list[list[float]] = []
+    for k in range(1, len(P_slice) - 1):
+        prev = np.asarray(P_slice[k], dtype=float) - np.asarray(P_slice[k - 1], dtype=float)
+        nxt = np.asarray(P_slice[k + 1], dtype=float) - np.asarray(P_slice[k], dtype=float)
+        n_prev = float(np.linalg.norm(prev))
+        n_next = float(np.linalg.norm(nxt))
+        if n_prev <= _VERTEX_DIR_EPS_RAD or n_next <= _VERTEX_DIR_EPS_RAD:
+            continue
+        u = prev / n_prev
+        w = nxt / n_next
+        turn = 2.0 * math.atan2(float(np.linalg.norm(u - w)), float(np.linalg.norm(u + w)))
+        if turn > _VERTEX_DIR_EPS_RAD:
+            vertices.append(P_slice[k])
+    return vertices
+
+
+def _vertex_segments_for_leg(vertices: list[list[float]], leg_positions: list[list[float]]) -> frozenset[int]:
+    """Segment indices local to one trace leg's own trajectory point range (`leg_positions`) that
+    are adjacent to a bit-exact match of one of `vertices` -- the set of segments G-TOOLSPEED's
+    vertex-dip amendment may excuse (mirrors `crackvision_motion.retime._vertex_segments_for_leg`
+    by hand, on the trajectory's own fixed points rather than a bisection trial's output mesh)."""
+    n_points = len(leg_positions)
+    segments: set[int] = set()
+    for vertex in vertices:
+        for m, pos in enumerate(leg_positions):
+            if _bit_exact(pos, vertex):
+                if m - 1 >= 0:
+                    segments.add(m - 1)
+                if m <= n_points - 2:
+                    segments.add(m)
+    return frozenset(segments)
+
+
+def _leg_vertex_segments(projection: dict, leg: dict, first: int, last: int) -> frozenset[int]:
+    plan_vertices = _interior_vertices_with_turn(projection["P"][leg["p_first"]:leg["p_last"] + 1])
+    leg_positions = projection["positions"][first:last + 1]
+    return _vertex_segments_for_leg(plan_vertices, leg_positions)
+
+
 def _leg_point_ranges(projection: dict) -> dict[int, tuple[int | None, int | None, str]]:
     """Map each plan leg to `[first, last]` trajectory point indices, derived purely from the
     projection's arc-length progress against each leg's own `[p_first, p_last]` span on the plan
     polyline — never from any report field (§16.5)."""
     cumlen = projection["cumlen"]
     points = projection["points"]
-    eps = _PATH_TOL_RAD * 10.0
+    # Float-noise slack only (MOT-07.11): a looser, path-tolerance-sized slack (formerly 1e-5 rad)
+    # wrongly also assigned to the next leg a point lying on this leg's own last segment just short
+    # of a rest boundary (the fixture's retract->transit vertex has a point 9.4e-6 rad before it).
+    eps = _FLOAT_TOL
     ranges: dict[int, tuple[int | None, int | None, str]] = {}
     for leg in projection["leg_info"]:
         lo = cumlen[leg["p_first"]]
@@ -806,7 +860,17 @@ def check_path(traj: dict, plan: dict, projection: dict | None = None) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def _toolspeed_rule23_ok(speeds: list[float], taus: list[float], tol: float, v_c: float, max_ramp_m: float) -> bool:
+def _toolspeed_rule23_ok(
+    speeds: list[float], taus: list[float], tol: float, v_c: float, max_ramp_m: float,
+    vertex_segments: frozenset[int] = frozenset(),
+) -> bool:
+    """G-TOOLSPEED rules 2-3 (§16.2 Step 4) for one trace leg's fixed segment speeds at a candidate
+    `v_c`. Rule 2 amendment (MOT-07.11, ADR-019 addendum): besides the leading/trailing ramp, an
+    interior maximal below-band run (a vertex-tied dip) is also permitted when it overlaps a segment
+    in `vertex_segments` (a genuine interior plan vertex) and is bounded (rule 3): its own tool arc
+    length is `<= max_ramp_m`, and all vertex-tied dips together cover at most `tol` of the leg's
+    tool arc length. Any below-band run that is neither a ramp nor vertex-tied still fails, exactly
+    as before this amendment."""
     n = len(speeds)
     below = [s < v_c * (1.0 - tol) for s in speeds]
     good_idx = [i for i in range(n) if not below[i]]
@@ -814,8 +878,27 @@ def _toolspeed_rule23_ok(speeds: list[float], taus: list[float], tol: float, v_c
         ramp_len = sum(s * t for s, t in zip(speeds, taus))
         return ramp_len <= max_ramp_m + _FLOAT_TOL
     start, end = min(good_idx), max(good_idx)
-    if len(good_idx) != end - start + 1:
-        return False  # the below-band set is not a single leading+trailing run
+
+    i = start
+    dip_total = 0.0
+    while i <= end:
+        if not below[i]:
+            i += 1
+            continue
+        j = i
+        while j <= end and below[j]:
+            j += 1
+        if not any(seg in vertex_segments for seg in range(i, j)):
+            return False
+        run_len = sum(s * t for s, t in zip(speeds[i:j], taus[i:j]))
+        if run_len > max_ramp_m + _FLOAT_TOL:
+            return False
+        dip_total += run_len
+        i = j
+    leg_len = sum(s * t for s, t in zip(speeds, taus))
+    if dip_total > tol * leg_len + _FLOAT_TOL:
+        return False
+
     ramp1_len = sum(s * t for s, t in zip(speeds[:start], taus[:start]))
     ramp2_len = sum(s * t for s, t in zip(speeds[end + 1 :], taus[end + 1 :]))
     return ramp1_len <= max_ramp_m + _FLOAT_TOL and ramp2_len <= max_ramp_m + _FLOAT_TOL
@@ -835,11 +918,13 @@ def _merge_intervals(intervals: list[list[float]]) -> list[list[float]]:
 
 
 def _toolspeed_feasible_set(
-    speeds: list[float], taus: list[float], tol: float, v_min: float, v_max: float, max_ramp_m: float
+    speeds: list[float], taus: list[float], tol: float, v_min: float, v_max: float, max_ramp_m: float,
+    vertex_segments: frozenset[int] = frozenset(),
 ) -> tuple[list[list[float]], float | None, float | None]:
     """§16.5 "C-TOOLSPEED v_c inference": the feasible set `F` of constant tool speeds `v_c` for
-    which this leg's fixed segment speeds satisfy G-TOOLSPEED rules 1-3. Returns `(F, L, v_0)` --
-    `L`/`v_0` are `None` for an `n = 0` leg, for which rule 1 (and so `L`) is not defined."""
+    which this leg's fixed segment speeds satisfy G-TOOLSPEED rules 1-3 (rule 2's vertex-dip
+    amendment per `vertex_segments`, MOT-07.11). Returns `(F, L, v_0)` -- `L`/`v_0` are `None` for
+    an `n = 0` leg, for which rule 1 (and so `L`) is not defined."""
     n = len(speeds)
     if n == 0:
         return [[v_min, v_max]], None, None
@@ -861,7 +946,7 @@ def _toolspeed_feasible_set(
     passing: list[list[float]] = []
     for lo, hi in pieces:
         rep = lo if lo == hi else (lo + hi) / 2.0
-        if _toolspeed_rule23_ok(speeds, taus, tol, rep, max_ramp_m):
+        if _toolspeed_rule23_ok(speeds, taus, tol, rep, max_ramp_m, vertex_segments):
             passing.append([lo, hi])
     return _merge_intervals(passing), L, v0
 
@@ -936,7 +1021,8 @@ def check_toolspeed(
             }
             continue
         speeds, taus = _leg_speeds(first, last, points, chain, end_effector)
-        F, L, v0 = _toolspeed_feasible_set(speeds, taus, tol, v_min_cfg, v_max_cfg, max_ramp_m)
+        vertex_segments = _leg_vertex_segments(projection, leg, first, last)
+        F, L, v0 = _toolspeed_feasible_set(speeds, taus, tol, v_min_cfg, v_max_cfg, max_ramp_m, vertex_segments)
         leg_numbers[leg_index] = {
             "point_range": [first, last],
             "speeds": speeds,
@@ -946,6 +1032,7 @@ def check_toolspeed(
             "v_0": v0,
             "v_max": v_max_cfg,
             "F": F,
+            "vertex_segments": sorted(vertex_segments),
         }
         if not F:
             violations.append(
@@ -1025,7 +1112,8 @@ def check_report(
             tol = float(trace_cfg["speed_tolerance"])
             max_ramp_m = float(trace_cfg["max_ramp_m"])
             speeds, taus = _leg_speeds(first, last, points, chain, end_effector)
-            F, _L, _v0 = _toolspeed_feasible_set(speeds, taus, tol, v_min_cfg, v_max_cfg, max_ramp_m)
+            vertex_segments = _leg_vertex_segments(projection, leg, first, last)
+            F, _L, _v0 = _toolspeed_feasible_set(speeds, taus, tol, v_min_cfg, v_max_cfg, max_ramp_m, vertex_segments)
             observed_min = min(speeds) if speeds else None
             observed_max = max(speeds) if speeds else None
             leg_number.update({"F": F, "observed_min": observed_min, "observed_max": observed_max})
