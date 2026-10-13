@@ -3220,7 +3220,7 @@ states for `G-CONFIRM`'s `EXECUTE <sha8>` phrase, deliberately mirrored here (AD
 | `trajectory_sha256` | the trajectory's current sha256 (step 2 above) |
 | `approved_by` | `--operator` |
 | `approved_utc` | now, ISO-8601 UTC |
-| `preview_artifacts[]` | exactly four entries, in this order: the manifest itself (`{path: --preview's own path, sha256: the manifest file's current sha256}`), then `manifest.artifacts[0..2]` each as `{path, sha256}` (the `joints`/`toolpath`/`toolspeed` PNGs, in the manifest's own `artifacts[]` order) |
+| `preview_artifacts[]` | exactly four entries, in this order: the manifest itself (`{path: the resolved --preview file's path, normalised by §11.2's convention — repo-relative (POSIX) when it lies under --root, otherwise absolute; sha256: the manifest file's current sha256}`), then `manifest.artifacts[0..2]` each as `{path, sha256}` (the `joints`/`toolpath`/`toolspeed` PNGs, in the manifest's own `artifacts[]` order) |
 
 **Output path.** Default `data/approvals/{case}_{sha8}_approval.json`, using the same `{case}`/`{sha8}`
 convention §18.1 uses for the preview directory (`{case}` from `manifest.case_id`, or `view` when it is

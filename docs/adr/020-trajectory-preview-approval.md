@@ -115,13 +115,13 @@ accurate or sufficient preview of what the arm will physically do, never that th
 at it carefully rather than typing the phrase from habit, and never that the scene or specimen has not
 moved since the render was produced (`G-STALE-CONFIG`/`G-LIMITS-HASH` catch *file* changes; nothing catches
 an un-recorded physical rearrangement of the cell, exactly the same residual risk `approval_max_age_s`
-already documents at §11.12). The red failing-check banner makes a failing trajectory hard to approve by
-accident, but a determined operator can still type `APPROVE <sha8>` at a manifest whose `check_report.
-all_pass` is `false` as long as every individual `approve_trajectory` precondition (§18) happens to pass —
-this card does not add a check-report-must-pass precondition to `approve_trajectory` itself beyond the ones
-listed in §18, by design (an operator may have a documented reason to approve a `warn`-only failing run);
-only `G-APPROVAL`'s own `check_report.all_pass == true` requirement (§18) is the hard backstop, and it
-applies at execution time, not at approval time.
+already documents at §11.12). `approve_trajectory` itself refuses (§18.2 check 4) whenever the check
+report names any check with outcome `fail`, so a failing trajectory cannot be approved at all — the same
+hard refusal `G-APPROVAL`'s own `check_report.all_pass == true` requirement (§18.3 check 5) re-applies at
+execution time, closing the gap for an approval that somehow predates a report regressing from pass to
+fail. The residual risk this leaves is narrower: an operator can still type `APPROVE <sha8>` carelessly,
+from habit, at a manifest whose checks all genuinely pass — approval remains a record that the operator was
+shown the rendering, not proof they scrutinised it.
 
 ## Revisit when
 
