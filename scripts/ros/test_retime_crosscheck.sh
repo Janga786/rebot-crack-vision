@@ -192,6 +192,24 @@ declare -A GATE_MUST_FLAG=(
     [accel_spike]=1
 )
 
+# Each fault must isolate its defect: trajectory_check's report must show at least the listed
+# check id(s) failing (space-separated) -- MOT-07.8.R1 finding fc26a0c71103bef7.
+declare -A EXPECTED_FAIL=(
+    [segment_overspeed]="C-LIMITS"
+    [accel_spike]="C-LIMITS"
+    [dropped_config]="C-PATH"
+    [corner_cut]="C-PATH"
+    [toolspeed_dip]="C-TOOLSPEED"
+    [wrong_limits_sha]="C-PROVENANCE"
+    [t_s_gap]="C-SAMPLING"
+)
+
+# toolspeed_dip must additionally *not* trip these checks (isolation: a regression that loosened
+# C-TOOLSPEED/G-TOOLSPEED must not be masked by this fault also failing for an unrelated reason).
+declare -A EXPECTED_PASS=(
+    [toolspeed_dip]="C-LIMITS C-SAMPLING C-PATH"
+)
+
 FAULT_NAMES=(segment_overspeed accel_spike dropped_config corner_cut toolspeed_dip wrong_limits_sha t_s_gap)
 UNCAUGHT=()
 
@@ -211,6 +229,39 @@ for name in "${FAULT_NAMES[@]}"; do
         continue
     fi
     echo "test_retime_crosscheck.sh: fault '$name' caught by trajectory_check (exit 3)"
+
+    expect_fail="${EXPECTED_FAIL[$name]:-}"
+    expect_pass="${EXPECTED_PASS[$name]:-}"
+    if [ -n "$expect_fail" ] || [ -n "$expect_pass" ]; then
+        if ! python3 - "$fout" "$expect_fail" "$expect_pass" <<'PYEOF'
+import json
+import sys
+
+report_path, expect_fail, expect_pass = sys.argv[1], sys.argv[2], sys.argv[3]
+report = json.load(open(report_path, encoding="utf-8"))
+outcomes = {c["check"]: c["outcome"] for c in report["checks"]}
+
+bad = []
+for check_id in expect_fail.split():
+    outcome = outcomes.get(check_id)
+    if outcome != "fail":
+        bad.append(f"expected {check_id}=fail, got {outcome!r}")
+for check_id in expect_pass.split():
+    outcome = outcomes.get(check_id)
+    if outcome != "pass":
+        bad.append(f"expected {check_id}=pass (isolation), got {outcome!r}")
+
+if bad:
+    for msg in bad:
+        print(msg, file=sys.stderr)
+    sys.exit(1)
+PYEOF
+        then
+            UNCAUGHT+=("$name: did not match expected check outcomes (expect fail: '$expect_fail', expect pass: '$expect_pass'; see $fout)")
+            continue
+        fi
+        echo "test_retime_crosscheck.sh: fault '$name' matched expected check outcomes (fail: '$expect_fail', pass: '$expect_pass')"
+    fi
 
     if [ "${GATE_MUST_FLAG[$name]:-0}" -eq 1 ]; then
         gout="$FAULTS_DIR/fault_$name.gate.txt"
