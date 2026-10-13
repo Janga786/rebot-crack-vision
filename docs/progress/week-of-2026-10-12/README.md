@@ -1,6 +1,6 @@
 # Progress — week of Mon Oct 12 – Sun Oct 18, 2026
 
-**19 task(s) completed and independently audited this week** · project total **113/156** accepted
+**20 task(s) completed and independently audited this week** · project total **92/156** accepted
 
 ## Completed this week
 
@@ -39,10 +39,12 @@
 - **MOT-07.10.5 — Headless mock run: view_plan → retime_plan --view-plan → trajectory_check → execute_trajectory dry/mock** ([details](MOT-07.10.5.md)): Wrote scripts/ros/test_view_retime_execute.sh (modelled on test_retime_execute.sh) proving the headless mock chain view_plan -> retime_plan --view-plan -> trajectory_check -> execute_trajectory (dry, 
 …[146 chars clipped]
 - **MOT-07.10 — Retime the view-plan transit leg and settle the §11.2 purpose for view moves** ([details](MOT-07.10.md)): All sub-tasks of this work package were completed and audited together: MOT-07.10.1, MOT-07.10.1.R1, MOT-07.10.2, MOT-07.10.2.R1, MOT-07.10.2.R2, MOT-07.10.3, MOT-07.10.4, MOT-07.10.5.
+- **MOT-08.1 — Decision + contract: trajectory preview manifest, approval CLI and G-APPROVAL preview binding (ADR-020, INTERFACES §18)** ([details](MOT-08.1.md)): Defined the full written contract (ADR-020 plus a new §18 in INTERFACES.md) for how a planned robot trajectory gets previewed and approved before it can run on the real arm: a rendered preview (JSON +
+…[395 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 29 / 306
+- Implementation/review sessions run: 30 / 307
 - Audits that rejected work with evidence-backed findings: 10 (repairs created: 11)
 - Re-verified after an upstream change: CAM-02, GEOM-01, GEOM-01.R1, GEOM-08.1, GEOM-09.1, GEOM-09.1.R1, GEOM-10, MOT-02, MOT-03, MOT-04.1, MOT-04.1.R1, MOT-04.2, MOT-04.3, MOT-04.3.R1, MOT-04.4, MOT-04.4.R1, MOT-04.5, MOT-04.6, MOT-04.6.R1, MOT-05.1, MOT-05.1.R1, MOT-05.2, MOT-05.3, MOT-05.3.R1, MOT-05.3.R2, MOT-05.4, MOT-05.4.R1, MOT-05.5, MOT-05.6, MOT-05.6.R1, MOT-05.7, MOT-05.7.R1, MOT-06.10, MOT-06.11, MOT-06.11.R1, MOT-06.2, MOT-06.2.R1, MOT-06.4, MOT-06.4.R1, MOT-06.6, MOT-06.6.R1, MOT-06.9, MOT-07.1, MOT-07.1.R1, MOT-07.10.1, MOT-07.10.1.R1, MOT-07.10.2, MOT-07.10.2.R1, MOT-07.10.2.R2, MOT-07.10.3, MOT-07.10.4, MOT-07.10.5, MOT-07.11, MOT-07.2, MOT-07.3, MOT-07.4, MOT-07.4.R1, MOT-07.5, MOT-07.5.R1, MOT-07.6, MOT-07.6.R1, MOT-07.7, MOT-07.7.R1, MOT-07.8, MOT-07.8.R1, MOT-07.9, MOT-10.1, MOT-10.1.R1, MOT-10.1.R2, MOT-10.3, PERC-03, PERC-03.R1
 
@@ -58,10 +60,10 @@
 |---|---|---|
 | Host platform & reproducibility (L-HOST) | 10 | 10 |
 | Local coding model (L-LLM) | 5 | 8 |
-| D405 capture (L-CAM) | 7 | 9 |
-| Perception (L-PERC) | 13 | 16 |
-| Geometry & calibration (L-GEOM) | 24 | 32 |
-| Motion planning (L-MOTION) | 51 | 66 |
+| D405 capture (L-CAM) | 6 | 9 |
+| Perception (L-PERC) | 12 | 16 |
+| Geometry & calibration (L-GEOM) | 18 | 32 |
+| Motion planning (L-MOTION) | 38 | 66 |
 | Integration & commissioning (L-INT) | 1 | 9 |
 | Operator workflow & handoff (L-OPS) | 1 | 4 |
 | Imitation learning (later phase) (L-IL) | 0 | 1 |
@@ -75,5 +77,3 @@
 …[2288 chars clipped]
 - LLM-06.1: dependency — The backlog currently has zero cards that are simultaneously unaccepted/ready, non-hardware, motion!=true, routing.conse
 …[181 chars clipped]
-- MOT-09: hardware — operator must declare: arm_powered_estop_verified, workspace_clear
-- MOT-10.4: hardware — operator must declare: workcell_measured
