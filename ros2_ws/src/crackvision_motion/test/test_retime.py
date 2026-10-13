@@ -159,6 +159,83 @@ def _flip_sha(sha: str) -> str:
     return first + sha[1:]
 
 
+def _recompute_peak_fractions(traj: Dict[str, Any], limits: Dict[str, Any]) -> tuple:
+    """Independent re-derivation of `totals.peak_velocity_fraction`/`peak_acceleration_fraction`
+    (§16.4) straight from the trajectory's own `points[]` and `b601_dm_limits.yaml`, via the same
+    finite-difference formulas §16.4 specifies -- never by reading the report's own numbers."""
+    points = traj["points"]
+    t_s = [p["t_s"] for p in points]
+    n = len(points)
+    v_fracs: List[float] = []
+    a_fracs: List[float] = []
+    for jidx, jn in enumerate(JOINT_NAMES):
+        positions = [p["positions"][jidx] for p in points]
+        seg_v = [(positions[i + 1] - positions[i]) / (t_s[i + 1] - t_s[i]) for i in range(n - 1)]
+        vmax = max(abs(v) for v in seg_v)
+        amax = 0.0
+        for i in range(1, n - 1):
+            dt = (t_s[i + 1] - t_s[i - 1]) / 2.0
+            a = (seg_v[i] - seg_v[i - 1]) / dt
+            amax = max(amax, abs(a))
+        v_fracs.append(vmax / limits[jn]["velocity"])
+        a_fracs.append(amax / limits[jn]["acceleration"])
+    return v_fracs, a_fracs
+
+
+def _recompute_ramp_m(chain, configs: np.ndarray, t_s: np.ndarray, v_c: float, tol: float) -> tuple:
+    """Independent re-derivation of one trace leg's `ramp_in_m`/`ramp_out_m` (§16.2 Step 4: the
+    leading/trailing arc length of segments whose tool speed falls below `v_c*(1-tol)`), via
+    `tool_fk` directly on the trajectory slice -- never by reading the report's own numbers."""
+    pts = chain.tool_positions(configs)
+    chords = np.linalg.norm(np.diff(pts, axis=0), axis=1)
+    speeds = chords / np.diff(t_s)
+    n = len(speeds)
+    if n == 0:
+        return 0.0, 0.0
+    below = speeds < v_c * (1.0 - tol) - 1e-9
+    lead = 0
+    while lead < n and below[lead]:
+        lead += 1
+    if lead == n:
+        total = float(np.sum(chords))
+        return total, total
+    trail = 0
+    while trail < n - lead and below[n - 1 - trail]:
+        trail += 1
+    ramp_in = float(np.sum(chords[:lead])) if lead else 0.0
+    ramp_out = float(np.sum(chords[n - trail:])) if trail else 0.0
+    return ramp_in, ramp_out
+
+
+def _assert_report_matches_trajectory(
+    plan: Dict[str, Any], report: Dict[str, Any], traj: Dict[str, Any], retime_cfg_path: Path,
+) -> None:
+    # Every leg's reported point_range boundary points are bit-exact with that leg's own first/
+    # last plan configuration (§16.4's shared-boundary convention).
+    for entry in report["legs"]:
+        leg = next(l for l in plan["legs"] if l["leg_index"] == entry["leg_index"])
+        first, last = entry["point_range"]
+        assert traj["points"][first]["positions"] == leg["positions"][0]
+        assert traj["points"][last]["positions"] == leg["positions"][-1]
+
+    v_fracs, a_fracs = _recompute_peak_fractions(traj, LIMITS)
+    assert report["totals"]["peak_velocity_fraction"] == pytest.approx(v_fracs, abs=1e-9)
+    assert report["totals"]["peak_acceleration_fraction"] == pytest.approx(a_fracs, abs=1e-9)
+
+    retime_raw = yaml.safe_load(Path(retime_cfg_path).read_text())
+    tol = retime_raw["trace"]["speed_tolerance"]
+    chain = load_tool_chain(URDF_PATH, END_EFFECTOR_PATH)
+    for entry in report["legs"]:
+        if entry["kind"] != "trace":
+            continue
+        first, last = entry["point_range"]
+        configs = np.array([p["positions"] for p in traj["points"][first:last + 1]])
+        t_s = np.array([p["t_s"] for p in traj["points"][first:last + 1]])
+        ramp_in, ramp_out = _recompute_ramp_m(chain, configs, t_s, entry["tool_speed"]["constant"], tol)
+        assert entry["tool_speed"]["ramp_in_m"] == pytest.approx(ramp_in, abs=1e-9)
+        assert entry["tool_speed"]["ramp_out_m"] == pytest.approx(ramp_out, abs=1e-9)
+
+
 def _assert_plan_positions_bit_exact_in_order(plan: Dict[str, Any], trajectory_doc: Dict[str, Any]) -> None:
     """Mirrors `retime_core.plan_polyline`'s own §16.2 Step 1 dedup: a leg's first position is not
     checked again when it is within `CONTINUITY_TOL_RAD` of the previous leg's last (the plan's
@@ -242,6 +319,8 @@ def test_retime_plan_doc_straight_trace_happy_path(tmp_path):
     assert trace_entry["tool_speed"]["constant"] > 0
     assert trace_entry["tool_speed"]["constant"] <= trace_entry["tool_speed"]["target"] + 1e-9
 
+    _assert_report_matches_trajectory(plan, report, traj, retime_cfg_path)
+
 
 def test_retime_plan_doc_curved_trace_has_ramp_and_toolspeed_holds(tmp_path):
     plan, plan_path = _build_plan(tmp_path, CURVED_TRACE, "curved")
@@ -280,6 +359,8 @@ def test_retime_plan_doc_curved_trace_has_ramp_and_toolspeed_holds(tmp_path):
     assert speeds.min() == pytest.approx(ts["min"], abs=1e-6)
     assert speeds.max() == pytest.approx(ts["max"], abs=1e-6)
     assert np.all(speeds <= v_c * (1.0 + tol) + 1e-9)
+
+    _assert_report_matches_trajectory(plan, report, traj, retime_cfg_path)
 
 
 # --------------------------------------------------------------------------------------
@@ -429,6 +510,63 @@ def test_validate_retime_report_rejects_bad_point_range(_valid_report):
 def test_validate_retime_report_rejects_bad_input_shas(_valid_report):
     bad = copy.deepcopy(_valid_report)
     bad["input_shas"]["plan"] = "not-a-sha"
+    with pytest.raises(RetimeError):
+        validate_retime_report(bad)
+
+
+def test_validate_retime_report_rejects_parameters_wrong_schema(_valid_report):
+    bad = copy.deepcopy(_valid_report)
+    bad["parameters"]["schema"] = "wrong/9"
+    with pytest.raises(RetimeError):
+        validate_retime_report(bad)
+
+
+def test_validate_retime_report_rejects_parameters_non_mapping_nested_block(_valid_report):
+    bad = copy.deepcopy(_valid_report)
+    bad["parameters"]["limit_fraction"] = None
+    with pytest.raises(RetimeError):
+        validate_retime_report(bad)
+
+
+def test_validate_retime_report_rejects_parameters_wrong_type_nested_block(_valid_report):
+    bad = copy.deepcopy(_valid_report)
+    bad["parameters"]["trace"] = "garbage"
+    with pytest.raises(RetimeError):
+        validate_retime_report(bad)
+
+
+def test_validate_retime_report_rejects_parameters_missing_nested_key(_valid_report):
+    bad = copy.deepcopy(_valid_report)
+    del bad["parameters"]["trace"]["max_ramp_m"]
+    with pytest.raises(RetimeError):
+        validate_retime_report(bad)
+
+
+def test_validate_retime_report_rejects_parameters_extra_nested_key(_valid_report):
+    bad = copy.deepcopy(_valid_report)
+    bad["parameters"]["sampling"]["bogus"] = 1.0
+    with pytest.raises(RetimeError):
+        validate_retime_report(bad)
+
+
+def test_validate_retime_report_rejects_parameters_out_of_range_value(_valid_report):
+    bad = copy.deepcopy(_valid_report)
+    bad["parameters"]["limit_fraction"]["velocity"] = 1.5
+    with pytest.raises(RetimeError):
+        validate_retime_report(bad)
+
+
+def test_validate_retime_report_rejects_non_iso8601_created_utc(_valid_report):
+    bad = copy.deepcopy(_valid_report)
+    bad["created_utc"] = "hello"
+    with pytest.raises(RetimeError):
+        validate_retime_report(bad)
+
+
+def test_validate_retime_report_rejects_point_range_last_at_n_points(_valid_report):
+    bad = copy.deepcopy(_valid_report)
+    n_points = bad["totals"]["n_points"]
+    bad["legs"][-1]["point_range"] = [0, n_points]
     with pytest.raises(RetimeError):
         validate_retime_report(bad)
 
