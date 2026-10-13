@@ -904,3 +904,35 @@ def test_test_purpose_with_view_plan_key_fails_traj(tmp_path, mode):
 
     report = evaluate_offline(mode, traj_path, **_view_move_kwargs(tmp_path))
     assert _get(report, G_TRAJ).outcome == "fail"
+
+
+# --------------------------------------------------------------------------------------
+# MOT-05.3.R2 feedback: non-UTF-8 view_plan / unparseable limits_path become 'error'
+# ('fail' is also acceptable), never raise, on the view_move G-ELIGIBLE path.
+# --------------------------------------------------------------------------------------
+
+@pytest.mark.parametrize("mode", ["mock", "dry", "real"])
+def test_view_move_non_utf8_view_plan_does_not_raise(tmp_path, mode):
+    vp_path = tmp_path / "view_plan.json"
+    vp_path.write_bytes(b"\xff\xfe\x00bad")
+    traj = _view_move_trajectory(vp_path)
+    traj_path = _write_json(tmp_path / "trajectory.json", traj)
+
+    report = evaluate_offline(mode, traj_path, **_view_move_kwargs(tmp_path))
+    assert not report.passed
+    assert _get(report, G_ELIGIBLE).outcome in ("error", "fail")
+
+
+@pytest.mark.parametrize("mode", ["mock", "dry", "real"])
+def test_view_move_unparseable_limits_path_does_not_raise(tmp_path, mode):
+    vp_path = _write_view_plan(tmp_path)
+    traj = _view_move_trajectory(vp_path)
+    traj_path = _write_json(tmp_path / "trajectory.json", traj)
+    bad_limits = tmp_path / "bad_limits.yaml"
+    bad_limits.write_text("joints: [unterminated flow sequence\n")
+
+    report = evaluate_offline(
+        mode, traj_path, **_view_move_kwargs(tmp_path, limits_path=bad_limits)
+    )
+    assert not report.passed
+    assert _get(report, G_ELIGIBLE).outcome in ("error", "fail")
