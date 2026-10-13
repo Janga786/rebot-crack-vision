@@ -28,6 +28,7 @@ from __future__ import annotations
 import argparse
 import copy
 import json
+import math
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
@@ -241,10 +242,28 @@ def fault_corner_cut(traj: dict, plan: dict) -> dict:
     return d
 
 
+_TOOLSPEED_DIP_VERTEX_MARGIN = 2  # segments this many points clear of any plan vertex's own
+# bit-exact match, well outside the vertex-tied segments MOT-07.11's G-TOOLSPEED rule-2 amendment
+# may excuse (checker's _vertex_segments_for_leg: only the one or two segments immediately
+# adjacent to the vertex point itself).
+_TOOLSPEED_DIP_MIN_SEGMENTS = 8  # smallest window this fault will accept: wide enough for a smooth
+# multi-segment hump (no abrupt single-segment jump -> no FD acceleration/period spike) that still
+# dips well below any plausible constant-speed band for its whole width.
+_TOOLSPEED_DIP_AMPLITUDE = 0.8  # peak duration multiplier is 1 + this, i.e. speed drops to as low
+# as 1/(1+amplitude) of the leg's undipped rate at the hump's centre -- far more than the 5%
+# speed_tolerance band, so the dip is below band for every v_c the checker's rule-1 baseline admits.
+
+
 def fault_toolspeed_dip(traj: dict, plan: dict) -> dict:
-    """Slow one mid-trace-leg segment down by 20x (not the leading or trailing segment of the
-    leg), without touching any other segment's duration: a below-band dip in the interior of the
-    leg, violating G-TOOLSPEED rule 2 (only a leading/trailing run may be below band)."""
+    """Slow a wide (>= `_TOOLSPEED_DIP_MIN_SEGMENTS`-segment) run in the strict interior of one
+    trace leg's widest inter-vertex gap, via a smooth sin^2 hump in each affected segment's
+    duration (positions untouched): the run's own tool arc length comfortably exceeds
+    `retime.yaml`'s `trace.max_ramp_m`, and it starts `_TOOLSPEED_DIP_VERTEX_MARGIN` segments clear
+    of the vertices bounding that gap, so it is neither a leading/trailing ramp nor a vertex-tied
+    dip under MOT-07.11's G-TOOLSPEED rule-2 amendment -- it must fail C-TOOLSPEED under any
+    inferred constant tool speed. Because the hump is smooth and gradual (not a single abrupt
+    segment), it leaves C-LIMITS (no FD acceleration spike) and C-SAMPLING (no period-gap) passing,
+    unlike a single-segment dip of equivalent depth."""
     d = copy.deepcopy(traj)
     points = d["points"]
     vertices = _plan_vertices(plan)
@@ -255,15 +274,34 @@ def fault_toolspeed_dip(traj: dict, plan: dict) -> dict:
         raise FaultInjectError("plan has no trace leg to dip the tool speed of")
     leg_index = trace_legs[0]
     leg_point_idxs = sorted(i for (_v, li, kind), i in zip(vertices, idxs) if kind == "trace" and li == leg_index)
-    first, last = leg_point_idxs[0], leg_point_idxs[-1]
-    if last - first < 4:
-        raise FaultInjectError(f"trace leg {leg_index} has too few points for a mid-leg dip")
-    mid = first + (last - first) // 2
-    if mid <= first or mid >= last:
-        raise FaultInjectError(f"trace leg {leg_index}: no strictly-interior segment for a mid-leg dip")
+    if len(leg_point_idxs) < 2:
+        raise FaultInjectError(f"trace leg {leg_index} has too few plan vertices for a mid-leg dip")
 
-    tau = points[mid + 1]["t_s"] - points[mid]["t_s"]
-    _shift_tail(points, mid + 1, 19.0 * tau)
+    # Widest gap between two consecutive plan vertices on this leg -- the most room for a wide,
+    # smooth, vertex-clear dip.
+    v_lo, v_hi = max(
+        zip(leg_point_idxs[:-1], leg_point_idxs[1:]),
+        key=lambda pair: pair[1] - pair[0],
+    )
+    lo = v_lo + _TOOLSPEED_DIP_VERTEX_MARGIN
+    hi = v_hi - _TOOLSPEED_DIP_VERTEX_MARGIN
+    if hi - lo < _TOOLSPEED_DIP_MIN_SEGMENTS:
+        raise FaultInjectError(
+            f"trace leg {leg_index}: widest inter-vertex gap ({v_hi - v_lo} points) has no "
+            f"{_TOOLSPEED_DIP_MIN_SEGMENTS}-segment span clear of both vertices for a mid-leg dip"
+        )
+
+    n = hi - lo
+    original_t_s = [p["t_s"] for p in points]
+    for p in range(lo + 1, hi + 1):
+        seg = p - 1
+        x = (seg - lo + 0.5) / n
+        scale = 1.0 + _TOOLSPEED_DIP_AMPLITUDE * math.sin(math.pi * x) ** 2
+        tau = original_t_s[p] - original_t_s[p - 1]
+        points[p]["t_s"] = points[p - 1]["t_s"] + scale * tau
+    total_added = points[hi]["t_s"] - original_t_s[hi]
+    for p in range(hi + 1, len(points)):
+        points[p]["t_s"] = original_t_s[p] + total_added
     return d
 
 
