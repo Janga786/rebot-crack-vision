@@ -1,6 +1,6 @@
 # Progress — week of Mon Oct 12 – Sun Oct 18, 2026
 
-**4 task(s) completed and independently audited this week** · project total **101/138** accepted
+**5 task(s) completed and independently audited this week** · project total **102/138** accepted
 
 ## Completed this week
 
@@ -12,11 +12,13 @@
 …[392 chars clipped]
 - **MOT-07.4 — Retimer: constant tool speed on trace legs + §11.2 trajectory and crackvision.retime_report/1 assembly with self-check** ([details](MOT-07.4.md)): Built the MOT-07.4 retimer: it takes a geometric crack-trace plan and produces a timed robot trajectory that moves at one steady, configurable speed along each trace while respecting every joint's spe
 …[398 chars clipped]
+- **MOT-07.6 — Independent trajectory checker (conda side), part 1: schema, provenance, FD limits, §11.6 margin, rest and sampling + CLI** ([details](MOT-07.6.md)): Built the first half of the independent trajectory safety-checker for the robot arm's motion pipeline: a standalone tool (crackvision.trajectory_check) that re-derives, from the written specification 
+…[442 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 5 / 52
-- Audits that rejected work with evidence-backed findings: 1 (repairs created: 1)
+- Implementation/review sessions run: 7 / 54
+- Audits that rejected work with evidence-backed findings: 2 (repairs created: 2)
 - Re-verified after an upstream change: CAM-02, GEOM-01, GEOM-01.R1, GEOM-08.1, GEOM-09.1, GEOM-09.1.R1, GEOM-10, MOT-02, MOT-04.2, MOT-04.3, MOT-04.3.R1, MOT-04.6, MOT-04.6.R1, MOT-05.1, MOT-05.1.R1, MOT-06.11, MOT-06.11.R1, MOT-06.2, MOT-06.2.R1, MOT-10.1, MOT-10.1.R1, MOT-10.1.R2, PERC-03, PERC-03.R1
 
 ## Progress by work package
@@ -28,7 +30,7 @@
 | D405 capture (L-CAM) | 7 | 9 |
 | Perception (L-PERC) | 13 | 16 |
 | Geometry & calibration (L-GEOM) | 24 | 32 |
-| Motion planning (L-MOTION) | 39 | 51 |
+| Motion planning (L-MOTION) | 40 | 51 |
 | Integration & commissioning (L-INT) | 1 | 6 |
 | Operator workflow & handoff (L-OPS) | 1 | 4 |
 | Imitation learning (later phase) (L-IL) | 0 | 1 |
