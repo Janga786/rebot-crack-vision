@@ -215,6 +215,12 @@ def test_dry_run_writes_nothing_and_prints_summary(fixtures, capsys):
     assert not (fixtures["tmp_path"] / "logs").exists()
 
     captured = capsys.readouterr()
+    lines = [line for line in captured.out.splitlines() if line.startswith("leg ")]
+    assert len(lines) == 4
+    for line in lines:
+        assert "configurations=" in line
+        assert "refined_points=" in line
+        assert "duration=" in line
     assert "trace" in captured.out
     assert "v_c=" in captured.out
 
@@ -270,6 +276,24 @@ def test_missing_plan_file_refuses(fixtures):
     rc = main(argv)
     assert rc == EXIT_PRECONDITION
     assert not fixtures["out_path"].exists()
+
+
+def test_self_check_violation_refuses(fixtures, monkeypatch):
+    import crackvision_motion.retime as retime_mod
+    from crackvision_motion.joint_trajectory import Violation
+
+    def _fake_check_limits(*args, **kwargs):
+        return [Violation(index=0, joint=JOINT_NAMES[0], kind="position", value=99.0, bound=1.0)]
+
+    monkeypatch.setattr(retime_mod, "check_limits", _fake_check_limits)
+    argv = _common_argv(
+        fixtures["tmp_path"], fixtures["plan_path"], fixtures["out_path"], fixtures["limits"],
+        fixtures["ee"], fixtures["urdf"], fixtures["retime_cfg"], fixtures["exec_cfg"],
+    )
+    rc = main(argv)
+    assert rc == EXIT_PRECONDITION
+    assert not fixtures["out_path"].exists()
+    assert not Path(str(fixtures["out_path"]) + ".retime.json").exists()
 
 
 def test_trace_below_min_speed_refuses(fixtures):
