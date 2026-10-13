@@ -112,6 +112,26 @@ def _is_number_list(value: Any, length: int) -> bool:
     return isinstance(value, list) and len(value) == length and all(_is_number(v) for v in value)
 
 
+def _is_sha256_hex(value: Any) -> bool:
+    return isinstance(value, str) and len(value) == 64 and all(c in "0123456789abcdef" for c in value.lower())
+
+
+def _view_plan_source_errors(view_plan: Any) -> list[str]:
+    """§17.1: `source.view_plan` for a `view_move` trajectory must be exactly
+    `{"path": non-empty str, "sha256": 64-hex str}` (no `execution_eligible` or other key)."""
+    if not isinstance(view_plan, dict):
+        return ["trajectory.source.view_plan must be {path: str, sha256: 64-hex str}"]
+    errors: list[str] = []
+    extra = set(view_plan) - {"path", "sha256"}
+    if extra:
+        errors.append(f"trajectory.source.view_plan has unexpected key(s) {sorted(extra)!r}")
+    if not isinstance(view_plan.get("path"), str) or not view_plan.get("path"):
+        errors.append("trajectory.source.view_plan.path must be a non-empty string")
+    if not _is_sha256_hex(view_plan.get("sha256")):
+        errors.append("trajectory.source.view_plan.sha256 must be a 64-hex string")
+    return errors
+
+
 # ---------------------------------------------------------------------------
 # C-SCHEMA (§11.2 / §13.11.1)
 # ---------------------------------------------------------------------------
@@ -131,8 +151,11 @@ def validate_trajectory_schema(doc: Any) -> list[str]:
     for key in ("created_utc", "producer"):
         if not isinstance(doc.get(key), str) or not doc.get(key):
             errors.append(f"trajectory.{key} must be a non-empty string")
-    if doc.get("purpose") not in ("crack_task", "test"):
-        errors.append(f"trajectory.purpose is {doc.get('purpose')!r}, expected 'crack_task' or 'test'")
+    purpose = doc.get("purpose")
+    if purpose not in ("crack_task", "test", "view_move"):
+        errors.append(
+            f"trajectory.purpose is {purpose!r}, expected 'crack_task', 'test' or 'view_move'"
+        )
     if doc.get("planning_frame") != "base_link":
         errors.append(f"trajectory.planning_frame is {doc.get('planning_frame')!r}, expected 'base_link'")
     if doc.get("joint_names") != JOINT_NAMES:
@@ -182,24 +205,95 @@ def validate_trajectory_schema(doc: Any) -> list[str]:
             errors.append(f"trajectory.{key} must be a string or null")
 
     source = doc.get("source")
-    if not isinstance(source, dict) or "paths3d" not in source:
-        errors.append("trajectory.source.paths3d must be present (object or null)")
-    else:
-        p3d = source["paths3d"]
-        if p3d is not None and (
-            not isinstance(p3d, dict)
-            or not isinstance(p3d.get("path"), str)
-            or not isinstance(p3d.get("sha256"), str)
-            or not (p3d.get("execution_eligible") is None or isinstance(p3d.get("execution_eligible"), bool))
-        ):
+    if not isinstance(source, dict):
+        errors.append("trajectory.source must be an object")
+    elif purpose == "view_move":
+        if "paths3d" not in source or source.get("paths3d") is not None:
             errors.append(
-                "trajectory.source.paths3d must be {path: str, sha256: str, execution_eligible: bool|null} or null"
+                "trajectory.source.paths3d must be null for purpose 'view_move', got "
+                f"{source.get('paths3d')!r}"
             )
+        extra = set(source) - {"paths3d", "view_plan"}
+        if extra:
+            errors.append(f"trajectory.source has unexpected key(s) {sorted(extra)!r} for purpose 'view_move'")
+        if "view_plan" not in source:
+            errors.append("trajectory.source.view_plan must be present for purpose 'view_move'")
+        else:
+            errors.extend(_view_plan_source_errors(source.get("view_plan")))
+    else:
+        if "view_plan" in source:
+            errors.append(
+                f"trajectory.source.view_plan must not be present when purpose is {purpose!r}"
+            )
+        if "paths3d" not in source:
+            errors.append("trajectory.source.paths3d must be present (object or null)")
+        else:
+            p3d = source["paths3d"]
+            if p3d is not None and (
+                not isinstance(p3d, dict)
+                or not isinstance(p3d.get("path"), str)
+                or not isinstance(p3d.get("sha256"), str)
+                or not (p3d.get("execution_eligible") is None or isinstance(p3d.get("execution_eligible"), bool))
+            ):
+                errors.append(
+                    "trajectory.source.paths3d must be {path: str, sha256: str, execution_eligible: bool|null} or null"
+                )
 
     return errors
 
 
 def validate_plan_schema(doc: Any) -> list[str]:
+    """§17.4: `--plan` is dispatched on its own `schema` field between
+    `crackvision.cartesian_plan/1` (§13.11.1) and `crackvision.view_plan/1` (§13.14.1,
+    minimal structure). Returns a list of error strings (empty = valid)."""
+    if isinstance(doc, dict) and doc.get("schema") == "crackvision.view_plan/1":
+        return validate_view_plan_schema(doc)
+    return validate_cartesian_plan_schema(doc)
+
+
+def validate_view_plan_schema(doc: Any) -> list[str]:
+    """§17.4's minimal `crackvision.view_plan/1` structure sufficient for C-SCHEMA to pass on the
+    plan side. Returns a list of error strings (empty = valid)."""
+    if not isinstance(doc, dict):
+        return ["plan is not a JSON object"]
+
+    errors: list[str] = []
+    if doc.get("schema") != "crackvision.view_plan/1":
+        errors.append(f"plan.schema is {doc.get('schema')!r}, expected 'crackvision.view_plan/1'")
+
+    sources = doc.get("sources")
+    if not isinstance(sources, dict):
+        errors.append("plan.sources must be an object")
+    else:
+        for name in ("scene", "end_effector", "limits", "config"):
+            block = sources.get(name)
+            if not isinstance(block, dict) or not isinstance(block.get("path"), str) or not isinstance(
+                block.get("sha256"), str
+            ):
+                errors.append(f"plan.sources.{name} must be {{path: str, sha256: str}}")
+
+    chosen = doc.get("chosen")
+    if not isinstance(chosen, dict):
+        errors.append("plan.chosen must be a non-null object")
+
+    transit_leg = doc.get("transit_leg")
+    if not isinstance(transit_leg, dict):
+        errors.append("plan.transit_leg must be a non-null object")
+    else:
+        if transit_leg.get("kind") != "transit":
+            errors.append(f"plan.transit_leg.kind is {transit_leg.get('kind')!r}, expected 'transit'")
+        positions = transit_leg.get("positions")
+        if not isinstance(positions, list) or not positions or not all(
+            _is_number_list(p, 6) for p in positions
+        ):
+            errors.append(
+                "plan.transit_leg.positions must be a non-empty list of 6-element lists of finite numbers"
+            )
+
+    return errors
+
+
+def validate_cartesian_plan_schema(doc: Any) -> list[str]:
     """§13.11.1 `crackvision.cartesian_plan/1`. Returns a list of error strings (empty = valid)."""
     if not isinstance(doc, dict):
         return ["plan is not a JSON object"]
@@ -269,6 +363,106 @@ def validate_plan_schema(doc: Any) -> list[str]:
 
 
 def check_provenance(traj: dict, plan: dict, files: dict) -> dict:
+    """§16.5/§17.4: a `view_move` trajectory requires its `--plan` to be a `view_plan`, and a
+    `crack_task`/`test` trajectory requires its `--plan` to be a `cartesian_plan`; a mismatch
+    either way is a provenance `fail` rather than a crash against the wrong-shaped plan."""
+    is_view_move = traj.get("purpose") == "view_move"
+    expected_plan_schema = "crackvision.view_plan/1" if is_view_move else "crackvision.cartesian_plan/1"
+    plan_schema = plan.get("schema")
+    if plan_schema != expected_plan_schema:
+        detail = (
+            f"trajectory.purpose {traj.get('purpose')!r} requires --plan schema "
+            f"{expected_plan_schema!r}, got {plan_schema!r}"
+        )
+        numbers = {
+            "trajectory": {"purpose": traj.get("purpose")},
+            "plan": {"schema": plan_schema},
+        }
+        return {"check": "C-PROVENANCE", "outcome": "fail", "detail": detail, "numbers": numbers}
+
+    if is_view_move:
+        return _check_provenance_view_move(traj, plan, files)
+    return _check_provenance_cartesian(traj, plan, files)
+
+
+def _check_provenance_view_move(traj: dict, plan: dict, files: dict) -> dict:
+    traj_limits_sha = (traj.get("limits_file") or {}).get("sha256")
+    traj_ee_sha = traj.get("end_effector_config_sha256")
+    traj_scene_sha = traj.get("scene_config_sha256")
+    source = traj.get("source") or {}
+    traj_paths3d = source.get("paths3d")
+    traj_view_plan = source.get("view_plan") or {}
+    traj_view_plan_sha = traj_view_plan.get("sha256")
+
+    view_sources = plan.get("sources") or {}
+    plan_limits_sha = (view_sources.get("limits") or {}).get("sha256")
+    plan_ee_sha = (view_sources.get("end_effector") or {}).get("sha256")
+    plan_scene_sha = (view_sources.get("scene") or {}).get("sha256")
+
+    cli_limits_sha = (files.get("limits") or {}).get("sha256")
+    cli_ee_sha = (files.get("end_effector") or {}).get("sha256")
+    plan_file_sha = files.get("plan_sha256")
+
+    errors: list[str] = []
+    if traj_paths3d is not None:
+        errors.append(f"trajectory.source.paths3d must be null for purpose 'view_move', got {traj_paths3d!r}")
+    if traj_view_plan_sha != plan_file_sha:
+        errors.append(
+            f"trajectory.source.view_plan.sha256 ({traj_view_plan_sha!r}) != --plan file sha256 "
+            f"({plan_file_sha!r})"
+        )
+    if traj_limits_sha != cli_limits_sha:
+        errors.append(
+            f"trajectory.limits_file.sha256 ({traj_limits_sha!r}) != --limits file sha256 ({cli_limits_sha!r})"
+        )
+    if traj_limits_sha != plan_limits_sha:
+        errors.append(
+            f"trajectory.limits_file.sha256 ({traj_limits_sha!r}) != "
+            f"view_plan.sources.limits.sha256 ({plan_limits_sha!r})"
+        )
+    if traj_ee_sha != cli_ee_sha:
+        errors.append(
+            f"trajectory.end_effector_config_sha256 ({traj_ee_sha!r}) != "
+            f"--end-effector-config file sha256 ({cli_ee_sha!r})"
+        )
+    if traj_ee_sha != plan_ee_sha:
+        errors.append(
+            f"trajectory.end_effector_config_sha256 ({traj_ee_sha!r}) != "
+            f"view_plan.sources.end_effector.sha256 ({plan_ee_sha!r})"
+        )
+    if traj_scene_sha != plan_scene_sha:
+        errors.append(
+            f"trajectory.scene_config_sha256 ({traj_scene_sha!r}) != "
+            f"view_plan.sources.scene.sha256 ({plan_scene_sha!r})"
+        )
+
+    numbers = {
+        "trajectory": {
+            "limits_sha256": traj_limits_sha,
+            "end_effector_config_sha256": traj_ee_sha,
+            "scene_config_sha256": traj_scene_sha,
+            "paths3d": traj_paths3d,
+            "view_plan_sha256": traj_view_plan_sha,
+        },
+        "view_plan": {
+            "limits_sha256": plan_limits_sha,
+            "end_effector_sha256": plan_ee_sha,
+            "scene_sha256": plan_scene_sha,
+        },
+        "cli_files": {
+            "limits_sha256": cli_limits_sha,
+            "end_effector_sha256": cli_ee_sha,
+            "plan_sha256": plan_file_sha,
+            "fk_files": files.get("fk_files"),
+        },
+    }
+
+    outcome = "fail" if errors else "pass"
+    detail = "; ".join(errors) if errors else "view_move trajectory provenance matches view plan and command-line files"
+    return {"check": "C-PROVENANCE", "outcome": outcome, "detail": detail, "numbers": numbers}
+
+
+def _check_provenance_cartesian(traj: dict, plan: dict, files: dict) -> dict:
     traj_limits_sha = (traj.get("limits_file") or {}).get("sha256")
     traj_ee_sha = traj.get("end_effector_config_sha256")
     traj_scene_sha = traj.get("scene_config_sha256")
@@ -616,8 +810,15 @@ def build_plan_polyline(plan: dict) -> tuple[list[list[float]], list[float], lis
     Returns `(P, cumlen, leg_info)`: `P` the plan polyline (bit-exact copies), `cumlen[k]` the
     Euclidean arc length from `P[0]` to `P[k]`, and one `{leg_index, kind, p_first, p_last}` per
     leg (inclusive indices into `P`, sharing one index at a dropped boundary, §16.4).
+
+    §17.4: a `view_plan` (`plan["schema"] == "crackvision.view_plan/1"`) has no `legs[]`; its single
+    polyline is `legs=[transit_leg]` (one leg, no concatenation), normalised here once so
+    `check_path`/`check_toolspeed`/`check_report` run unchanged downstream.
     """
-    legs = sorted(plan["legs"], key=lambda leg: leg["leg_index"])
+    raw_legs = plan["transit_leg"] if "legs" not in plan else plan["legs"]
+    if isinstance(raw_legs, dict):
+        raw_legs = [raw_legs]
+    legs = sorted(raw_legs, key=lambda leg: leg["leg_index"])
     P: list[list[float]] = []
     cumlen: list[float] = []
     leg_info: list[dict] = []
@@ -998,6 +1199,16 @@ def check_toolspeed(
 
     trace_legs = [leg for leg in projection["leg_info"] if leg["kind"] == "trace"]
     if not trace_legs:
+        if plan.get("schema") == "crackvision.view_plan/1":
+            # §17.4: a view-move polyline is `kind == "transit"` only, so there is no leg for
+            # G-TOOLSPEED to evaluate -- a vacuous pass, not a skip (C-SCHEMA, its precondition,
+            # did run and succeed).
+            return {
+                "check": "C-TOOLSPEED",
+                "outcome": "pass",
+                "detail": "view-move polyline has no trace legs: G-TOOLSPEED is vacuously satisfied",
+                "numbers": {"trace_legs": []},
+            }
         return {"check": "C-TOOLSPEED", "outcome": "skip", "detail": "plan has no trace legs", "numbers": {}}
 
     trace_cfg = retime_cfg["trace"]
@@ -1192,6 +1403,9 @@ def run_checks(
     plan_errors = validate_plan_schema(plan_doc)
     schema_errors = traj_errors + plan_errors
     schema_outcome = "fail" if schema_errors else "pass"
+    plan_schema_name = (
+        plan_doc.get("schema") if isinstance(plan_doc, dict) else None
+    ) or "crackvision.cartesian_plan/1"
     checks = [
         {
             "check": "C-SCHEMA",
@@ -1199,7 +1413,7 @@ def run_checks(
             "detail": (
                 "; ".join(schema_errors)
                 if schema_errors
-                else "trajectory parses as crackvision.joint_trajectory/1 and plan as crackvision.cartesian_plan/1"
+                else f"trajectory parses as crackvision.joint_trajectory/1 and plan as {plan_schema_name}"
             ),
             "numbers": {"trajectory_errors": traj_errors, "plan_errors": plan_errors},
         }
@@ -1251,7 +1465,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     add_common_args(parser)
     parser.add_argument("--trajectory", type=Path, required=True, help="crackvision.joint_trajectory/1 file")
-    parser.add_argument("--plan", type=Path, required=True, help="crackvision.cartesian_plan/1 file")
+    parser.add_argument(
+        "--plan", type=Path, required=True,
+        help="crackvision.cartesian_plan/1 or crackvision.view_plan/1 file (dispatched by schema, §17.4)",
+    )
     parser.add_argument(
         "--report", type=Path, default=None,
         help="crackvision.retime_report/1 sidecar; enables C-REPORT when given",
@@ -1327,13 +1544,15 @@ def main(argv: list[str] | None = None) -> int:
         trajectory_sha256 = file_sha256(args.trajectory)
         limits_sha256 = file_sha256(limits_path)
         end_effector_sha256 = file_sha256(end_effector_path)
+        plan_sha256 = file_sha256(args.plan)
 
         # FK (crackvision.kinematics, never crackvision_motion.tool_fk, §16.5) is only needed, and
         # only loaded, when the plan actually has a trace leg -- C-TOOLSPEED/C-REPORT's own
-        # precondition.
+        # precondition. A view_plan (§17.4) never has a trace leg.
         needs_fk = isinstance(plan_doc, dict) and any(
             isinstance(leg, dict) and leg.get("kind") == "trace" for leg in (plan_doc.get("legs") or [])
         )
+        is_view_plan = isinstance(plan_doc, dict) and plan_doc.get("schema") == "crackvision.view_plan/1"
         chain = end_effector = urdf_sha256 = None
         if needs_fk:
             chain = load_chain(urdf_path=urdf_path)
@@ -1351,6 +1570,7 @@ def main(argv: list[str] | None = None) -> int:
         "limits": {"path": str(limits_path), "sha256": limits_sha256},
         "end_effector": {"path": str(end_effector_path), "sha256": end_effector_sha256},
         "fk_files": {"urdf_sha256": urdf_sha256, "end_effector_sha256": end_effector_sha256},
+        "plan_sha256": plan_sha256,
     }
 
     try:
@@ -1361,8 +1581,10 @@ def main(argv: list[str] | None = None) -> int:
             # exactly `needs_fk`'s own condition, since a plan with no trace leg has nothing for
             # C-TOOLSPEED/C-REPORT to evaluate (§16.5's own "skip when nothing to evaluate"
             # precedent) and C-PATH piggybacks on the same gate rather than running against a
-            # plan whose only legs are untraced coarse moves.
-            extended=needs_fk, chain=chain, end_effector=end_effector, report_doc=report_doc,
+            # plan whose only legs are untraced coarse moves -- plus, always, a view_plan
+            # (§17.4: C-PATH/C-TOOLSPEED/C-REPORT run on the single transit-leg polyline even
+            # though it has no trace leg).
+            extended=needs_fk or is_view_plan, chain=chain, end_effector=end_effector, report_doc=report_doc,
         )
     except Exception as exc:  # unexpected failure while a check is running (§16.5 exit 1)
         logger.exception("unexpected error while running checks")
