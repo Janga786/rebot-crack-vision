@@ -1,10 +1,10 @@
 # Progress — week of Mon Oct 12 – Sun Oct 18, 2026
 
-**7 task(s) completed and independently audited this week** · project total **104/138** accepted
+**8 task(s) completed and independently audited this week** · project total **79/139** accepted
 
 ## Completed this week
 
-- **MOT-07.1 — Decision + contract: time parameterization and independent trajectory checker (ADR-019, INTERFACES §16)** ([details](MOT-07.1.md)): Decided and documented how MOT-07 will turn an untimed Cartesian crack-path plan into a timed, executable robot trajectory, and how a second, independent program will check that result. I verified han
+- **MOT-07.1 — Decision + contract: time parameterization and independent trajectory checker (ADR-019, INTERFACES §16)** ([details](MOT-07.11.md)): Decided and documented how MOT-07 will turn an untimed Cartesian crack-path plan into a timed, executable robot trajectory, and how a second, independent program will check that result. I verified han
 …[684 chars clipped]
 - **MOT-07.2 — Pure-numpy tool_tip FK in crackvision_motion (tool_fk) with parity against crackvision.kinematics** ([details](MOT-07.2.md)): Added a pure-numpy, ROS-free forward-kinematics module (tool_fk) that computes the robot's tool-tip position/orientation from joint angles, matching the existing reference implementation to better tha
 …[249 chars clipped]
@@ -18,10 +18,12 @@
 …[255 chars clipped]
 - **MOT-07.7 — Independent trajectory checker, part 2: path fidelity, constant tool speed (crackvision.kinematics FK) and retime-report consistency** ([details](MOT-07.7.md)): Finished the second half of the independent trajectory checker: it now also verifies that a planned robot path stays on its intended route (within 1e-6 rad), that crack-tracing moves hold a steady too
 …[367 chars clipped]
+- **MOT-07.11 — Retimer G-TOOLSPEED is infeasible on real plan_crack_path trace legs: tool-speed dips at joint-space vertices** ([details](MOT-07.11.md)): The retimer now handles a real crack-tracing plan that it used to refuse. It accepts short tool-speed dips where the joint path turns sharply (1–18° on the test plan), as long as each dip is at most 5
+…[343 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 13 / 79
+- Implementation/review sessions run: 15 / 80
 - Audits that rejected work with evidence-backed findings: 4 (repairs created: 4)
 - Re-verified after an upstream change: CAM-02, GEOM-01, GEOM-01.R1, GEOM-08.1, GEOM-09.1, GEOM-09.1.R1, GEOM-10, MOT-02, MOT-03, MOT-04.1, MOT-04.1.R1, MOT-04.2, MOT-04.3, MOT-04.3.R1, MOT-04.4, MOT-04.4.R1, MOT-04.6, MOT-04.6.R1, MOT-05.1, MOT-05.1.R1, MOT-05.4, MOT-05.4.R1, MOT-06.11, MOT-06.11.R1, MOT-06.2, MOT-06.2.R1, MOT-06.6, MOT-06.6.R1, MOT-06.9, MOT-07.6, MOT-07.6.R1, MOT-10.1, MOT-10.1.R1, MOT-10.1.R2, MOT-10.3, PERC-03, PERC-03.R1
 
@@ -31,10 +33,10 @@
 |---|---|---|
 | Host platform & reproducibility (L-HOST) | 10 | 10 |
 | Local coding model (L-LLM) | 5 | 8 |
-| D405 capture (L-CAM) | 7 | 9 |
-| Perception (L-PERC) | 13 | 16 |
-| Geometry & calibration (L-GEOM) | 24 | 32 |
-| Motion planning (L-MOTION) | 42 | 51 |
+| D405 capture (L-CAM) | 6 | 9 |
+| Perception (L-PERC) | 12 | 16 |
+| Geometry & calibration (L-GEOM) | 18 | 32 |
+| Motion planning (L-MOTION) | 25 | 52 |
 | Integration & commissioning (L-INT) | 1 | 6 |
 | Operator workflow & handoff (L-OPS) | 1 | 4 |
 | Imitation learning (later phase) (L-IL) | 0 | 1 |
@@ -49,6 +51,4 @@
 - LLM-06.1: dependency — The backlog currently has zero cards that are simultaneously unaccepted/ready, non-hardware, motion!=true, routing.conse
 …[181 chars clipped]
 - MOT-07.8: dependency — retime_plan (ros2_ws/src/crackvision_motion/crackvision_motion/retime.py, out of this card's scope.write) refuses with e
-…[182 chars clipped]
-- MOT-09: hardware — operator must declare: arm_powered_estop_verified, workspace_clear
-- MOT-10.4: hardware — operator must declare: workcell_measured
+…[221 chars clipped]
