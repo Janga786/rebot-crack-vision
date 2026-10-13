@@ -1,6 +1,6 @@
 # Progress — week of Mon Oct 12 – Sun Oct 18, 2026
 
-**14 task(s) completed and independently audited this week** · project total **108/144** accepted
+**15 task(s) completed and independently audited this week** · project total **105/144** accepted
 
 ## Completed this week
 
@@ -32,10 +32,12 @@
 …[550 chars clipped]
 - **MOT-05.3 — Offline execution gate: commissioning/approval/execution-config loaders + full gate report (pure Python)** ([details](MOT-05.3-v2.md)): Built the offline safety gate that must pass before the robot arm's trajectory executor is allowed to run in real mode: it checks trajectory validity, joint-limit compliance, speed caps, scene/end-eff
 …[521 chars clipped]
+- **MOT-07.10.3 — retime_plan --view-plan: retime the view_plan transit leg into a view_move trajectory** ([details](MOT-07.10.3.md)): Implemented retime_plan --view-plan (§17.3): factored retime.retime_plan_doc's shared §16.2-16.4 body into a private _retime_legs_doc helper, added retime_view_plan_doc on top of it, and updated retim
+…[506 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 25 / 247
+- Implementation/review sessions run: 26 / 248
 - Audits that rejected work with evidence-backed findings: 9 (repairs created: 10)
 - Re-verified after an upstream change: CAM-02, GEOM-01, GEOM-01.R1, GEOM-08.1, GEOM-09.1, GEOM-09.1.R1, GEOM-10, MOT-02, MOT-03, MOT-04.1, MOT-04.1.R1, MOT-04.2, MOT-04.3, MOT-04.3.R1, MOT-04.4, MOT-04.4.R1, MOT-04.5, MOT-04.6, MOT-04.6.R1, MOT-05.1, MOT-05.1.R1, MOT-05.2, MOT-05.3, MOT-05.3.R1, MOT-05.3.R2, MOT-05.4, MOT-05.4.R1, MOT-05.5, MOT-05.6, MOT-05.6.R1, MOT-05.7, MOT-05.7.R1, MOT-06.10, MOT-06.11, MOT-06.11.R1, MOT-06.2, MOT-06.2.R1, MOT-06.4, MOT-06.4.R1, MOT-06.6, MOT-06.6.R1, MOT-06.9, MOT-07.1, MOT-07.1.R1, MOT-07.11, MOT-07.2, MOT-07.3, MOT-07.4, MOT-07.4.R1, MOT-07.5, MOT-07.5.R1, MOT-07.6, MOT-07.6.R1, MOT-07.7, MOT-07.7.R1, MOT-07.8, MOT-07.8.R1, MOT-07.9, MOT-10.1, MOT-10.1.R1, MOT-10.1.R2, MOT-10.3, PERC-03, PERC-03.R1
 
@@ -52,7 +54,7 @@
 | D405 capture (L-CAM) | 7 | 9 |
 | Perception (L-PERC) | 13 | 16 |
 | Geometry & calibration (L-GEOM) | 24 | 32 |
-| Motion planning (L-MOTION) | 46 | 57 |
+| Motion planning (L-MOTION) | 43 | 57 |
 | Integration & commissioning (L-INT) | 1 | 6 |
 | Operator workflow & handoff (L-OPS) | 1 | 4 |
 | Imitation learning (later phase) (L-IL) | 0 | 1 |
@@ -66,4 +68,5 @@
 …[2288 chars clipped]
 - LLM-06.1: dependency — The backlog currently has zero cards that are simultaneously unaccepted/ready, non-hardware, motion!=true, routing.conse
 …[181 chars clipped]
+- MOT-09: hardware — operator must declare: arm_powered_estop_verified, workspace_clear
 - MOT-10.4: hardware — operator must declare: workcell_measured
