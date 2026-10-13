@@ -2,7 +2,7 @@
 
 ```json card
 {
-  "kind": "impl",
+  "kind": "branch",
   "depends_on": [
     "MOT-07.5",
     "MOT-07.7"
@@ -11,7 +11,6 @@
     "REQ-MOT-2",
     "REQ-OPS-1"
   ],
-  "spec_state": "draft",
   "refine_after": [
     "MOT-07.1",
     "MOT-07.9"
@@ -59,3 +58,6 @@ The likely scope:
 - tests, and a mock run.
 
 If the change touches execution_gate (MOT-05 accepted code), split it into its own card with the gate regression suite (`scripts/ros/test_execution.sh`) as acceptance.
+
+## Decomposed 2026-10-13T12:15:23Z by L-MOTION (claude-opus-5-5, high)
+Children: MOT-07.10.1, MOT-07.10.2, MOT-07.10.3, MOT-07.10.4, MOT-07.10.5
