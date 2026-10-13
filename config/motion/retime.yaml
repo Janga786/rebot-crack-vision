@@ -1,0 +1,31 @@
+# config/motion/retime.yaml — time-parameterization parameters for the MOT-07 retimer (ADR-019).
+#
+# Schema: crackvision.retime_config/1 (docs/INTERFACES.md §16.1), loaded strictly by
+# ros2_ws/src/crackvision_motion/crackvision_motion/retime_core.py:load_retime_config (unknown key,
+# missing key or out-of-range value -> RetimeConfigError). Numeric defaults and their rationale are
+# §16.7's own table, carried into `sources` below so this file states its own provenance the same
+# way config/motion/cartesian_planning.yaml does. `execution.yaml`'s `position_margin_rad` is read
+# directly from that file (§16.1 inputs table) for the (M) margin check -- it is not a field here
+# and is never duplicated into this file.
+schema: crackvision.retime_config/1
+
+limit_fraction:
+  velocity: 0.95
+  acceleration: 0.95
+
+sampling:
+  max_joint_step_rad: 0.01
+  max_period_s: 0.02
+
+trace:
+  tool_speed_m_s: 0.05
+  min_tool_speed_m_s: 0.005
+  speed_tolerance: 0.05
+  max_ramp_m: 0.005
+
+value_status: nominal
+
+sources:
+  limit_fraction: "0.95/0.95 (§16.7): leaves a 5% margin below the raw b601_dm_limits.yaml bound for G-SELFCHECK's independent full-limit re-derivation and for floating-point/iteration slack in the bounded profiling pass, while still using nearly the full envelope. Not a substitute for execution.yaml's separate, further speed_scale.real_default (0.10) real-mode cap applied at execution time."
+  sampling: "max_joint_step_rad (0.01 rad, §16.7): finer than cartesian_planning.yaml's own recheck.max_joint_step_rad (0.2 rad) by 20x, so refinement never coarsens what the plan's own independent re-check already certified at a 0.2 rad grain down to this trajectory's much finer FD sampling grid. max_period_s (0.02 s, §16.7): matches the vendor driver's own 20 ms control tick (§11.12), so a finite-difference acceleration value reflects a real commanded velocity step rather than an artifact of oversampling a coarser physical rate (ADR-019)."
+  trace: "tool_speed_m_s (0.05 m/s, §16.7): unscaled; at execution.yaml's speed_scale.real_default (0.10) the effective real-mode tool speed is 0.005 m/s, a cautious first real-execution speed well below the trace clearance scale (trace_clearance_m, ADR-014 §8.2/INTERFACES.md §8.2/§10). min_tool_speed_m_s (0.005 m/s): an order of magnitude below the target, below which a trace leg is crawling slowly enough that refusing is the honest answer. speed_tolerance (0.05, 5% relative): tight enough that 'constant tool speed' is a meaningful claim, loose enough to absorb the bounded-iteration profiling pass's own numerical slack. max_ramp_m (0.005 m): half of execution.yaml's densify_step_m (0.01 m) and equal to end_effector.yaml's own collision_padding_m (0.005 m), short enough not to eat meaningfully into either margin. These four fields are only consumed by MOT-07.4's trace constant-speed bisection, not by this card's plan_polyline/refine/time_profile."
