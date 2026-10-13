@@ -225,6 +225,83 @@ def test_bad_source_shape(tmp_path):
 
 
 # --------------------------------------------------------------------------------------
+# load_trajectory: purpose "view_move" (§17.1)
+# --------------------------------------------------------------------------------------
+
+def test_load_trajectory_view_move_valid(tmp_path):
+    raw = _mutate(
+        _VALID_RAW, purpose="view_move",
+        source={"paths3d": None, "view_plan": {"path": "view_plan.json", "sha256": _SHA_A}},
+    )
+    traj = load_trajectory(_write(tmp_path, raw))
+    assert traj["purpose"] == "view_move"
+    assert traj["source"] == {"paths3d": None, "view_plan": {"path": "view_plan.json", "sha256": _SHA_A}}
+
+
+def test_view_move_lowercases_view_plan_sha(tmp_path):
+    raw = _mutate(
+        _VALID_RAW, purpose="view_move",
+        source={"paths3d": None, "view_plan": {"path": "view_plan.json", "sha256": _SHA_A.upper()}},
+    )
+    traj = load_trajectory(_write(tmp_path, raw))
+    assert traj["source"]["view_plan"]["sha256"] == _SHA_A
+
+
+def test_view_move_rejects_nonnull_paths3d(tmp_path):
+    raw = _mutate(
+        _VALID_RAW, purpose="view_move",
+        source={
+            "paths3d": {"path": "a", "sha256": _SHA_A, "execution_eligible": True},
+            "view_plan": {"path": "v.json", "sha256": _SHA_B},
+        },
+    )
+    with pytest.raises(TrajectoryError, match="source.paths3d"):
+        load_trajectory(_write(tmp_path, raw))
+
+
+def test_view_move_rejects_missing_view_plan_key(tmp_path):
+    raw = _mutate(_VALID_RAW, purpose="view_move", source={"paths3d": None})
+    with pytest.raises(TrajectoryError, match="source"):
+        load_trajectory(_write(tmp_path, raw))
+
+
+def test_view_move_rejects_malformed_view_plan_shape(tmp_path):
+    raw = _mutate(
+        _VALID_RAW, purpose="view_move",
+        source={"paths3d": None, "view_plan": {"path": "v.json"}},
+    )
+    with pytest.raises(TrajectoryError, match="source.view_plan"):
+        load_trajectory(_write(tmp_path, raw))
+
+
+def test_view_move_rejects_bad_view_plan_sha(tmp_path):
+    raw = _mutate(
+        _VALID_RAW, purpose="view_move",
+        source={"paths3d": None, "view_plan": {"path": "v.json", "sha256": "not-a-sha"}},
+    )
+    with pytest.raises(TrajectoryError, match="source.view_plan.sha256"):
+        load_trajectory(_write(tmp_path, raw))
+
+
+def test_crack_task_rejects_view_plan_key(tmp_path):
+    raw = _mutate(
+        _VALID_RAW, purpose="crack_task",
+        source={"paths3d": None, "view_plan": {"path": "v.json", "sha256": _SHA_A}},
+    )
+    with pytest.raises(TrajectoryError, match="exactly key 'paths3d'"):
+        load_trajectory(_write(tmp_path, raw))
+
+
+def test_test_purpose_rejects_view_plan_key_even_null(tmp_path):
+    raw = _mutate(
+        _VALID_RAW, purpose="test",
+        source={"paths3d": None, "view_plan": None},
+    )
+    with pytest.raises(TrajectoryError, match="exactly key 'paths3d'"):
+        load_trajectory(_write(tmp_path, raw))
+
+
+# --------------------------------------------------------------------------------------
 # file_sha256
 # --------------------------------------------------------------------------------------
 

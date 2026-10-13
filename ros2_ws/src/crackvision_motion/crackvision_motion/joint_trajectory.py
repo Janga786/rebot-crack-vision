@@ -43,7 +43,7 @@ _REQUIRED_TOP_LEVEL_KEYS = (
     "limits_file", "end_effector_config_sha256", "scene_config_sha256", "source",
 )
 _POINT_KEYS = frozenset({"t_s", "positions", "velocities", "accelerations"})
-_PURPOSE_VALUES = frozenset({"crack_task", "test"})
+_PURPOSE_VALUES = frozenset({"crack_task", "test", "view_move"})
 _SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
 
 _N_JOINTS = len(JOINT_NAMES)
@@ -162,27 +162,45 @@ def load_trajectory(path: Union[str, Path]) -> dict:
     scene_sha = _check_sha_or_null(raw["scene_config_sha256"], "scene_config_sha256")
 
     source_raw = raw["source"]
-    if not isinstance(source_raw, dict) or set(source_raw) != {"paths3d"}:
-        raise TrajectoryError("'source' must be an object with exactly key 'paths3d'")
-    paths3d_raw = source_raw["paths3d"]
-    if paths3d_raw is None:
-        source: Dict[str, Any] = {"paths3d": None}
-    else:
-        if not isinstance(paths3d_raw, dict) or set(paths3d_raw) != {"path", "sha256", "execution_eligible"}:
-            raise TrajectoryError(
-                "'source.paths3d' must be null or an object with 'path', 'sha256', 'execution_eligible'"
-            )
-        if not isinstance(paths3d_raw["path"], str) or not paths3d_raw["path"]:
-            raise TrajectoryError("'source.paths3d.path' must be a non-empty string")
-        sha = paths3d_raw["sha256"]
-        if not isinstance(sha, str) or not _SHA256_RE.match(sha):
-            raise TrajectoryError(f"'source.paths3d.sha256' must be a 64-hex-char sha256 digest, got {sha!r}")
-        eligible = paths3d_raw["execution_eligible"]
-        if eligible is not None and not isinstance(eligible, bool):
-            raise TrajectoryError(f"'source.paths3d.execution_eligible' must be a bool or null, got {eligible!r}")
-        source = {
-            "paths3d": {"path": paths3d_raw["path"], "sha256": sha.lower(), "execution_eligible": eligible}
+    if raw["purpose"] == "view_move":
+        if not isinstance(source_raw, dict) or set(source_raw) != {"paths3d", "view_plan"}:
+            raise TrajectoryError("'source' must be an object with exactly keys 'paths3d', 'view_plan'")
+        if source_raw["paths3d"] is not None:
+            raise TrajectoryError("'source.paths3d' must be null for purpose 'view_move'")
+        view_plan_raw = source_raw["view_plan"]
+        if not isinstance(view_plan_raw, dict) or set(view_plan_raw) != {"path", "sha256"}:
+            raise TrajectoryError("'source.view_plan' must be an object with exactly 'path', 'sha256'")
+        if not isinstance(view_plan_raw["path"], str) or not view_plan_raw["path"]:
+            raise TrajectoryError("'source.view_plan.path' must be a non-empty string")
+        vp_sha = view_plan_raw["sha256"]
+        if not isinstance(vp_sha, str) or not _SHA256_RE.match(vp_sha):
+            raise TrajectoryError(f"'source.view_plan.sha256' must be a 64-hex-char sha256 digest, got {vp_sha!r}")
+        source: Dict[str, Any] = {
+            "paths3d": None,
+            "view_plan": {"path": view_plan_raw["path"], "sha256": vp_sha.lower()},
         }
+    else:
+        if not isinstance(source_raw, dict) or set(source_raw) != {"paths3d"}:
+            raise TrajectoryError("'source' must be an object with exactly key 'paths3d'")
+        paths3d_raw = source_raw["paths3d"]
+        if paths3d_raw is None:
+            source = {"paths3d": None}
+        else:
+            if not isinstance(paths3d_raw, dict) or set(paths3d_raw) != {"path", "sha256", "execution_eligible"}:
+                raise TrajectoryError(
+                    "'source.paths3d' must be null or an object with 'path', 'sha256', 'execution_eligible'"
+                )
+            if not isinstance(paths3d_raw["path"], str) or not paths3d_raw["path"]:
+                raise TrajectoryError("'source.paths3d.path' must be a non-empty string")
+            sha = paths3d_raw["sha256"]
+            if not isinstance(sha, str) or not _SHA256_RE.match(sha):
+                raise TrajectoryError(f"'source.paths3d.sha256' must be a 64-hex-char sha256 digest, got {sha!r}")
+            eligible = paths3d_raw["execution_eligible"]
+            if eligible is not None and not isinstance(eligible, bool):
+                raise TrajectoryError(f"'source.paths3d.execution_eligible' must be a bool or null, got {eligible!r}")
+            source = {
+                "paths3d": {"path": paths3d_raw["path"], "sha256": sha.lower(), "execution_eligible": eligible}
+            }
 
     result: Dict[str, Any] = {
         "schema": raw["schema"],
