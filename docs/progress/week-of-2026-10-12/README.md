@@ -1,15 +1,17 @@
 # Progress — week of Mon Oct 12 – Sun Oct 18, 2026
 
-**1 task(s) completed and independently audited this week** · project total **98/138** accepted
+**2 task(s) completed and independently audited this week** · project total **98/138** accepted
 
 ## Completed this week
 
 - **MOT-07.1 — Decision + contract: time parameterization and independent trajectory checker (ADR-019, INTERFACES §16)** ([details](MOT-07.1.md)): Decided and documented how MOT-07 will turn an untimed Cartesian crack-path plan into a timed, executable robot trajectory, and how a second, independent program will check that result. I verified han
 …[684 chars clipped]
+- **MOT-07.2 — Pure-numpy tool_tip FK in crackvision_motion (tool_fk) with parity against crackvision.kinematics** ([details](MOT-07.2.md)): Added a pure-numpy, ROS-free forward-kinematics module (tool_fk) that computes the robot's tool-tip position/orientation from joint angles, matching the existing reference implementation to better tha
+…[249 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 1 / 44
+- Implementation/review sessions run: 2 / 45
 - Audits that rejected work with evidence-backed findings: 0 (repairs created: 0)
 - Re-verified after an upstream change: CAM-02, GEOM-01, GEOM-01.R1, GEOM-08.1, GEOM-09.1, GEOM-09.1.R1, GEOM-10, MOT-04.2, MOT-04.3, MOT-04.3.R1, MOT-04.6, MOT-04.6.R1, MOT-05.1, MOT-05.1.R1, MOT-06.11, MOT-06.11.R1, MOT-06.2, MOT-06.2.R1, MOT-10.1, MOT-10.1.R1, MOT-10.1.R2, PERC-03, PERC-03.R1
 
@@ -37,3 +39,4 @@
 - LLM-06.1: dependency — The backlog currently has zero cards that are simultaneously unaccepted/ready, non-hardware, motion!=true, routing.conse
 …[181 chars clipped]
 - MOT-09: hardware — operator must declare: arm_powered_estop_verified, workspace_clear
+- MOT-10.4: hardware — operator must declare: workcell_measured
