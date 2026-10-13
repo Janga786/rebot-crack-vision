@@ -273,3 +273,91 @@ retract→transit rest vertex. So the checker also gave that point to the transi
 vs the retimer's `[8492, …]`). The slack is now float noise (`1e-9`), matching §16.5's
 "leg owning the segment the point lies on". Both fixes are covered by
 `tests/test_trajectory_check_path.py`.
+
+## Addendum (MOT-07.10): purpose "view_move" for view-plan transit legs
+
+**Status:** accepted (MOT-07.10). Amends INTERFACES §11.2, §11.7, §16.3–§16.6; resolves §16.8's
+named gap. Normative schema text lives in the newly appended `docs/INTERFACES.md` §17, in the same
+append-only style this ADR's own body already used for §16 and the MOT-07.11 addendum above.
+
+### Context
+
+§16.8 named the gap directly: a `view_plan`'s `transit_leg` (home → the chosen camera pose, §13.14)
+is exactly as untimed as a `cartesian_plan` leg, needs the same retiming algorithm (§16.2) to become
+executable, but has no `paths3d` file to bind to. §11.2's `purpose` enum had only `"crack_task"`
+(requires non-null `source.paths3d`) and `"test"` (refused unconditionally in `real` by `G-TRAJ`,
+§11.7), so a retimed view move could not run in `real` under any existing `purpose` value. This card
+settles that gap rather than deferring it to OPS-01, because OPS-01 ("clean launch → capture → plan
+→ preview → controlled execution") needs an executable capture move: the wrist camera has to reach
+its view pose for real, under the same commissioning/approval/confirmation discipline as a
+crack-task move, or OPS-01 cannot exercise the real capture leg of its own workflow at all.
+
+### Decision
+
+Add `purpose: "view_move"` to §11.2's enum. A view_move trajectory carries `source.paths3d: null`
+and a new `source.view_plan: {path, sha256}` binding to the `crackvision.view_plan/1` file (§13.14)
+whose `transit_leg` it retimes. `G-TRAJ` treats `view_move` as schema-valid in every mode (never a
+`warn`, since it is not `"test"`). `G-ELIGIBLE` gets a view_move-specific rule: an **integrity**
+check (refuse in every mode) that the bound view-plan file exists, matches its recorded sha256,
+parses via `load_view_plan`, has a non-null `chosen`/`transit_leg`, and that the trajectory's first/
+last positions equal `transit_leg`'s endpoints to float tolerance; then an **eligibility** check
+(warn in mock/dry, refuse in real) that the view plan's own recorded `limits`/`end_effector`/`scene`
+shas match the trajectory's `limits_file.sha256`/`end_effector_config_sha256`/`scene_config_sha256`
+— which `G-LIMITS-HASH`/`G-STALE-CONFIG` already bind to the live files, closing the provenance
+chain the same way `G-ELIGIBLE` already closes it for a `crack_task` trajectory's `paths3d` binding.
+Full field-level and gate-level text is §17 (`docs/INTERFACES.md`).
+
+`retime_plan` gains a `--view-plan PATH` input, mutually exclusive with `--plan`, that always writes
+`purpose: "view_move"` and retimes the view plan's single `transit_leg` as a one-leg plan through
+the unchanged §16.2 algorithm (no trace legs, so G-TOOLSPEED is vacuous). `trajectory_check` learns
+to read either a `cartesian_plan` or a `view_plan` as its `--plan` input, dispatching on the file's
+own `schema` field, and runs the same checks against the view plan's one transit leg.
+
+**Why a view-plan binding is enough provenance for a camera-positioning move.** `G-ELIGIBLE`'s job
+for `crack_task` is to prove the trajectory traces a crack path that was actually planned,
+collision-checked and marked eligible — the `paths3d` file is that proof, because it is the thing
+`plan_crack_path`'s own re-check (§13.8) certified. A view move's analogous claim is narrower: it
+only has to prove the trajectory ends at a camera pose that `plan_view`'s own FOV/reachability/
+re-check selection (§13.14) certified, starting from the same `home` that selection assumed. The
+`view_plan` file carries exactly that: a `chosen` candidate and a `transit_leg` that *is* the
+certified `home → chosen pose` path, with the same `sources.{limits,end_effector,scene}` shas a
+`cartesian_plan` carries. Binding to it and checking the trajectory's endpoints against
+`transit_leg`'s own endpoints is therefore the same proof shape as `paths3d`, just pointed at a
+different upstream artefact — not a weaker standard, and not a bypass of any commissioning,
+e-stop, approval, start-state, collision or confirmation gate, every one of which still applies to
+`view_move` unchanged (§17.2).
+
+**Alternatives considered and rejected:**
+
+- **Reuse `purpose: "test"`.** Rejected: `G-TRAJ` refuses `"test"` unconditionally in `real`
+  (§11.7), by design, because `"test"` carries no provenance claim at all. A view move legitimately
+  needs to run in `real` (it is how the camera gets into position for a real capture), so it cannot
+  share a purpose value whose entire point is "never trust this in real".
+- **A synthetic `paths3d` binding** (wrap the view plan's `transit_leg` in a fabricated
+  `crackvision.paths3d/1` document just to satisfy `crack_task`'s existing shape). Rejected: a
+  `paths3d` file's `execution_eligible`/`ineligible_reasons` and `components[]` encode a crack-trace
+  planning claim (lifting policy, per-segment uncertainty, §10) that a view move never makes; writing
+  one anyway would be a fabricated artefact claiming a review process (§13.8's crack-path re-check)
+  that never ran over this data, exactly the kind of "measured-looking but not actually verified"
+  record this project's `value_status`/provenance discipline exists to prevent (ADR-014 §8.1's
+  reasoning, cited already in this ADR's main Decision).
+- **Defer to OPS-01.** Rejected per the card body: OPS-01 needs an executable capture move as an
+  input, not a decision to make itself, and OPS-01's own card scope is the operator workflow, not a
+  gate-catalogue amendment. Settling the `purpose` gap inside a motion-stack card (this one) keeps
+  gate changes in the same place §11/§16 already live, rather than splitting gate semantics across a
+  workflow card.
+
+### Consequences
+
+**Makes easy:** a real-mode view move can be retimed, checked and executed through the exact same
+gate catalogue, commissioning record and confirmation flow as a crack-task move, so OPS-01 composes
+the capture step from existing, already-reviewed machinery instead of a parallel, weaker path.
+
+**Costs:** `retime_plan`, `trajectory_check` and the gate catalogue each pick up one more purpose/
+schema branch to maintain and keep in sync with any future §16/§17 amendment, the same bookkeeping
+cost §16.8 already flagged when it deferred this decision.
+
+### Revisit when
+
+- A future view-plan shape adds more than one leg (e.g. a multi-pose scan), at which point §17.3's
+  "one-leg plan" simplification needs revisiting.
