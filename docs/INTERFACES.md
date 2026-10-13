@@ -3010,3 +3010,305 @@ typed confirmation phrase all still gate a real-mode view move, unchanged.
 - §11.9's `crackvision.execution_record/1` is unchanged: it already carries whatever `purpose` the
   trajectory file itself declared, so a `view_move` run's record simply carries that new value —
   no new record field is added by this section.
+
+---
+
+## 18. Trajectory preview and operator approval (`crackvision.trajectory_preview/1`; amends §11.5/§11.7 `G-APPROVAL`)
+
+**Normative source:** `docs/adr/020-trajectory-preview-approval.md`. MOT-08.2–.9 implement this
+section verbatim. Nothing here edits §0–§17: §11.5's five-key `crackvision.execution_approval/1`
+schema (`schema`, `trajectory_sha256`, `approved_by`, `approved_utc`, `preview_artifacts[]`) is not
+changed — this section fixes the previously-unspecified shape of `preview_artifacts[]` entries
+(§18.2) and amends `G-APPROVAL` (§11.7) to require one of them to be a valid, binding
+`crackvision.trajectory_preview/1` manifest (§18.3). Everything §11.7 already says about every other
+gate, and about `G-APPROVAL`'s own existing sha-match/age checks, is unchanged.
+
+### 18.1 `crackvision.trajectory_preview/1` manifest and its PNGs
+
+Produced by:
+
+```bash
+./env.sh python -m crackvision.trajectory_preview --trajectory PATH --plan PATH
+    [--retime-report PATH] [--check-report PATH] [--execution-config PATH]
+    [--limits PATH] [--end-effector-config PATH] [--scene-config PATH]
+    [--out-dir PATH] [§0.3 flags]
+```
+
+`--trajectory` and `--plan` are required. `--retime-report` defaults to `<trajectory>.retime.json`,
+`--check-report` to `<trajectory>.check.json` (§16.4/§16.5's own sidecar-naming convention, unchanged
+here). `--execution-config`, `--limits`, `--end-effector-config`, `--scene-config` default exactly as
+§11.10/§16.1 already default them, under `--root`. `--plan` is dispatched on the file's own `schema`
+field, exactly as §17.4's `trajectory_check --plan` dispatch: `crackvision.cartesian_plan/1` (§13.11.1)
+or `crackvision.view_plan/1` (§13.14.1) are both accepted. Forward kinematics throughout this tool come
+from `crackvision.kinematics` (`load_chain(...).fk(q)` composed with `load_end_effector(...).
+T_gripper_link_tool_tip`, §13/§16.5), **never** `crackvision_motion.tool_fk` — the same independent-FK
+lineage `trajectory_check` already uses, so a preview can never silently agree with the retimer on a
+wrong tool-tip pose.
+
+**Output location.** `--out-dir` default: `data/previews/{case}_{sha8}/`, where `{sha8}` is the first
+8 lowercase hex digits of the trajectory file's own sha256, and `{case}` is `plan.case_id` when `--plan`
+is a `cartesian_plan` (§13.11.1), or the literal string `view` when `--plan` is a `view_plan` (which
+carries no `case_id`, §13.14). Inside that directory, exactly four files are written, every time, with
+these fixed names: `preview.json`, `joints.png`, `toolpath.png`, `toolspeed.png`. `--out-dir` overrides
+only the directory; the four file names are not configurable. Every path field *inside* the manifest
+follows §11.2's existing path convention: repo-relative (POSIX) when the file lies under `--root`,
+otherwise absolute.
+
+**Refusal (exit 3, nothing written — no partial directory, no partial manifest):**
+
+- the trajectory file does not parse as `crackvision.joint_trajectory/1` (§11.2, amended by §17.1 for
+  `purpose: "view_move"`);
+- the plan file does not parse as `crackvision.cartesian_plan/1` or `crackvision.view_plan/1`;
+- the retime report does not parse as `crackvision.retime_report/1`, or its `trajectory_sha256`
+  differs from the trajectory file's own current sha256;
+- the check report does not parse as `crackvision.trajectory_check/1`, or its `trajectory_sha256`
+  differs from the trajectory file's own current sha256;
+- any required input file (`--trajectory`, `--plan`, the retime report, the check report) cannot be
+  opened or is not valid JSON at all — the ordinary "missing/unreadable required input" exit-3
+  precondition every CLI in this contract already uses (§0.2), listed here explicitly because this
+  tool, unlike `execute_trajectory`, has no mode in which a bad input is merely a `warn`.
+
+A trajectory whose own checks *fail* is **not** one of the refusal conditions above: `trajectory_preview`
+still renders it; §18.1.3 is exactly how that failure is surfaced. The point of this tool is to let an
+operator see *why* a trajectory fails, not to hide a failing trajectory from them.
+
+#### 18.1.1 Manifest fields
+
+| Field | Type | Meaning |
+|---|---|---|
+| `schema` | str | `"crackvision.trajectory_preview/1"` |
+| `created_utc` | str | ISO-8601 UTC, now. The **only** field that may differ between two renders of byte-identical inputs (§18.1.4) |
+| `producer` | str | `"trajectory_preview"` |
+| `case_id` | str\|null | `plan.case_id` for a `cartesian_plan`; `null` for a `view_plan` (no `case_id`, §13.14) |
+| `trajectory.path`, `.sha256` | str, str | the `--trajectory` file, as read |
+| `trajectory.purpose` | str | the trajectory's own `purpose` field (§11.2: `crack_task \| test \| view_move`), copied, never recomputed |
+| `plan.path`, `.sha256` | str, str | the `--plan` file, as read |
+| `plan.schema` | str | `"crackvision.cartesian_plan/1"` \| `"crackvision.view_plan/1"`, the plan file's own `schema` field |
+| `retime_report.path`, `.sha256` | str, str | the retime report, as read |
+| `check_report.path`, `.sha256` | str, str | the check report, as read |
+| `check_report.all_pass` | bool | `true` iff every entry in the check report's own `checks[]`/outcome list (§16.5) is `pass` or `skip` — `false` if any is `fail` |
+| `check_report.failed_checks` | list[str] | the `check` id of every entry whose outcome is `fail`, in the order the check report lists them; `[]` when `all_pass` is `true` |
+| `bindings.limits_file_sha256` | str\|null | copied from `trajectory.limits_file.sha256` (§11.2) |
+| `bindings.end_effector_config_sha256` | str\|null | copied from `trajectory.end_effector_config_sha256` (§11.2) |
+| `bindings.scene_config_sha256` | str\|null | copied from `trajectory.scene_config_sha256` (§11.2) |
+| `bindings.paths3d_sha256` | str\|null | copied from `trajectory.source.paths3d.sha256` when `source.paths3d` is non-null (§11.2/§17.1); `null` when it is (including every `view_move` trajectory, whose `source.paths3d` is always `null`, §17.1) |
+| `preview_speed_scale` | float | `execution.yaml`'s `speed_scale.real_default` (§11.1), read at render time — the scale `real`/`dry` actually use by default (§11.7 `G-SPEED`), so the operator sees the duration and tool speed a real run would actually have, not the unscaled file's own numbers |
+| `summary` | object | §18.1.2 |
+| `artifacts[]` | list | `[{kind: "joints", path, sha256}, {kind: "toolpath", path, sha256}, {kind: "toolspeed", path, sha256}]`, in this fixed order; `path`/`sha256` are the written PNG's own repo-relative path and the sha256 of its actual bytes |
+| `warnings[]` | list[str] | free-text, non-refusing observations — at minimum, one entry whenever `check_report.all_pass` is `false` (`"check report has N failing check(s): ..."`) and one whenever any `bindings.*` field is `null` (mirroring §11.7's own `G-STALE-CONFIG`/`G-LIMITS-HASH` "null is a warn, not a pass" convention, restated here for the preview reader, not re-checked against live files — that re-check is `approve_trajectory`'s job, §18.2) |
+
+#### 18.1.2 `summary`
+
+| Field | Type | Meaning |
+|---|---|---|
+| `n_points` | int | trajectory's own `len(points)` |
+| `duration_s` | float | `points[-1].t_s - points[0].t_s`, unscaled |
+| `duration_scaled_s` | float | `duration_s / preview_speed_scale` — the duration a `real`/`dry` run at the default speed scale would actually take (ADR-016 §4's retiming identity: scaling velocity by `s` scales duration by `1/s`) |
+| `per_joint[6]` | list | one entry per `joint_names[j]`, §18.1.2.1 |
+| `tool` | object | §18.1.2.2 |
+
+**18.1.2.1 `per_joint[j]`** — all computed from the trajectory's own unscaled `positions`/`t_s`
+(never from `velocities`/`accelerations`, even when present), using the same finite-difference
+convention §11.6 and §16.2 Step 3 already define for this project (forward segment velocity, centered
+interior acceleration) — exactly the formulas §11.7's `G-LIMITS` finite-difference pass already
+applies, recomputed independently here rather than copied from the trajectory or from the retime
+report:
+
+| Field | Type | Meaning |
+|---|---|---|
+| `joint` | str | `joint_names[j]` |
+| `min_q`, `max_q` | float | `min`/`max` of `positions[:, j]` over the whole trajectory |
+| `lower`, `upper` | float | `b601_dm_limits.yaml`'s inclusive position bound for this joint (§11.6) |
+| `min_headroom_rad` | float | `min_i min(q_ij − lower, upper − q_ij)` — the closest any point of this trajectory comes to either bound, on either side |
+| `max_abs_v` | float | `max_i \|v_ij\|`, `v_ij = (q_{i+1,j} − q_{i,j}) / (t_{i+1} − t_i)` (§11.6's `w`, §16.2's `seg_v`), `i = 0..N-1` |
+| `v_limit` | float | `b601_dm_limits.yaml`'s `velocity` for this joint |
+| `v_ratio` | float | `max_abs_v / v_limit` — the same quantity `retime_report.totals.peak_velocity_fraction[j]` (§16.4) reports, recomputed here independently from the trajectory file, never copied from that report |
+| `max_abs_a` | float | `max_i \|a_ij\|`, `a_ij = (v_ij − v_{(i-1)j}) / ((τ_{i-1} + τ_i)/2)` for interior `i = 1..N-1` (§16.2 Step 3's centered difference); `0.0` for an `N ≤ 1`-segment trajectory (no interior point) |
+| `a_limit` | float | `b601_dm_limits.yaml`'s `acceleration` for this joint |
+| `a_ratio` | float | `max_abs_a / a_limit`, mirroring `retime_report.totals.peak_acceleration_fraction[j]` the same way `v_ratio` mirrors the velocity one |
+
+**18.1.2.2 `tool`** — tool-tip (`tool_tip`, §8/§9) position via `crackvision.kinematics`, in
+`base_link`, over the same unscaled `positions`:
+
+| Field | Type | Meaning |
+|---|---|---|
+| `path_length_m` | float | `Σ_i ‖tool_fk(q_{i+1}) − tool_fk(q_i)‖` over the whole trajectory |
+| `max_speed_m_s` | float | `max_i s_i`, `s_i = ‖tool_fk(q_{i+1}) − tool_fk(q_i)‖ / (t_{i+1} − t_i)` — the unscaled tool speed, §16.2 Step 4's formula, recomputed independently of any `retime_report.legs[].tool_speed` value |
+| `max_speed_scaled_m_s` | float | `max_speed_m_s * preview_speed_scale` — the effective tool speed a `real`/`dry` run at the default scale would reach (§16.2's "effective tool speed at runtime is `v_c · s`" identity) |
+| `min_z_m` | float | `min_i tool_fk(q_i).z` — lowest point the tool reaches, `base_link` frame, a quick sanity figure for an operator checking the tool does not dip unexpectedly |
+| `legs[]` | list | one entry per `retime_report.legs[]` entry (§16.4), carried over unchanged for `leg_index`, `kind`, `point_range`, `duration_s`, plus two fields `trajectory_preview` computes itself over that leg's own `point_range` (never copied from the report): `length_m` (tool arc length within the range) and `mean_speed_m_s` (`length_m / duration_s`) |
+
+#### 18.1.3 The three PNGs
+
+All three are rendered with `matplotlib.use("Agg")` (no display, no font-cache-dependent layout
+beyond the default font), at fixed, code-level constants — never computed from terminal size, screen
+DPI or any other runtime-environment value:
+
+| PNG | `figsize` (in) | `dpi` | Content |
+|---|---|---|---|
+| `joints.png` | `(10, 12)` | `100` | Six stacked subplots, one per joint in `joint_names` order: `positions[:, j]` vs `t_s`, with horizontal reference lines at that joint's `lower`/`upper` bound |
+| `toolpath.png` | `(8, 8)` | `100` | Two side-by-side subplots: (left) the tool path's `(x, y)` projection, `base_link` frame; (right) tool height `z` vs cumulative tool arc length. Both colour-code points by the owning leg's `kind` (`transit`/`approach`/`trace`/`retract`), from `summary.tool.legs[]`'s `point_range` |
+| `toolspeed.png` | `(10, 4)` | `100` | Tool speed `s_i` vs `t_s`, one line, with a vertical dashed line at every leg boundary (`summary.tool.legs[].point_range`) |
+
+**Red failure banner.** When `check_report.all_pass` is `false`, every one of the three PNGs additionally
+carries a fixed-position red banner (e.g. a `suptitle` in red, `"CHECK REPORT FAILED: " +
+", ".join(failed_checks)`) — so a reviewer who only ever opens the PNG files later, without reading
+`preview.json`, still sees the failure baked into the image itself, per ADR-020 Decision §3.
+
+**Byte-identical reproducibility.** Re-rendering from the same four input files must produce
+byte-identical PNGs. This holds because: (a) `figsize`/`dpi` are the fixed constants in the table
+above, never derived from the environment; (b) every plotted value is a deterministic function of the
+input files' own contents (positions, `t_s`, bounds), with no randomness and no wall-clock-dependent
+content drawn *into* the figure; (c) `savefig(..., metadata={"Software": "", "Creation Time": ""})` (or
+the equivalent for whatever Pillow/Agg PNG writer this project's matplotlib version uses) zeroes the
+only two metadata chunks matplotlib's own PNG writer would otherwise populate with a version string and
+a timestamp. `created_utc` in `preview.json` is therefore the **only** field across all four output
+files that may differ between two such renders — the PNGs and every other manifest field must be
+identical byte-for-byte.
+
+`--dry-run` (§0.3) validates every refusal condition (§18.1), prints the would-be `summary`, and writes
+nothing — no directory, no files — exiting 0 regardless.
+
+### 18.2 `approve_trajectory` CLI
+
+```bash
+./env.sh python -m crackvision.approve_trajectory --preview PATH --operator ID
+    [--out PATH] [--limits PATH] [--scene-config PATH] [--end-effector-config PATH]
+    [--execution-config PATH] [§0.3 flags]
+```
+
+`--preview` points at a `preview.json` written by §18.1 (not at a trajectory file — the manifest, and
+everything it names, is what gets re-verified and recorded). `--operator` is the free-text identifier
+written to `approved_by`. Config paths default exactly as §11.10/§16.1. `approve_trajectory` **never**
+trusts any sha256 the manifest itself recorded — every one of the checks below re-reads the live file
+and recomputes it, the same "never trust the copy" convention `G-STALE-CONFIG`/`G-LIMITS-HASH` already
+use (§11.7).
+
+**Refusal, exit 3, nothing written, checked in this order (every one of 1–6 evaluated before any
+`/dev/tty` interaction is attempted):**
+
+1. The manifest at `--preview` does not parse as `crackvision.trajectory_preview/1` (§18.1.1).
+2. The trajectory file at `manifest.trajectory.path` (resolved against `--root`) cannot be read, or its
+   current sha256 differs from `manifest.trajectory.sha256`.
+3. Any of the three artefacts in `manifest.artifacts[]` is missing, or its current sha256 differs from
+   the sha256 recorded in that artefact's own entry.
+4. The check report at `manifest.check_report.path` cannot be read, or its current sha256 differs from
+   `manifest.check_report.sha256`, or it does not name the trajectory's current sha256 in its own
+   `trajectory_sha256` field, or any one of its checks has outcome `fail`.
+5. The trajectory's `purpose` (`manifest.trajectory.purpose`) is `"test"`. **Only `crack_task` and
+   `view_move` trajectories can ever be approved** — a `"test"` trajectory already refuses
+   unconditionally in `real` at `G-TRAJ` (§11.7), so approving one would be meaningless, and this rule
+   makes that explicit rather than leaving it to `G-APPROVAL` to discover later.
+6. Any non-null `manifest.bindings.*` field differs from the sha256 of the corresponding **current**
+   file (`--limits`, `--scene-config`, `--end-effector-config`) — the same integrity rule
+   `G-STALE-CONFIG`/`G-LIMITS-HASH` already apply at execution time, re-applied here at approval time so
+   an approval is never issued against a preview rendered before the scene/limits/end-effector files
+   last changed.
+
+**Only after every one of 1–6 passes** does `approve_trajectory` open `/dev/tty` **directly** (never
+`sys.stdin`) and prompt for the exact phrase `APPROVE <sha8>`, `{sha8}` being the first 8 hex characters
+of the trajectory's current sha256 — matching after `.strip()`, case-sensitive. No controlling tty, or
+any phrase other than an exact match, is a refusal (exit 3). **There is no `--yes` flag, no environment
+variable, and no stdin path that can substitute for this prompt** — the same absolute rule §11.8 already
+states for `G-CONFIRM`'s `EXECUTE <sha8>` phrase, deliberately mirrored here (ADR-020 Decision §5).
+
+**On success**, it writes exactly the five §11.5 keys — no sixth key, no change to that schema:
+
+| Key | Value |
+|---|---|
+| `schema` | `"crackvision.execution_approval/1"` |
+| `trajectory_sha256` | the trajectory's current sha256 (step 2 above) |
+| `approved_by` | `--operator` |
+| `approved_utc` | now, ISO-8601 UTC |
+| `preview_artifacts[]` | exactly four entries, in this order: the manifest itself (`{path: --preview's own path, sha256: the manifest file's current sha256}`), then `manifest.artifacts[0..2]` each as `{path, sha256}` (the `joints`/`toolpath`/`toolspeed` PNGs, in the manifest's own `artifacts[]` order) |
+
+**Output path.** Default `data/approvals/{case}_{sha8}_approval.json`, using the same `{case}`/`{sha8}`
+convention §18.1 uses for the preview directory (`{case}` from `manifest.case_id`, or `view` when it is
+`null`; `{sha8}` from the trajectory's current sha256). **An existing file at the output path is never
+overwritten — exit 3 unconditionally**, including when `--skip-existing` is given: this is a stricter
+rule than §0.3's ordinary "overwrite by default, `--skip-existing` to skip" convention, stated here as
+an explicit exception, because an approval is a one-time signed record, not a regenerable artefact.
+
+**`--dry-run`** (§0.3) runs every one of checks 1–6, prints which would pass or fail and why, never
+opens `/dev/tty`, writes nothing, and exits **0** regardless of whether any check would have refused —
+the ordinary §0.3 `--dry-run` contract, not a special case.
+
+### 18.3 `G-APPROVAL` amendment (§11.7)
+
+`G-APPROVAL`'s two existing checks — the approval's `trajectory_sha256` matches the current trajectory,
+and `now - approved_utc ≤ approval_max_age_s` (§11.5) — are unchanged, including their outcome category
+(`warn` in `mock`/`dry`, `fail` in `real`, §11.7's table). **Only once both of those pass** does
+`G-APPROVAL` go on to evaluate, in this order, the following additional checks, each in the same outcome
+category (`warn` in `mock`/`dry`, `fail` in `real`) as the two existing ones:
+
+1. `approval.preview_artifacts` is non-empty.
+2. Every entry's `path`, resolved against `--root`, exists and its current sha256 equals the entry's own
+   recorded `sha256`.
+3. **Exactly one** entry parses as a `crackvision.trajectory_preview/1` manifest (§18.1.1) — zero such
+   entries, or more than one, is itself a violation of this check.
+4. That one manifest's `trajectory.sha256` equals the current trajectory's sha256.
+5. That one manifest's `check_report.all_pass` is `true`.
+
+A violation of any one of 1–5 is reported with a detail naming which numbered check failed and why —
+the same per-gate `detail` convention every other row of §11.7's table already uses. **Unreadable files,
+malformed JSON, a non-UTF-8 artefact, or any other exception while loading an artefact or manifest become
+that check's violation outcome, never an uncaught exception** — the same robustness rule already
+established for `G-ELIGIBLE`'s `view_move` branch (MOT-05.3.R2, MOT-07.10.2.R2 precedents).
+
+**No approvals exist in this repository as of this writing.** Stated explicitly rather than left
+implicit: every approval written before this section's checks 1–5 existed in code would need to satisfy
+them to keep `G-APPROVAL` passing after this card's implementer cards land — since no such approval
+exists yet, this is a forward-looking fact about the rule, not a migration this project has to perform.
+
+### 18.4 RViz preview convenience (motion-free by construction)
+
+```bash
+source scripts/ros/env_ros.sh
+set +u; source ros2_ws/install/setup.bash
+ros2 run crackvision_motion preview_trajectory --trajectory PATH [--rate-hz FLOAT] [§0.3 flags]
+ros2 launch crackvision_motion preview_rviz.launch.py trajectory:=PATH
+```
+
+`preview_trajectory` is an `rclpy` node (console-script entry point, same package as
+`execute_trajectory`/`retime_plan`, §11.10/§16.6). It reads the `--trajectory` file directly and
+publishes:
+
+| Topic | Type | QoS |
+|---|---|---|
+| `/display_planned_path` | `moveit_msgs/msg/DisplayTrajectory` | `TRANSIENT_LOCAL` + `RELIABLE`, depth 1 |
+| `/crackvision/preview_markers` | `visualization_msgs/msg/MarkerArray` | `TRANSIENT_LOCAL` + `RELIABLE`, depth 1 |
+
+**This node is motion-free by construction, not by configuration.** It never constructs a
+`rclpy.action.ActionClient` of any kind, never constructs a ROS service client of any kind, never
+publishes on `/joint_states` or on any `/rebotarm/**` topic or any other vendor command topic, and never
+calls a vendor service. This is checkable the same way §16.5 already checks `trajectory_check`'s "must
+not import `crackvision_motion`" rule — a grep/import-time test over this node's own module asserting the
+absence of `ActionClient(`, `create_client(`, and any publisher construction naming `/joint_states` or a
+`/rebotarm` topic.
+
+`preview_rviz.launch.py` composes `crackvision_motion/launch/mock_planning.launch.py` (MOT-02's headless
+mock stack, §11.11 — reused here purely so RViz has a `RobotModel`/`PlanningScene` to render against, not
+as a motion path) with `rviz2 -d rviz/preview.rviz` and this node. `rviz/preview.rviz` configures exactly
+four displays: `RobotModel`, `moveit_rviz_plugin/Trajectory`, `PlanningScene`, `MarkerArray`. **The
+`MotionPlanning` display is not present in the config file at all** — not merely unchecked or hidden —
+because that display ships its own Plan/Execute buttons wired to live planning/execution services, which
+is exactly the motion-capable surface ADR-016 keeps behind commissioning and `G-CONFIRM` (ADR-020 Decision
+§1, "Alternatives considered"). RViz is a convenience for looking at the motion in 3D; it is never read by
+`trajectory_preview`, `approve_trajectory`, or `G-APPROVAL` — nothing in §18.1–§18.3 depends on this
+section in any way.
+
+### 18.5 Defaults and non-goals
+
+| Parameter | Default | Rationale |
+|---|---|---|
+| preview output directory | `data/previews/{case}_{sha8}/` | Mirrors `data/trajectories/{case}_trajectory.json` (§16.6) and `data/approvals/{case}_{sha8}_approval.json` (§18.2)'s own `{case}`/`{sha8}` keying, so every artefact tied to one trajectory sits under a name a human can find from the sha8 printed at `G-CONFIRM` time (§11.8) |
+| `preview_speed_scale` source | `execution.yaml`'s `speed_scale.real_default` | The operator approving a run needs to see the duration/speed `real` (and `dry`) would *actually* use by default (§11.7 `G-SPEED`), not the unscaled file's own numbers, which no mode ever runs at except `mock`'s own default of `1.0` |
+| PNG `dpi`/`figsize` | per §18.1.3's table | Fixed, code-level constants (never environment-derived) are what makes byte-identical re-rendering possible at all (§18.1.3) |
+| `approve_trajectory` output path overwrite rule | never overwrite, exit 3 | An approval is a one-time signed record of a specific review event; silently overwriting one would let a later, unreviewed run reuse an earlier filename while looking, from the filename alone, like the original approval |
+| typed phrase | `APPROVE <sha8>` | Deliberately distinct text from `G-CONFIRM`'s `EXECUTE <sha8>` (§11.8) so the two prompts, which an operator may see minutes apart, cannot be confused or auto-completed into each other, while reusing the same `/dev/tty`-direct, no-flag-substitute shape operators already know (ADR-020 Decision §5) |
+
+**Non-goals.** No video export of a preview (the three static PNGs are the whole visual artefact). No
+approval revocation list — an approval's validity window is already bounded by `approval_max_age_s`
+(§11.5/§11.12), and revoking a specific past approval is not a problem this section solves. No
+multi-operator sign-off — `approved_by` is a single free-text identifier, and §11.5's schema has no
+second-approver field; a future card would need its own ADR to add one.
