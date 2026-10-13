@@ -36,6 +36,7 @@ setup(
             "plan_crack_path = crackvision_motion.plan_crack_path:main",
             "plan_view = crackvision_motion.plan_view:main",
             "retime_plan = crackvision_motion.retime_plan:main",
+            "preview_trajectory = crackvision_motion.preview_trajectory:main",
         ],
     },
 )
