@@ -42,7 +42,14 @@ from crackvision_motion.execution_gate import (  # noqa: E402
     load_commissioning,
     load_execution_config,
 )
-from crackvision_motion.joint_trajectory import file_sha256  # noqa: E402
+from crackvision_motion.cartesian_plan import (  # noqa: E402
+    add_view_candidate,
+    build_leg,
+    finalize_view,
+    new_view_plan,
+    write_view_plan,
+)
+from crackvision_motion.joint_trajectory import file_sha256, load_limits  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 PRODUCTION_LIMITS = REPO_ROOT / "config" / "robot" / "b601_dm_limits.yaml"
@@ -59,6 +66,8 @@ SCENE_MEASURED = GATE_FIXTURES / "scene_measured.yaml"
 EE_MEASURED = GATE_FIXTURES / "end_effector_measured.yaml"
 COMMISSIONING_READY = GATE_FIXTURES / "commissioning_ready.yaml"
 PATHS3D_ELIGIBLE = GATE_FIXTURES / "paths3d_eligible.json"
+
+VIEW_LIMITS = load_limits(PRODUCTION_LIMITS)
 
 _NO_ARM = {}
 _ARM_REAL = {"CRACKVISION_ARM_REAL": "1"}
@@ -691,3 +700,207 @@ def test_load_approval_rejects_unknown_key(tmp_path):
     bad = _write_json(tmp_path / "approval.json", approval)
     with pytest.raises(GateConfigError):
         load_approval(bad)
+
+
+# --------------------------------------------------------------------------------------
+# §17.1/§17.2 purpose "view_move": G-TRAJ and G-ELIGIBLE (MOT-07.10.2)
+# --------------------------------------------------------------------------------------
+
+_VM_POS0 = [0.0] * 6
+_VM_POS1 = [0.2, -0.1, -0.1, 0.0, 0.0, 0.0]
+
+
+def _view_recheck():
+    return {
+        "max_pos_err_m": 0.0001, "max_ang_err_rad": 0.001,
+        "all_valid": True, "within_limits": True, "max_joint_step_rad": 0.01,
+    }
+
+
+def _view_pose():
+    return {"position_m": [0.0, 0.0, 0.5], "quat_xyzw": [0.0, 0.0, 0.0, 1.0]}
+
+
+def _view_fov_check():
+    return {"passed": True, "horizontal_margins_deg": [1.0] * 4, "vertical_margins_deg": [1.0] * 4}
+
+
+def _view_plan_sources():
+    return {
+        "scene": {"path": "config/scene/scene.yaml", "sha256": file_sha256(SCENE_MEASURED)},
+        "end_effector": {"path": "config/robot/end_effector.yaml", "sha256": file_sha256(EE_MEASURED)},
+        "limits": {"path": "config/robot/b601_dm_limits.yaml", "sha256": file_sha256(PRODUCTION_LIMITS)},
+        "config": {"path": "config/motion/cartesian_planning.yaml", "sha256": "c" * 64},
+    }
+
+
+def _write_view_plan(tmp_path, name="view_plan.json", *, chosen=True, positions=None) -> Path:
+    plan = new_view_plan(_view_plan_sources(), {"view_distance_m": 0.25}, "--center", [0.1, 0.2], 0.0, [0.2, 0.2])
+    if chosen:
+        add_view_candidate(plan, 0.0, 0.0, _view_pose(), _view_fov_check(), True, True)
+        pts = positions if positions is not None else [_VM_POS0, _VM_POS1]
+        transit_leg = build_leg("transit", None, None, None, pts, [None] * len(pts), _view_recheck())
+        finalize_view(plan, {"tilt_deg": 0.0, "yaw_deg": 0.0}, transit_leg, VIEW_LIMITS)
+    else:
+        finalize_view(plan, None, None, VIEW_LIMITS)
+    path = tmp_path / name
+    write_view_plan(plan, path)
+    return path
+
+
+def _view_move_trajectory(
+    view_plan_path: Path, *, points=None, limits_sha=None, ee_sha=None, scene_sha=None,
+) -> dict:
+    return {
+        "schema": "crackvision.joint_trajectory/1",
+        "created_utc": "2026-01-01T00:00:00Z",
+        "producer": "MOT-07.10.2 fixture",
+        "purpose": "view_move",
+        "planning_frame": "base_link",
+        "joint_names": ["joint1", "joint2", "joint3", "joint4", "joint5", "joint6"],
+        "points": points if points is not None else [
+            {"t_s": 0.0, "positions": _VM_POS0},
+            {"t_s": 1.0, "positions": _VM_POS1},
+        ],
+        "limits_file": {
+            "path": "config/robot/b601_dm_limits.yaml",
+            "sha256": limits_sha if limits_sha is not None else file_sha256(PRODUCTION_LIMITS),
+        },
+        "end_effector_config_sha256": ee_sha if ee_sha is not None else file_sha256(EE_MEASURED),
+        "scene_config_sha256": scene_sha if scene_sha is not None else file_sha256(SCENE_MEASURED),
+        "source": {"paths3d": None, "view_plan": {"path": view_plan_path.name, "sha256": file_sha256(view_plan_path)}},
+    }
+
+
+def _view_move_kwargs(tmp_path, **overrides):
+    return _common_kwargs(
+        tmp_path,
+        scene_config_path=SCENE_MEASURED,
+        end_effector_config_path=EE_MEASURED,
+        env=_ARM_REAL,
+        **overrides,
+    )
+
+
+@pytest.mark.parametrize("mode", ["mock", "dry", "real"])
+def test_view_move_valid_binding_passes_traj_and_eligible(tmp_path, mode):
+    vp_path = _write_view_plan(tmp_path)
+    traj = _view_move_trajectory(vp_path)
+    traj_path = _write_json(tmp_path / "trajectory.json", traj)
+
+    report = evaluate_offline(mode, traj_path, **_view_move_kwargs(tmp_path))
+    assert _get(report, G_TRAJ).outcome == "pass"
+    assert _get(report, G_ELIGIBLE).outcome == "pass"
+
+
+@pytest.mark.parametrize("mode", ["mock", "dry", "real"])
+def test_view_move_missing_view_plan_file_fails_eligible(tmp_path, mode):
+    vp_path = _write_view_plan(tmp_path)
+    traj = _view_move_trajectory(vp_path)
+    vp_path.unlink()
+    traj_path = _write_json(tmp_path / "trajectory.json", traj)
+
+    report = evaluate_offline(mode, traj_path, **_view_move_kwargs(tmp_path))
+    assert _get(report, G_ELIGIBLE).outcome == "fail"
+
+
+@pytest.mark.parametrize("mode", ["mock", "dry", "real"])
+def test_view_move_sha_mismatch_fails_eligible(tmp_path, mode):
+    vp_path = _write_view_plan(tmp_path)
+    traj = _view_move_trajectory(vp_path)
+    traj["source"]["view_plan"]["sha256"] = "a" * 64
+    traj_path = _write_json(tmp_path / "trajectory.json", traj)
+
+    report = evaluate_offline(mode, traj_path, **_view_move_kwargs(tmp_path))
+    assert _get(report, G_ELIGIBLE).outcome == "fail"
+
+
+@pytest.mark.parametrize("mode", ["mock", "dry", "real"])
+def test_view_move_non_view_plan_file_fails_eligible(tmp_path, mode):
+    not_a_plan = tmp_path / "view_plan.json"
+    _write_json(not_a_plan, {"schema": "crackvision.paths3d/1", "counts": {}, "execution_eligible": True})
+    traj = _view_move_trajectory(not_a_plan)
+    traj_path = _write_json(tmp_path / "trajectory.json", traj)
+
+    report = evaluate_offline(mode, traj_path, **_view_move_kwargs(tmp_path))
+    assert _get(report, G_ELIGIBLE).outcome == "fail"
+
+
+@pytest.mark.parametrize("mode", ["mock", "dry", "real"])
+def test_view_move_null_chosen_transit_fails_eligible(tmp_path, mode):
+    vp_path = _write_view_plan(tmp_path, chosen=False)
+    traj = _view_move_trajectory(vp_path)
+    traj_path = _write_json(tmp_path / "trajectory.json", traj)
+
+    report = evaluate_offline(mode, traj_path, **_view_move_kwargs(tmp_path))
+    assert _get(report, G_ELIGIBLE).outcome == "fail"
+
+
+@pytest.mark.parametrize("mode", ["mock", "dry", "real"])
+def test_view_move_endpoint_mismatch_fails_eligible(tmp_path, mode):
+    vp_path = _write_view_plan(tmp_path)
+    traj = _view_move_trajectory(vp_path)
+    traj["points"][-1]["positions"] = [0.9] * 6  # no longer matches transit_leg's last position
+    traj_path = _write_json(tmp_path / "trajectory.json", traj)
+
+    report = evaluate_offline(mode, traj_path, **_view_move_kwargs(tmp_path))
+    assert _get(report, G_ELIGIBLE).outcome == "fail"
+
+
+@pytest.mark.parametrize(
+    "sha_field", ["limits_file", "end_effector_config_sha256", "scene_config_sha256"],
+)
+def test_view_move_sha_binding_mismatch_warns_outside_real_fails_in_real(tmp_path, sha_field):
+    vp_path = _write_view_plan(tmp_path)
+    traj = _view_move_trajectory(vp_path)
+    bad_sha = "d" * 64
+    if sha_field == "limits_file":
+        traj["limits_file"]["sha256"] = bad_sha
+    else:
+        traj[sha_field] = bad_sha
+    traj_path = _write_json(tmp_path / "trajectory.json", traj)
+
+    for mode in ("mock", "dry"):
+        report = evaluate_offline(mode, traj_path, **_view_move_kwargs(tmp_path))
+        assert _get(report, G_ELIGIBLE).outcome == "warn"
+
+    report = evaluate_offline("real", traj_path, **_view_move_kwargs(tmp_path))
+    assert _get(report, G_ELIGIBLE).outcome == "fail"
+
+
+@pytest.mark.parametrize(
+    "sha_field", ["limits_file", "end_effector_config_sha256", "scene_config_sha256"],
+)
+def test_view_move_null_sha_binding_counts_as_mismatch(tmp_path, sha_field):
+    vp_path = _write_view_plan(tmp_path)
+    traj = _view_move_trajectory(vp_path)
+    if sha_field == "limits_file":
+        traj["limits_file"]["sha256"] = None
+    else:
+        traj[sha_field] = None
+    traj_path = _write_json(tmp_path / "trajectory.json", traj)
+
+    report = evaluate_offline("real", traj_path, **_view_move_kwargs(tmp_path))
+    assert _get(report, G_ELIGIBLE).outcome == "fail"
+
+
+@pytest.mark.parametrize("mode", ["mock", "dry", "real"])
+def test_view_move_schema_refusal_nonnull_paths3d_fails_traj(tmp_path, mode):
+    vp_path = _write_view_plan(tmp_path)
+    traj = _view_move_trajectory(vp_path)
+    traj["source"]["paths3d"] = {"path": "a", "sha256": "a" * 64, "execution_eligible": True}
+    traj_path = _write_json(tmp_path / "trajectory.json", traj)
+
+    report = evaluate_offline(mode, traj_path, **_view_move_kwargs(tmp_path))
+    assert _get(report, G_TRAJ).outcome == "fail"
+
+
+@pytest.mark.parametrize("mode", ["mock", "dry", "real"])
+def test_test_purpose_with_view_plan_key_fails_traj(tmp_path, mode):
+    vp_path = _write_view_plan(tmp_path)
+    traj = _view_move_trajectory(vp_path)
+    traj["purpose"] = "test"
+    traj_path = _write_json(tmp_path / "trajectory.json", traj)
+
+    report = evaluate_offline(mode, traj_path, **_view_move_kwargs(tmp_path))
+    assert _get(report, G_TRAJ).outcome == "fail"

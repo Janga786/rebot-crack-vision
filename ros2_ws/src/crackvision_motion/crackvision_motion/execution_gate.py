@@ -37,6 +37,7 @@ from crackvision_description.end_effector import (
 from crackvision_description.end_effector import assert_commissioning_ready as ee_assert_commissioning_ready
 from crackvision_description.end_effector import load_config as ee_load_config
 
+from crackvision_motion.cartesian_plan import CartesianPlanError, load_view_plan
 from crackvision_motion.joint_trajectory import (
     TrajectoryError,
     check_limits,
@@ -635,7 +636,7 @@ def evaluate_offline(
     if not traj_ok:
         checks.append(GateCheck(G_ELIGIBLE, "error", "cannot evaluate: G-TRAJ failed to load trajectory"))
     else:
-        checks.append(_evaluate_eligible(traj, root, mode))
+        checks.append(_evaluate_eligible(traj, root, mode, limits_path))
 
     # G-APPROVAL
     if not traj_ok or traj_sha is None:
@@ -667,7 +668,10 @@ def _eligible_violation(mode: str, msg: str) -> GateCheck:
     return GateCheck(G_ELIGIBLE, "warn", f"{msg} (warn outside real)")
 
 
-def _evaluate_eligible(traj: dict, root: Path, mode: str) -> GateCheck:
+def _evaluate_eligible(traj: dict, root: Path, mode: str, limits_path: Union[str, Path]) -> GateCheck:
+    if traj["purpose"] == "view_move":
+        return _evaluate_eligible_view_move(traj, root, mode, limits_path)
+
     source = traj["source"]["paths3d"]
     if source is None:
         if traj["purpose"] == "crack_task":
@@ -711,6 +715,61 @@ def _evaluate_eligible(traj: dict, root: Path, mode: str) -> GateCheck:
     if not file_eligible:
         return _eligible_violation(mode, f"paths3d file reports execution_eligible=false, reasons={reasons}")
     return GateCheck(G_ELIGIBLE, "pass", "paths3d sha matches and is execution_eligible")
+
+
+def _evaluate_eligible_view_move(traj: dict, root: Path, mode: str, limits_path: Union[str, Path]) -> GateCheck:
+    """§17.2 `G-ELIGIBLE` for `purpose: "view_move"`: integrity (fail in every mode) then,
+    only once integrity passes, the three sha-binding eligibility checks (warn in mock/dry, fail
+    in real). The view-plan file is always read from disk, never trusted from the trajectory."""
+    vp_source = traj["source"]["view_plan"]
+    vp_path = _resolve(root, vp_source["path"])
+    if not vp_path.is_file():
+        return GateCheck(G_ELIGIBLE, "fail", f"source.view_plan.path does not exist: {vp_path}")
+    try:
+        actual_sha = file_sha256(vp_path)
+    except OSError as exc:
+        return GateCheck(G_ELIGIBLE, "error", f"source.view_plan.path unreadable: {exc}")
+    if actual_sha != vp_source["sha256"]:
+        return GateCheck(
+            G_ELIGIBLE, "fail",
+            f"source.view_plan.sha256 {vp_source['sha256']} does not match file's actual sha256 {actual_sha}",
+        )
+    try:
+        view_plan = load_view_plan(vp_path, limits_path)
+    except CartesianPlanError as exc:
+        return GateCheck(G_ELIGIBLE, "fail", f"source.view_plan.path does not load as a view plan: {exc}")
+
+    chosen = view_plan["chosen"]
+    transit_leg = view_plan["transit_leg"]
+    if chosen is None or transit_leg is None:
+        return GateCheck(
+            G_ELIGIBLE, "fail", "view plan's chosen/transit_leg is null (written on a plan_view refusal)"
+        )
+
+    transit_positions = transit_leg["positions"]
+    first_err = max(abs(a - b) for a, b in zip(traj["points"][0]["positions"], transit_positions[0]))
+    last_err = max(abs(a - b) for a, b in zip(traj["points"][-1]["positions"], transit_positions[-1]))
+    if first_err > 1e-9 or last_err > 1e-9:
+        return GateCheck(
+            G_ELIGIBLE, "fail",
+            f"trajectory endpoints do not match transit_leg within 1e-9 rad "
+            f"(first_err={first_err}, last_err={last_err})",
+        )
+
+    vp_sources = view_plan["sources"]
+    bindings = (
+        ("limits", vp_sources["limits"]["sha256"], traj["limits_file"]["sha256"]),
+        ("end_effector", vp_sources["end_effector"]["sha256"], traj["end_effector_config_sha256"]),
+        ("scene", vp_sources["scene"]["sha256"], traj["scene_config_sha256"]),
+    )
+    mismatches = [
+        f"{name}: view_plan sources.{name}.sha256 {vp_sha} != trajectory sha {traj_sha}"
+        for name, vp_sha, traj_sha in bindings
+        if traj_sha is None or traj_sha != vp_sha
+    ]
+    if mismatches:
+        return _eligible_violation(mode, "; ".join(mismatches))
+    return GateCheck(G_ELIGIBLE, "pass", "view_plan integrity and sha-binding eligibility checks pass")
 
 
 def _evaluate_approval(
