@@ -8,12 +8,16 @@ paths and tool_tip traces built by hand from `crackvision.kinematics`'s own FK (
 
 from __future__ import annotations
 
+import json
+
 import numpy as np
 import pytest
 
 import crackvision.kinematics as kin
 from crackvision.trajectory_check import (
     JOINT_NAMES,
+    _build_projection,
+    _leg_point_ranges,
     build_plan_polyline,
     check_path,
     check_provenance,
@@ -153,6 +157,112 @@ def _build_case(speeds=None, n=6, extra_points=()):
     return plan, traj, configs
 
 
+C = [0.7, -0.8, -0.7, 0.4, 0.2, 0.2]
+
+
+def _build_revisit_case(trace_speeds=None, n_trace=6):
+    """transit HOME->A, approach A->B, trace B->C, retract C->A: the last leg returns to `A`, an
+    earlier leg's own vertex, so the plan polyline `P = [HOME, A, B, C, A]` revisits a
+    configuration. Exercises the projection's tie-break at that revisited vertex (Finding
+    4c399faa89247366)."""
+    if trace_speeds is None:
+        trace_speeds = [0.05] * n_trace
+    assert len(trace_speeds) == n_trace
+
+    plan = _plan(
+        [
+            _leg(0, "transit", [HOME, A]),
+            _leg(1, "approach", [A, B]),
+            _leg(2, "trace", [B, C]),
+            _leg(3, "retract", [C, A]),
+        ]
+    )
+
+    points = [{"t_s": 0.0, "positions": HOME}]
+    t = 0.0
+
+    for cfg in _joint_lerp(HOME, A, 2)[1:]:
+        t += 1.0
+        points.append({"t_s": t, "positions": list(cfg)})
+
+    for cfg in _joint_lerp(A, B, 2)[1:]:
+        t += 1.0
+        points.append({"t_s": t, "positions": list(cfg)})
+
+    trace_configs = _joint_lerp(B, C, n_trace)
+    tool_prev = _tool_tip(B)
+    for cfg, v in zip(trace_configs[1:], trace_speeds):
+        tool_next = _tool_tip(cfg)
+        dist = float(np.linalg.norm(tool_next - tool_prev))
+        tau = dist / v if v > 0 else 1.0
+        t += tau
+        points.append({"t_s": t, "positions": list(cfg)})
+        tool_prev = tool_next
+
+    for cfg in _joint_lerp(C, A, 2)[1:]:
+        t += 1.0
+        points.append({"t_s": t, "positions": list(cfg)})
+
+    traj = _traj(points)
+    return plan, traj
+
+
+def _consistent_revisit_report(traj, plan, ranges):
+    def _recompute(first, last):
+        t = [float(p["t_s"]) for p in traj["points"]]
+        duration = t[last] - t[first]
+        idxs = list(range(first, last + 1))
+        speeds = []
+        for a, b in zip(idxs[:-1], idxs[1:]):
+            d = math_dist(_tool_tip(traj["points"][a]["positions"]), _tool_tip(traj["points"][b]["positions"]))
+            speeds.append(d / (t[b] - t[a]))
+        return duration, speeds
+
+    legs = []
+    for leg_index, (first, last, kind) in sorted(ranges.items()):
+        duration, speeds = _recompute(first, last)
+        leg_doc = {"leg_index": leg_index, "kind": kind, "point_range": [first, last], "duration_s": duration}
+        if kind == "trace":
+            leg_doc["tool_speed"] = {
+                "target": 0.05,
+                "constant": 0.05,
+                "ramp_in_m": 0.0,
+                "ramp_out_m": 0.0,
+                "min": min(speeds),
+                "max": max(speeds),
+            }
+        legs.append(leg_doc)
+    return {"schema": "crackvision.retime_report/1", "legs": legs}
+
+
+def test_projection_breaks_ties_toward_continuing_progress_at_revisited_vertex():
+    plan, traj = _build_revisit_case()
+    projection = _build_projection(traj, plan)
+    ranges = _leg_point_ranges(projection)
+
+    assert ranges == {
+        0: (0, 2, "transit"),
+        1: (2, 4, "approach"),
+        2: (4, 10, "trace"),
+        3: (10, 12, "retract"),
+    }
+    # The final trajectory point (idx 12) is bit-exact with `A` (P[1] as well as P[4]), but the
+    # projection must assign it to the retract leg it actually continues from, not leg 0.
+    assert traj["points"][12]["positions"] == A
+
+    path_result = check_path(traj, plan, projection=projection)
+    assert path_result["outcome"] == "pass", path_result["detail"]
+
+    toolspeed_result = check_toolspeed(traj, plan, RETIME_CFG, CHAIN, END_EFFECTOR, projection=projection)
+    assert toolspeed_result["outcome"] == "pass", toolspeed_result["detail"]
+
+    report = _consistent_revisit_report(traj, plan, ranges)
+    report_result = check_report(traj, plan, RETIME_CFG, CHAIN, END_EFFECTOR, report, projection=projection)
+    assert report_result["outcome"] == "pass", report_result["detail"]
+    for leg in report["legs"]:
+        assert leg["point_range"] == list(ranges[leg["leg_index"]][:2])
+
+
 def _files():
     return {"trajectory_sha256": "x" * 64, "limits": {"sha256": LIMITS_SHA}, "end_effector": {"sha256": EE_SHA}}
 
@@ -235,6 +345,17 @@ def test_toolspeed_clean_constant_speed_passes():
     assert result["outcome"] == "pass", result["detail"]
     leg1 = result["numbers"]["legs"][1]
     assert leg1["F"]  # non-empty feasible set
+
+
+def test_toolspeed_numbers_record_L_v0_v_max_and_F():
+    # §16.5: "numbers for C-TOOLSPEED records, per trace leg, L, v_0, v_max and F".
+    plan, traj, _configs = _build_case(speeds=[0.05] * 6)
+    result = check_toolspeed(traj, plan, RETIME_CFG, CHAIN, END_EFFECTOR)
+    leg1 = result["numbers"]["legs"][1]
+    assert isinstance(leg1["L"], float)
+    assert isinstance(leg1["v_0"], float)
+    assert leg1["v_max"] == RETIME_CFG["trace"]["tool_speed_m_s"]
+    assert isinstance(leg1["F"], list) and leg1["F"]
 
 
 def test_toolspeed_overspeed_fails():
@@ -364,6 +485,64 @@ def test_report_wrong_tool_speed_min_max_fails():
     result = check_report(traj, plan, RETIME_CFG, CHAIN, END_EFFECTOR, report)
     assert result["outcome"] == "fail"
     assert "tool_speed.max" in result["detail"]
+
+
+def test_report_missing_point_range_fails_without_crashing():
+    plan, traj, _configs = _build_case()
+    report = _consistent_report(traj, plan)
+    del report["legs"][0]["point_range"]
+    result = check_report(traj, plan, RETIME_CFG, CHAIN, END_EFFECTOR, report)
+    assert result["outcome"] == "fail"
+    assert "point_range" in result["detail"]
+
+
+def test_report_non_list_point_range_fails_without_crashing():
+    plan, traj, _configs = _build_case()
+    report = _consistent_report(traj, plan)
+    report["legs"][0]["point_range"] = "not-a-list"
+    result = check_report(traj, plan, RETIME_CFG, CHAIN, END_EFFECTOR, report)
+    assert result["outcome"] == "fail"
+    assert "point_range" in result["detail"]
+
+
+def test_report_non_dict_tool_speed_fails_without_crashing():
+    plan, traj, _configs = _build_case()
+    report = _consistent_report(traj, plan)
+    report["legs"][1]["tool_speed"] = [0.05]
+    result = check_report(traj, plan, RETIME_CFG, CHAIN, END_EFFECTOR, report)
+    assert result["outcome"] == "fail"
+    assert "tool_speed" in result["detail"]
+
+
+def test_cli_malformed_report_exits_precondition_not_runtime(tmp_path):
+    from crackvision.config import find_root
+    from crackvision.trajectory_check import main
+
+    plan, traj, _configs = _build_case()
+    report = _consistent_report(traj, plan)
+    report["legs"][1]["tool_speed"] = "oops"  # non-dict: must not crash the CLI
+
+    traj_path = tmp_path / "traj.json"
+    plan_path = tmp_path / "plan.json"
+    report_path = tmp_path / "report.json"
+    out_path = tmp_path / "out.check.json"
+    traj_path.write_text(json.dumps(traj), encoding="utf-8")
+    plan_path.write_text(json.dumps(plan), encoding="utf-8")
+    report_path.write_text(json.dumps(report), encoding="utf-8")
+
+    code = main(
+        [
+            "--root", str(find_root()),
+            "--trajectory", str(traj_path),
+            "--plan", str(plan_path),
+            "--report", str(report_path),
+            "--out", str(out_path),
+        ]
+    )
+    assert code == 3  # EXIT_PRECONDITION, not EXIT_RUNTIME (1)
+    written = json.loads(out_path.read_text(encoding="utf-8"))
+    by_check = {c["check"]: c["outcome"] for c in written["checks"]}
+    assert by_check["C-REPORT"] == "fail"
 
 
 # ---------------------------------------------------------------------------

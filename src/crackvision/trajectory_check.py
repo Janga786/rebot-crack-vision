@@ -653,7 +653,13 @@ def _point_to_segment(q: np.ndarray, a: np.ndarray, b: np.ndarray) -> tuple[floa
 def project_polyline(positions: list[list[float]], P: list[list[float]]) -> list[dict]:
     """Project each `positions[i]` onto the nearest segment of polyline `P`, walking a window
     around the previous match and falling back to a global search when the window result exceeds
-    the path tolerance (keeps this O(N) in the common, monotone-progress case)."""
+    the path tolerance (keeps this O(N) in the common, monotone-progress case).
+
+    When several segments tie for nearest (within `_PATH_TOL_RAD`) -- which happens whenever the
+    polyline revisits an earlier configuration, e.g. a retract leg that ends back at an earlier
+    leg's vertex -- the tie is broken by preferring the candidate with the smallest progress that
+    is still `>= ` the previous trajectory point's progress, so progress stays monotone and a
+    revisited vertex is not reassigned to the earlier leg it also touches."""
     P_arr = [np.asarray(p, dtype=float) for p in P]
     n_segs = len(P_arr) - 1
     seg_len = [float(np.linalg.norm(P_arr[k + 1] - P_arr[k])) for k in range(n_segs)]
@@ -661,33 +667,43 @@ def project_polyline(positions: list[list[float]], P: list[list[float]]) -> list
     for length in seg_len:
         cumlen.append(cumlen[-1] + length)
 
-    def eval_range(q: np.ndarray, lo: int, hi: int):
-        best = None
+    def eval_range(q: np.ndarray, lo: int, hi: int, prev_progress: float | None):
+        candidates = []
         for k in range(lo, hi):
             s, d = _point_to_segment(q, P_arr[k], P_arr[k + 1])
-            if best is None or d < best[0]:
-                best = (d, k, s)
-        return best
+            progress = cumlen[k] + s * seg_len[k]
+            candidates.append((d, k, s, progress))
+        if not candidates:
+            return None
+        d_min = min(c[0] for c in candidates)
+        tied = [c for c in candidates if c[0] <= d_min + _PATH_TOL_RAD]
+        if prev_progress is not None:
+            forward = [c for c in tied if c[3] >= prev_progress - _FLOAT_TOL]
+            if forward:
+                return min(forward, key=lambda c: c[3])
+        return min(tied, key=lambda c: c[3])
 
     results: list[dict] = []
     cursor = 0
     window = 4
+    prev_progress: float | None = None
     for pos in positions:
         q = np.asarray(pos, dtype=float)
         if n_segs == 0:
             dist = float(np.linalg.norm(q - P_arr[0]))
             results.append({"segment": 0, "s": 0.0, "distance": dist, "progress": 0.0})
+            prev_progress = 0.0
             continue
         lo = max(0, cursor - window)
         hi = min(n_segs, cursor + window + 1)
-        best = eval_range(q, lo, hi)
+        best = eval_range(q, lo, hi, prev_progress)
         if best is None or best[0] > _PATH_TOL_RAD:
-            global_best = eval_range(q, 0, n_segs)
+            global_best = eval_range(q, 0, n_segs, prev_progress)
             if global_best is not None and (best is None or global_best[0] < best[0]):
                 best = global_best
-        dist, k, s = best
+        dist, k, s, progress = best
         cursor = k
-        progress = cumlen[k] + s * seg_len[k]
+        prev_progress = progress
         results.append({"segment": k, "s": s, "distance": dist, "progress": progress})
     return results
 
@@ -820,16 +836,17 @@ def _merge_intervals(intervals: list[list[float]]) -> list[list[float]]:
 
 def _toolspeed_feasible_set(
     speeds: list[float], taus: list[float], tol: float, v_min: float, v_max: float, max_ramp_m: float
-) -> list[list[float]]:
+) -> tuple[list[list[float]], float | None, float | None]:
     """§16.5 "C-TOOLSPEED v_c inference": the feasible set `F` of constant tool speeds `v_c` for
-    which this leg's fixed segment speeds satisfy G-TOOLSPEED rules 1-3."""
+    which this leg's fixed segment speeds satisfy G-TOOLSPEED rules 1-3. Returns `(F, L, v_0)` --
+    `L`/`v_0` are `None` for an `n = 0` leg, for which rule 1 (and so `L`) is not defined."""
     n = len(speeds)
     if n == 0:
-        return [[v_min, v_max]]
+        return [[v_min, v_max]], None, None
     L = max(speeds) / (1.0 + tol)
     v0 = max(L, v_min)
     if v0 > v_max + _FLOAT_TOL:
-        return []
+        return [], L, v0
 
     breakpoints = {v0, v_max}
     for s in speeds:
@@ -846,7 +863,7 @@ def _toolspeed_feasible_set(
         rep = lo if lo == hi else (lo + hi) / 2.0
         if _toolspeed_rule23_ok(speeds, taus, tol, rep, max_ramp_m):
             passing.append([lo, hi])
-    return _merge_intervals(passing)
+    return _merge_intervals(passing), L, v0
 
 
 def _distance_to_intervals(v: float, intervals: list[list[float]]) -> float:
@@ -919,12 +936,15 @@ def check_toolspeed(
             }
             continue
         speeds, taus = _leg_speeds(first, last, points, chain, end_effector)
-        F = _toolspeed_feasible_set(speeds, taus, tol, v_min_cfg, v_max_cfg, max_ramp_m)
+        F, L, v0 = _toolspeed_feasible_set(speeds, taus, tol, v_min_cfg, v_max_cfg, max_ramp_m)
         leg_numbers[leg_index] = {
             "point_range": [first, last],
             "speeds": speeds,
             "min_speed": min(speeds) if speeds else None,
             "max_speed": max(speeds) if speeds else None,
+            "L": L,
+            "v_0": v0,
+            "v_max": v_max_cfg,
             "F": F,
         }
         if not F:
@@ -981,7 +1001,9 @@ def check_report(
             continue
 
         rep_range = report_leg.get("point_range")
-        if list(rep_range) != [first, last]:
+        if not isinstance(rep_range, list):
+            violations.append(f"leg {leg_index} report point_range must be a list, got {rep_range!r}")
+        elif rep_range != [first, last]:
             violations.append(f"leg {leg_index} report point_range {rep_range!r} != recomputed [{first}, {last}]")
 
         recomputed_duration = t[last] - t[first]
@@ -1003,12 +1025,15 @@ def check_report(
             tol = float(trace_cfg["speed_tolerance"])
             max_ramp_m = float(trace_cfg["max_ramp_m"])
             speeds, taus = _leg_speeds(first, last, points, chain, end_effector)
-            F = _toolspeed_feasible_set(speeds, taus, tol, v_min_cfg, v_max_cfg, max_ramp_m)
+            F, _L, _v0 = _toolspeed_feasible_set(speeds, taus, tol, v_min_cfg, v_max_cfg, max_ramp_m)
             observed_min = min(speeds) if speeds else None
             observed_max = max(speeds) if speeds else None
             leg_number.update({"F": F, "observed_min": observed_min, "observed_max": observed_max})
 
-            rep_tool_speed = report_leg.get("tool_speed") or {}
+            rep_tool_speed = report_leg.get("tool_speed")
+            if not isinstance(rep_tool_speed, dict):
+                violations.append(f"leg {leg_index} report tool_speed must be an object, got {rep_tool_speed!r}")
+                rep_tool_speed = {}
             rep_constant = rep_tool_speed.get("constant")
             if not isinstance(rep_constant, (int, float)):
                 violations.append(f"leg {leg_index} report tool_speed.constant missing or non-numeric")
