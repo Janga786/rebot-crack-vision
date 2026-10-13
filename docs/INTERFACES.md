@@ -2944,9 +2944,13 @@ typed confirmation phrase all still gate a real-mode view move, unchanged.
   `--plan`'s existing `data/trajectories/{case}_trajectory.json` default (§16.6), which is unchanged.
 - The `crackvision.retime_report/1` sidecar (§16.4) is written exactly as for any other retime:
   `input_shas.plan` is the view plan's own sha256 (the file `--view-plan` pointed at); `legs[]` has
-  exactly one entry, `{leg_index: 0, kind: "transit", point_range: [0, N], duration_s}`, with no
-  `tool_speed` block (that block is `kind == "trace"`-only, §16.4, and a view-move retime has no
-  trace leg).
+  exactly one entry, `{leg_index: transit_leg.leg_index, kind: "transit", point_range: [0, n_points − 1], duration_s}`,
+  where `leg_index` is carried through unchanged from the loaded view plan's own `transit_leg.leg_index`
+  (§13.14.1 does not constrain that field to 0, and `retime_plan` does not rewrite it), `point_range`
+  is `[0, n_points − 1]` inclusive at both ends per §16.4 (`n_points` being this trajectory's own
+  `totals.n_points`, §16.4 — the one-leg plan's `point_range` always spans every point in the
+  trajectory), and there is no `tool_speed` block (that block is `kind == "trace"`-only, §16.4, and a
+  view-move retime has no trace leg).
 - `--dry-run` validates the view plan's paths/sha/schema and `transit_leg` non-nullness, and prints
   the one-leg summary (duration, point count) the same way it prints a multi-leg summary for
   `--plan` — without calling any ROS service or writing a file, exit 0 regardless, per §16.6's
@@ -2988,7 +2992,10 @@ typed confirmation phrase all still gate a real-mode view move, unchanged.
   whose own precondition failed, §16.5's outcome vocabulary).
 - `C-REPORT`: as §16.5, over the single transit leg's `point_range`/`duration_s` (no `tool_speed`
   comparison, since the report's `legs[]` entry for a transit leg carries no `tool_speed` block,
-  §17.3).
+  §17.3). §16.5's `C-REPORT` text never compares a `legs[]` entry's `leg_index` field (only
+  `point_range`, `duration_s` and, for trace legs, `tool_speed`), so the report's `leg_index`
+  value — whatever `transit_leg.leg_index` the loaded view plan carried (§17.3) — is not itself
+  part of this check, unchanged from that existing rule.
 
 ### 17.5 Non-goals and defaults
 
