@@ -1,0 +1,149 @@
+# config/robot/b601_dm_limits.yaml — canonical B601-DM joint limits for MoveIt planning (MOT-01).
+#
+# Robot: reBot_B601_DM_with_gripper (6-DOF arm + 2-finger parallel gripper, Damiao "DM" motors).
+# Canonical model: docs/motion/ROBOT_MODEL.md picks the vendor
+#   ~/rebot_ws/src/rebotarm_bringup/description/urdf/reBot_B601_DM_with_gripper.urdf
+#   at ~/rebot_ws git commit 2ebc4b8c09b560321a0023e13f813b6539644a22 (rebot_ws is read-only
+#   from this project; that commit is the exact state read here).
+#
+# position/effort  -> parsed straight from the URDF <limit> tags of the file above (rad, rad
+#                     for prismatic gripper joints: metres).
+# velocity          -> ~/rebot_ws/src/rebotarm_moveit_config/config/joint_limits.yaml
+#                     (max_velocity). This is what MoveIt actually plans against.
+#                     velocity_urdf_rad_s is recorded alongside for traceability: the URDF's
+#                     <limit velocity=".."> is a vendor motor no-load-speed spec (50-200 rad/s
+#                     on the arm), not a safe planning limit, and MoveIt never reads it for this
+#                     robot (moveit_controllers/ompl consume joint_limits.yaml). Do not use
+#                     velocity_urdf_rad_s for planning.
+# acceleration      -> ~/rebot_ws/src/rebotarm_moveit_config/config/joint_limits.yaml
+#                     (max_acceleration). The URDF has no <limit ...> acceleration attribute at
+#                     all (URDF <limit> has no such field); this is the only sourced value found
+#                     for acceleration, so it is used as-is and never invented.
+#
+# default_velocity_scaling_factor: 0.2 and default_acceleration_scaling_factor: 0.2 also live in
+# joint_limits.yaml; they are per-trajectory runtime scalers applied on top of the max_velocity /
+# max_acceleration below, not separate limit values, so they are not repeated per joint here.
+#
+# rebot_ws working tree also has 2 uncommitted local modifications on top of that commit
+# (src/rebotarm_moveit_config/config/kinematics.yaml: KDL -> TRAC-IK solver switch;
+# src/rebotarm_moveit_config/package.xml: + trac_ik_kinematics_plugin exec_depend). Neither file
+# touches joints/links/limits, so they do not affect any value below; recorded for provenance
+# only (see docs/motion/ROBOT_MODEL.md).
+
+units:
+  revolute_joints: radians, radians/s, radians/s^2, newton-metres
+  prismatic_joints: metres, metres/s, metres/s^2, newtons
+
+joints:
+  joint1:
+    lower: -2.8
+    upper: 2.8
+    velocity: 1.0
+    velocity_urdf_rad_s: 50.0
+    acceleration: 1.0
+    effort: 27.0
+    source:
+      lower: "rebot_ws@2ebc4b8 rebotarm_bringup/description/urdf/reBot_B601_DM_with_gripper.urdf joint1 limit/@lower"
+      upper: "rebot_ws@2ebc4b8 rebotarm_bringup/description/urdf/reBot_B601_DM_with_gripper.urdf joint1 limit/@upper"
+      velocity: "rebot_ws@2ebc4b8 rebotarm_moveit_config/config/joint_limits.yaml joint_limits.joint1.max_velocity"
+      velocity_urdf_rad_s: "rebot_ws@2ebc4b8 rebotarm_bringup/description/urdf/reBot_B601_DM_with_gripper.urdf joint1 limit/@velocity (vendor no-load spec, not planning-safe)"
+      acceleration: "rebot_ws@2ebc4b8 rebotarm_moveit_config/config/joint_limits.yaml joint_limits.joint1.max_acceleration"
+      effort: "rebot_ws@2ebc4b8 rebotarm_bringup/description/urdf/reBot_B601_DM_with_gripper.urdf joint1 limit/@effort"
+  joint2:
+    lower: -3.14
+    upper: 0.0
+    velocity: 1.0
+    velocity_urdf_rad_s: 50.0
+    acceleration: 1.0
+    effort: 27.0
+    source:
+      lower: "rebot_ws@2ebc4b8 rebotarm_bringup/description/urdf/reBot_B601_DM_with_gripper.urdf joint2 limit/@lower"
+      upper: "rebot_ws@2ebc4b8 rebotarm_bringup/description/urdf/reBot_B601_DM_with_gripper.urdf joint2 limit/@upper"
+      velocity: "rebot_ws@2ebc4b8 rebotarm_moveit_config/config/joint_limits.yaml joint_limits.joint2.max_velocity"
+      velocity_urdf_rad_s: "rebot_ws@2ebc4b8 rebotarm_bringup/description/urdf/reBot_B601_DM_with_gripper.urdf joint2 limit/@velocity (vendor no-load spec, not planning-safe)"
+      acceleration: "rebot_ws@2ebc4b8 rebotarm_moveit_config/config/joint_limits.yaml joint_limits.joint2.max_acceleration"
+      effort: "rebot_ws@2ebc4b8 rebotarm_bringup/description/urdf/reBot_B601_DM_with_gripper.urdf joint2 limit/@effort"
+  joint3:
+    lower: -3.14
+    upper: 0.0
+    velocity: 1.0
+    velocity_urdf_rad_s: 50.0
+    acceleration: 1.0
+    effort: 27.0
+    source:
+      lower: "rebot_ws@2ebc4b8 rebotarm_bringup/description/urdf/reBot_B601_DM_with_gripper.urdf joint3 limit/@lower"
+      upper: "rebot_ws@2ebc4b8 rebotarm_bringup/description/urdf/reBot_B601_DM_with_gripper.urdf joint3 limit/@upper"
+      velocity: "rebot_ws@2ebc4b8 rebotarm_moveit_config/config/joint_limits.yaml joint_limits.joint3.max_velocity"
+      velocity_urdf_rad_s: "rebot_ws@2ebc4b8 rebotarm_bringup/description/urdf/reBot_B601_DM_with_gripper.urdf joint3 limit/@velocity (vendor no-load spec, not planning-safe)"
+      acceleration: "rebot_ws@2ebc4b8 rebotarm_moveit_config/config/joint_limits.yaml joint_limits.joint3.max_acceleration"
+      effort: "rebot_ws@2ebc4b8 rebotarm_bringup/description/urdf/reBot_B601_DM_with_gripper.urdf joint3 limit/@effort"
+  joint4:
+    lower: -1.87
+    upper: 1.57
+    velocity: 1.0
+    velocity_urdf_rad_s: 200.0
+    acceleration: 1.0
+    effort: 7.0
+    source:
+      lower: "rebot_ws@2ebc4b8 rebotarm_bringup/description/urdf/reBot_B601_DM_with_gripper.urdf joint4 limit/@lower"
+      upper: "rebot_ws@2ebc4b8 rebotarm_bringup/description/urdf/reBot_B601_DM_with_gripper.urdf joint4 limit/@upper"
+      velocity: "rebot_ws@2ebc4b8 rebotarm_moveit_config/config/joint_limits.yaml joint_limits.joint4.max_velocity"
+      velocity_urdf_rad_s: "rebot_ws@2ebc4b8 rebotarm_bringup/description/urdf/reBot_B601_DM_with_gripper.urdf joint4 limit/@velocity (vendor no-load spec, not planning-safe)"
+      acceleration: "rebot_ws@2ebc4b8 rebotarm_moveit_config/config/joint_limits.yaml joint_limits.joint4.max_acceleration"
+      effort: "rebot_ws@2ebc4b8 rebotarm_bringup/description/urdf/reBot_B601_DM_with_gripper.urdf joint4 limit/@effort"
+  joint5:
+    lower: -1.57
+    upper: 1.57
+    velocity: 1.0
+    velocity_urdf_rad_s: 200.0
+    acceleration: 1.0
+    effort: 7.0
+    source:
+      lower: "rebot_ws@2ebc4b8 rebotarm_bringup/description/urdf/reBot_B601_DM_with_gripper.urdf joint5 limit/@lower"
+      upper: "rebot_ws@2ebc4b8 rebotarm_bringup/description/urdf/reBot_B601_DM_with_gripper.urdf joint5 limit/@upper"
+      velocity: "rebot_ws@2ebc4b8 rebotarm_moveit_config/config/joint_limits.yaml joint_limits.joint5.max_velocity"
+      velocity_urdf_rad_s: "rebot_ws@2ebc4b8 rebotarm_bringup/description/urdf/reBot_B601_DM_with_gripper.urdf joint5 limit/@velocity (vendor no-load spec, not planning-safe)"
+      acceleration: "rebot_ws@2ebc4b8 rebotarm_moveit_config/config/joint_limits.yaml joint_limits.joint5.max_acceleration"
+      effort: "rebot_ws@2ebc4b8 rebotarm_bringup/description/urdf/reBot_B601_DM_with_gripper.urdf joint5 limit/@effort"
+  joint6:
+    lower: -3.14
+    upper: 3.14
+    velocity: 1.0
+    velocity_urdf_rad_s: 200.0
+    acceleration: 1.0
+    effort: 7.0
+    source:
+      lower: "rebot_ws@2ebc4b8 rebotarm_bringup/description/urdf/reBot_B601_DM_with_gripper.urdf joint6 limit/@lower"
+      upper: "rebot_ws@2ebc4b8 rebotarm_bringup/description/urdf/reBot_B601_DM_with_gripper.urdf joint6 limit/@upper"
+      velocity: "rebot_ws@2ebc4b8 rebotarm_moveit_config/config/joint_limits.yaml joint_limits.joint6.max_velocity"
+      velocity_urdf_rad_s: "rebot_ws@2ebc4b8 rebotarm_bringup/description/urdf/reBot_B601_DM_with_gripper.urdf joint6 limit/@velocity (vendor no-load spec, not planning-safe)"
+      acceleration: "rebot_ws@2ebc4b8 rebotarm_moveit_config/config/joint_limits.yaml joint_limits.joint6.max_acceleration"
+      effort: "rebot_ws@2ebc4b8 rebotarm_bringup/description/urdf/reBot_B601_DM_with_gripper.urdf joint6 limit/@effort"
+  gripper_joint1:
+    lower: 0.0
+    upper: 0.0715
+    velocity: 0.2
+    velocity_urdf_rad_s: 15.0
+    acceleration: 0.5
+    effort: 100.0
+    source:
+      lower: "rebot_ws@2ebc4b8 rebotarm_bringup/description/urdf/reBot_B601_DM_with_gripper.urdf gripper_joint1 limit/@lower"
+      upper: "rebot_ws@2ebc4b8 rebotarm_bringup/description/urdf/reBot_B601_DM_with_gripper.urdf gripper_joint1 limit/@upper"
+      velocity: "rebot_ws@2ebc4b8 rebotarm_moveit_config/config/joint_limits.yaml joint_limits.gripper_joint1.max_velocity"
+      velocity_urdf_rad_s: "rebot_ws@2ebc4b8 rebotarm_bringup/description/urdf/reBot_B601_DM_with_gripper.urdf gripper_joint1 limit/@velocity (prismatic joint, m/s despite the field name; vendor spec, not planning-safe)"
+      acceleration: "rebot_ws@2ebc4b8 rebotarm_moveit_config/config/joint_limits.yaml joint_limits.gripper_joint1.max_acceleration"
+      effort: "rebot_ws@2ebc4b8 rebotarm_bringup/description/urdf/reBot_B601_DM_with_gripper.urdf gripper_joint1 limit/@effort"
+  gripper_joint2:
+    lower: 0.0
+    upper: 0.0715
+    velocity: 0.2
+    velocity_urdf_rad_s: 15.0
+    acceleration: 0.5
+    effort: 100.0
+    source:
+      lower: "rebot_ws@2ebc4b8 rebotarm_bringup/description/urdf/reBot_B601_DM_with_gripper.urdf gripper_joint2 limit/@lower"
+      upper: "rebot_ws@2ebc4b8 rebotarm_bringup/description/urdf/reBot_B601_DM_with_gripper.urdf gripper_joint2 limit/@upper"
+      velocity: "rebot_ws@2ebc4b8 rebotarm_moveit_config/config/joint_limits.yaml joint_limits.gripper_joint2.max_velocity"
+      velocity_urdf_rad_s: "rebot_ws@2ebc4b8 rebotarm_bringup/description/urdf/reBot_B601_DM_with_gripper.urdf gripper_joint2 limit/@velocity (prismatic joint, m/s despite the field name; vendor spec, not planning-safe)"
+      acceleration: "rebot_ws@2ebc4b8 rebotarm_moveit_config/config/joint_limits.yaml joint_limits.gripper_joint2.max_acceleration"
+      effort: "rebot_ws@2ebc4b8 rebotarm_bringup/description/urdf/reBot_B601_DM_with_gripper.urdf gripper_joint2 limit/@effort"

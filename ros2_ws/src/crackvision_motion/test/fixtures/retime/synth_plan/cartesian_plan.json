@@ -1,0 +1,1042 @@
+{
+  "schema": "crackvision.cartesian_plan/1",
+  "case_id": "synth_mot06",
+  "created_utc": "2026-10-13T05:28:42Z",
+  "producer": "plan_crack_path",
+  "planning_frame": "base_link",
+  "joint_names": [
+    "joint1",
+    "joint2",
+    "joint3",
+    "joint4",
+    "joint5",
+    "joint6"
+  ],
+  "sources": {
+    "paths3d": {
+      "path": "data/paths3d/synth_mot06_paths3d.json",
+      "sha256": "6dfd714440f49c89169a6837ff5173ea1db4f74044f2507c6cefbf9d4195028b",
+      "execution_eligible": false
+    },
+    "scene": {
+      "path": "scene.yaml",
+      "sha256": "edfbb737c0bb9abec0e1b24ad1ece9f0618e10d4f2abc98621c9d83fe93c8cfd"
+    },
+    "end_effector": {
+      "path": "config/robot/end_effector.yaml",
+      "sha256": "c8133145469e3662c501c5bfe60e7a8cc6b66be7d809b50fc02f3ad70e6bb877"
+    },
+    "limits": {
+      "path": "config/robot/b601_dm_limits.yaml",
+      "sha256": "43f5e2e3a92bcae348b077bfc7d1dd223e555a28869789235813d4c2723aa82b"
+    },
+    "config": {
+      "path": "/home/boosterk1/Projects/rebot_crack_vision/config/motion/cartesian_planning.yaml",
+      "sha256": "f8df65f6504e9fd5e560ba24d4a4ba8f379ff7f85d4aaae8d5f7e14ca173999f"
+    }
+  },
+  "parameters": {
+    "schema": "crackvision.cartesian_planning_config/1",
+    "candidates": {
+      "roll_offsets_deg": [
+        0.0,
+        30.0,
+        -30.0,
+        60.0,
+        -60.0,
+        90.0,
+        -90.0,
+        120.0,
+        -120.0,
+        150.0,
+        -150.0,
+        180.0
+      ]
+    },
+    "cartesian": {
+      "max_step_m": 0.001,
+      "jump_threshold": 0.0,
+      "prismatic_jump_threshold": 0.0,
+      "revolute_jump_threshold": 0.0
+    },
+    "recheck": {
+      "fk_tolerance_m": 0.001,
+      "fk_tolerance_deg": 1.0,
+      "max_joint_step_rad": 0.2
+    },
+    "splitting": {
+      "max_splits_per_segment": 3,
+      "min_waypoints_per_remainder": 3
+    },
+    "end_state": "start",
+    "surface_object_id": "specimen",
+    "surface_object_tolerance_m": 0.002,
+    "service_timeout_s": 15.0,
+    "ik_solver_timeout_s": 0.05,
+    "view": {
+      "view_distance_m": 0.25,
+      "tilt_candidates_deg": [
+        0.0,
+        15.0
+      ],
+      "yaw_candidates_deg": [
+        0.0,
+        90.0,
+        180.0,
+        270.0
+      ],
+      "fov_deg": {
+        "horizontal": 87.0,
+        "vertical": 58.0
+      },
+      "fov_margin_deg": 5.0,
+      "footprint_m": [
+        0.2,
+        0.2
+      ],
+      "surface_z_m": 0.0
+    },
+    "value_status": "nominal",
+    "sources": {
+      "candidates": "roll_offsets_deg: ADR-017 §1's own default 12-value uniform roll-offset set (0..180 by 30 deg, both signs where distinct), card body default. A uniform per-segment offset (not a ramp) is chosen because MOT-06.1's CARTESIAN_PROBE.md fact 4 measured a ramped roll inflating trajectory size/duration for no benefit this project needs.",
+      "cartesian": "max_step_m (0.001 m) is finer than paths3d's own 0.002 m default waypoint spacing (INTERFACES.md §10.4), so the Cartesian interpolation never coarsens an already-resampled trace (CARTESIAN_PROBE.md consequence 3). jump_threshold/prismatic_jump_threshold/revolute_jump_threshold are disabled (0.0): MOT-06.1's probe only confirmed these fields exist on this Humble install (fact 5), never calibrated their numeric effect; jump detection is recheck.max_joint_step_rad instead (ADR-017 §4).",
+      "recheck": "fk_tolerance_m/_deg (1 mm / 1 deg) and max_joint_step_rad (0.2 rad, ~11.5 deg) are the card body's own defaults (ADR-017 §4): the joint-step bound sits above ordinary per-point motion at cartesian.max_step_m away from a singularity and below the scale of a true wrist-singularity discontinuity (CARTESIAN_PROBE.md consequence 1 / fact 1).",
+      "splitting": "max_splits_per_segment=3 is the card body's own default. min_waypoints_per_remainder=3 matches paths3d's own minimum kept-segment length after trimming/splitting (INTERFACES.md §10.3).",
+      "end_state": "'start' (return to the start state) is the §13.1 default end-of-plan behaviour.",
+      "surface_object_id": "'specimen' is the one scene.yaml object every trace waypoint is standoffed from by construction (§10.5 point 2); ADR-017 §5 relaxes, rather than drops, the surface/scene check against exactly this object.",
+      "surface_object_tolerance_m": "0.002 m (ADR-017 §5): an order of magnitude above the trace standoff construction's own floating-point/axis-aligned-box-approximation noise, and an order of magnitude below config/motion/specimen_placement.yaml's own 0.02 m placement tolerance -- so a correctly-placed trace waypoint never false-positives, while a genuinely mis-placed specimen still trips the check.",
+      "service_timeout_s": "15.0 s (raised from the card body's original 2.0 s default by MOT-06.11, debugger D0010/docs/INTERFACES.md §15): the per-call wait for /compute_cartesian_path, /plan_kinematic_path, /compute_fk and /check_state_validity (and the overall wait_for_services discovery deadline), NOT /compute_ik's own solver budget any more (see ik_solver_timeout_s below). Mock-stack measurement (ADR-017 addendum) found a 0.06 m / 31-waypoint trace leg's own /compute_cartesian_path call takes up to ~5.7 s; 15.0 s keeps >2.6x margin above that without forcing every /compute_ik call to spend the same multi-second budget.",
+      "ik_solver_timeout_s": "0.05 s (MOT-06.11, docs/INTERFACES.md §15): the /compute_ik request's own internal TRAC-IK solver budget, decoupled from service_timeout_s so raising the latter for a body-sized Cartesian trace does not also make every IK call take that long. Matches ~/rebot_ws's own kinematics.yaml kinematics_solver_timeout (0.05, solve_type: Distance) -- mock-stack measurement (ADR-017 addendum) confirmed TRAC-IK's Distance solve type spends its whole requested budget on every call, success or failure alike (observed ~0.053-0.056 s at this value, ~2.0 s when this field still read service_timeout_s at 2.0).",
+      "view": "view_distance_m (0.25 m) is the ADR-014 §8.2 nominal mid-band value within its own [0.20, 0.30] bound. tilt_candidates_deg ({0, 15}) brackets that same section's 15 deg anti-normal bound. yaw_candidates_deg (4 cardinal directions) matches config/motion/reachability.yaml's own orientation.tilt_azimuth_samples: 4. fov_deg (87 x 58 deg) is the D405 public datasheet figure (58 deg vertical already cited by ADR-014 §8.2/INTERFACES.md §8.2) -- not yet independently re-verified in this repo, carried with the same nominal-value_status honesty as every other not-yet-measured number here (ADR-017 §6 Revisit). fov_margin_deg (5 deg) is a nominal angular safety margin on the FOV check. footprint_m/surface_z_m reuse config/motion/specimen_placement.yaml's own placement.footprint_m/placement.surface_z_m so the --center-less view path matches the placement pipeline's own nominal specimen."
+    }
+  },
+  "start_state": {
+    "joint_names": [
+      "joint1",
+      "joint2",
+      "joint3",
+      "joint4",
+      "joint5",
+      "joint6"
+    ],
+    "positions_rad": [
+      -0.0447351254442983,
+      -1.2432099556026008,
+      -1.0688130701320264,
+      1.1348501324002256,
+      -0.011578406419357895,
+      -0.04320812001372169
+    ],
+    "source": "capture_record"
+  },
+  "end_state": {
+    "mode": "start",
+    "positions_rad": [
+      -0.0447351254442983,
+      -1.2432099556026008,
+      -1.0688130701320264,
+      1.1348501324002256,
+      -0.011578406419357895,
+      -0.04320812001372169
+    ]
+  },
+  "legs": [
+    {
+      "leg_index": 0,
+      "kind": "transit",
+      "segment_ref": {
+        "component_id": "0",
+        "polyline_kind": "main",
+        "branch_index": null,
+        "segment_index": 0,
+        "sub_segment": null
+      },
+      "direction": "reverse",
+      "roll_offset_rad": 1.0471975511965976,
+      "positions": [
+        [
+          -0.0447351254442983,
+          -1.2432099556026008,
+          -1.0688130701320264,
+          1.1348501324002256,
+          -0.011578406419357895,
+          -0.04320812001372169
+        ],
+        [
+          -0.04453109015353752,
+          -1.2460536765380381,
+          -1.0695196727350083,
+          1.1339135351242704,
+          -0.011526724925560847,
+          -0.038208120013721696
+        ],
+        [
+          -0.043918984281255194,
+          -1.25458483934435,
+          -1.071639480543953,
+          1.1311037432964044,
+          -0.0113716804441697,
+          -0.023208120013721675
+        ],
+        [
+          -0.04289880782745129,
+          -1.268803444021536,
+          -1.0751724935588614,
+          1.1264207569166276,
+          -0.011113272975184454,
+          0.0017918799862783868
+        ],
+        [
+          -0.04147056086422333,
+          -1.288709489564746,
+          -1.0801187115300492,
+          1.119864576315894,
+          -0.010751502536867175,
+          0.03679187821948915
+        ],
+        [
+          -0.039634243423510136,
+          -1.3143029755288345,
+          -1.0864781343469085,
+          1.111435201640815,
+          -0.010286369137307875,
+          0.08179187390323081
+        ],
+        [
+          -0.037389855850598286,
+          -1.3455838971014056,
+          -1.094250760813663,
+          1.1011326344763832,
+          -0.009717872863966543,
+          0.13679185857606116
+        ],
+        [
+          -0.034737398511981765,
+          -1.382552249174487,
+          -1.1034365896610936,
+          1.0889568765049413,
+          -0.00904601380967495,
+          0.20179182325683814
+        ],
+        [
+          -0.03167687119559036,
+          -1.4252080347037859,
+          -1.1140356216236285,
+          1.0749079267530088,
+          -0.008270791920716383,
+          0.27679177314246217
+        ],
+        [
+          -0.028208273775836283,
+          -1.4735512554396688,
+          -1.1260478571361963,
+          1.0589857846440913,
+          -0.00739220716527985,
+          0.3617917113105329
+        ],
+        [
+          -0.024331609214411916,
+          -1.527581870103852,
+          -1.1394732859420436,
+          1.04119046377345,
+          -0.0064102602935526675,
+          0.45679156518310593
+        ],
+        [
+          -0.020253032614827086,
+          -1.5844266130881546,
+          -1.1535979642316718,
+          1.022468292139793,
+          -0.005377169741196359,
+          0.5567393875519038
+        ],
+        [
+          -0.016418040439452115,
+          -1.6378764231464462,
+          -1.1668790757660061,
+          1.0048642628987068,
+          -0.004405778353047971,
+          0.650718036075784
+        ],
+        [
+          -0.012991118845598712,
+          -1.6856387913338635,
+          -1.1787469820943774,
+          0.9891334282095312,
+          -0.0035377499524936818,
+          0.7346966845996643
+        ],
+        [
+          -0.009972267833266848,
+          -1.7277137176504063,
+          -1.189201683216785,
+          0.9752757880722664,
+          -0.002773084539533487,
+          0.8086753331235448
+        ],
+        [
+          -0.007361487402456565,
+          -1.7641012020960738,
+          -1.1982431791332293,
+          0.9632913424869123,
+          -0.0021117821141673977,
+          0.8726539816474246
+        ],
+        [
+          -0.005158777553167832,
+          -1.7948012446708674,
+          -1.2058714698437105,
+          0.9531800914534689,
+          -0.0015538426763954025,
+          0.9266326301713046
+        ],
+        [
+          -0.0033641382854006563,
+          -1.819813845374786,
+          -1.2120865553482283,
+          0.9449420349719362,
+          -0.0010992662262175046,
+          0.9706112786951847
+        ],
+        [
+          -0.0019775695991550413,
+          -1.8391390042078304,
+          -1.2168884356467828,
+          0.9385771730423143,
+          -0.0007480527636337063,
+          1.0045899272190646
+        ],
+        [
+          -0.00099907149443097,
+          -1.8527767211700001,
+          -1.220277110739374,
+          0.9340855056646029,
+          -0.000500202288644003,
+          1.0285685757429444
+        ],
+        [
+          -0.000428643971228456,
+          -1.8607269962612956,
+          -1.222252580626002,
+          0.9314670328388022,
+          -0.00035571480124839747,
+          1.0425472242668246
+        ],
+        [
+          -0.0002641586173797633,
+          -1.8630194940079758,
+          -1.2228222162941673,
+          0.9307119843676539,
+          -0.00031405118137685557,
+          1.0465780307325927
+        ]
+      ],
+      "waypoint_index_map": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        0
+      ],
+      "recheck": {
+        "max_pos_err_m": 0.00033240285703105244,
+        "max_ang_err_rad": 0.0004894437096513906,
+        "all_valid": true,
+        "within_limits": true,
+        "max_joint_step_rad": 0.09994782236879785
+      }
+    },
+    {
+      "leg_index": 1,
+      "kind": "approach",
+      "segment_ref": {
+        "component_id": "0",
+        "polyline_kind": "main",
+        "branch_index": null,
+        "segment_index": 0,
+        "sub_segment": null
+      },
+      "direction": "reverse",
+      "roll_offset_rad": 1.0471975511965976,
+      "positions": [
+        [
+          -0.0002641586173797633,
+          -1.8630194940079758,
+          -1.2228222162941673,
+          0.9307119843676539,
+          -0.00031405118137685557,
+          1.0465780307325927
+        ],
+        [
+          -0.00025266152443518197,
+          -1.8650102792502308,
+          -1.2198178271024118,
+          0.9257119990094788,
+          -0.0003004917976110605,
+          1.0466050568745893
+        ],
+        [
+          -0.00021815175734348638,
+          -1.8711392122545434,
+          -1.2109612589227274,
+          0.9107120620151407,
+          -0.0002597940652836953,
+          1.0466861743697804
+        ],
+        [
+          -0.000160574771954873,
+          -1.8818258030443884,
+          -1.196671964424802,
+          0.8857121058282549,
+          -0.000191899641595584,
+          1.0468214996294958
+        ],
+        [
+          -8.826400647827872e-05,
+          -1.8960576243419587,
+          -1.179589689341747,
+          0.8543678040134774,
+          -0.00010664325246295187,
+          1.0469914306214987
+        ],
+        [
+          -3.531803772189386e-05,
+          -1.9070456109437666,
+          -1.1676931076147625,
+          0.8314611369964809,
+          -4.422697625183094e-05,
+          1.0471158375004705
+        ],
+        [
+          -5.448040039419445e-06,
+          -1.9134545089237753,
+          -1.1612100170519737,
+          0.8185566878732055,
+          -9.017373480579171e-06,
+          1.0471860166757148
+        ],
+        [
+          1.7845827357917568e-06,
+          -1.9150273352375107,
+          -1.159663229359926,
+          0.8154340573684724,
+          -4.921543339433486e-07,
+          1.0472030090057873
+        ]
+      ],
+      "waypoint_index_map": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        0,
+        null
+      ],
+      "recheck": {
+        "max_pos_err_m": 0.0008073772490808338,
+        "max_ang_err_rad": 1.3305193343262738e-05,
+        "all_valid": true,
+        "within_limits": true,
+        "max_joint_step_rad": 0.03134430181477743
+      }
+    },
+    {
+      "leg_index": 2,
+      "kind": "trace",
+      "segment_ref": {
+        "component_id": "0",
+        "polyline_kind": "main",
+        "branch_index": null,
+        "segment_index": 0,
+        "sub_segment": null
+      },
+      "direction": "reverse",
+      "roll_offset_rad": 1.0471975511965976,
+      "positions": [
+        [
+          1.7845827357917568e-06,
+          -1.9150273352375107,
+          -1.159663229359926,
+          0.8154340573684724,
+          -4.921543339433486e-07,
+          1.0472030090057873
+        ],
+        [
+          -0.002081223408126779,
+          -1.9114964274315884,
+          -1.1546630931212427,
+          0.8139648223119863,
+          -4.959844841926213e-07,
+          1.045120001014928
+        ],
+        [
+          -0.007254907144494444,
+          -1.9012543832640125,
+          -1.140242061454512,
+          0.8097858183931316,
+          -5.055528383502077e-07,
+          1.039946317278568
+        ],
+        [
+          -0.012313676338629564,
+          -1.8866591833233057,
+          -1.119888310994992,
+          0.8040272518689286,
+          -5.149933980049085e-07,
+          1.0348875480844404
+        ],
+        [
+          -0.015090468538874247,
+          -1.874682918117679,
+          -1.1033604959810766,
+          0.7994756932954794,
+          -5.202097107848089e-07,
+          1.0321107558841998
+        ],
+        [
+          -0.016882600991352553,
+          -1.8657990091753545,
+          -1.0912053796682664,
+          0.7962044802758862,
+          -5.235895560170123e-07,
+          1.0303186234317243
+        ],
+        [
+          -0.015543366579096538,
+          -1.8566694224505693,
+          -1.0788018846794571,
+          0.7929305762302532,
+          -5.210586550845465e-07,
+          1.0316578578439783
+        ],
+        [
+          -0.012974460310320679,
+          -1.845093834311335,
+          -1.063213288289008,
+          0.7889175760808673,
+          -5.162208606158815e-07,
+          1.0342267641127503
+        ],
+        [
+          -0.0075491850156903795,
+          -1.829773997707603,
+          -1.0428165305891437,
+          0.7838406721346777,
+          -5.060706372545934e-07,
+          1.0396520394073727
+        ],
+        [
+          -0.001220058437630199,
+          -1.819609606605159,
+          -1.0294323347242367,
+          0.7806208874448762,
+          -4.943406766099955e-07,
+          1.0459811659854232
+        ],
+        [
+          0.0005657835913258184,
+          -1.8114884985946782,
+          -1.0188229326009999,
+          0.778132599009999,
+          -4.910551527694602e-07,
+          1.0477670080143764
+        ],
+        [
+          0.00734860941505136,
+          -1.8009970053176123,
+          -1.0052348544364489,
+          0.7750360357378022,
+          -4.786632357480723e-07,
+          1.054549833838091
+        ],
+        [
+          0.01328983831446584,
+          -1.787591264324014,
+          -0.9880572683359767,
+          0.771264209634825,
+          -4.679326831671588e-07,
+          1.0604910627374957
+        ],
+        [
+          0.016673270910764204,
+          -1.7766274100333146,
+          -0.9741694811797993,
+          0.7683402876209016,
+          -4.618736109103962e-07,
+          1.063874495333788
+        ],
+        [
+          0.018355030230396085,
+          -1.767292253166158,
+          -0.9624582642862392,
+          0.7659642329963989,
+          -4.5887636028944987e-07,
+          1.0655562546534172
+        ],
+        [
+          0.01736029103804159,
+          -1.7592445332471114,
+          -0.952447777910801,
+          0.7640014633414426,
+          -4.606430510593782e-07,
+          1.0645615154610644
+        ],
+        [
+          0.01635371064456087,
+          -1.7474058570347804,
+          -0.9378625745389452,
+          0.761254932948743,
+          -4.624370304968924e-07,
+          1.0635549350675852
+        ],
+        [
+          0.011728785774035855,
+          -1.7368607261588611,
+          -0.9250166865960003,
+          0.7589541610456715,
+          -4.7071467960302646e-07,
+          1.0589300101970682
+        ],
+        [
+          0.005615251466301031,
+          -1.7218460518002634,
+          -0.9069637491753387,
+          0.7559158784323631,
+          -4.81763663409128e-07,
+          1.0528164758893435
+        ],
+        [
+          0.0007519682369073188,
+          -1.7128378600610954,
+          -0.8962654350097594,
+          0.7542257404988671,
+          -4.906338146596507e-07,
+          1.0479531926599575
+        ],
+        [
+          6.040752270384986e-06,
+          -1.7108315046405116,
+          -0.893896665344693,
+          0.7538633238798577,
+          -4.920011997234913e-07,
+          1.0472072651753217
+        ]
+      ],
+      "waypoint_index_map": [
+        0,
+        1,
+        3,
+        6,
+        7,
+        9,
+        10,
+        12,
+        15,
+        17,
+        18,
+        20,
+        22,
+        24,
+        26,
+        27,
+        29,
+        31,
+        33,
+        35,
+        35
+      ],
+      "recheck": {
+        "max_pos_err_m": 3.8371443893362466e-05,
+        "max_ang_err_rad": 0.0,
+        "all_valid": true,
+        "within_limits": true,
+        "max_joint_step_rad": 0.020396757699864265
+      }
+    },
+    {
+      "leg_index": 3,
+      "kind": "retract",
+      "segment_ref": {
+        "component_id": "0",
+        "polyline_kind": "main",
+        "branch_index": null,
+        "segment_index": 0,
+        "sub_segment": null
+      },
+      "direction": "reverse",
+      "roll_offset_rad": 1.0471975511965976,
+      "positions": [
+        [
+          6.040752270384986e-06,
+          -1.7108315046405116,
+          -0.893896665344693,
+          0.7538633238798577,
+          -4.920011997234913e-07,
+          1.0472072651753217
+        ],
+        [
+          5.880699781816112e-06,
+          -1.7081606783331145,
+          -0.8962257788954899,
+          0.7588632637375424,
+          -4.920014937109734e-07,
+          1.047207105122833
+        ],
+        [
+          5.399691641205817e-06,
+          -1.7002878316162215,
+          -0.9033527524631914,
+          0.7738630840206067,
+          -4.920023772384741e-07,
+          1.0472066241146922
+        ],
+        [
+          4.595348850661668e-06,
+          -1.6875826245951449,
+          -0.9156472026136091,
+          0.798862741189542,
+          -4.920038546768235e-07,
+          1.0472058197719016
+        ],
+        [
+          3.5077941286180698e-06,
+          -1.6713171336514003,
+          -0.9330091730762762,
+          0.8324902025924942,
+          -4.920058523275117e-07,
+          1.0472047322171796
+        ],
+        [
+          2.6103050759852553e-06,
+          -1.658683397058208,
+          -0.9479669364707872,
+          0.8600817025773421,
+          -4.920075008639378e-07,
+          1.0472038347281272
+        ],
+        [
+          2.0355550080928516e-06,
+          -1.6509663020235457,
+          -0.9578412133837633,
+          0.8776730745231527,
+          -4.920085565846995e-07,
+          1.0472032599780594
+        ],
+        [
+          1.7869137654017164e-06,
+          -1.647716456914871,
+          -0.962182615999685,
+          0.885264322246958,
+          -4.920090132971511e-07,
+          1.0472030113368167
+        ],
+        [
+          1.7759126435886776e-06,
+          -1.6475733759161983,
+          -0.9623752572888508,
+          0.8856000445347614,
+          -4.920090335043606e-07,
+          1.047203000335695
+        ]
+      ],
+      "waypoint_index_map": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        0,
+        null
+      ],
+      "recheck": {
+        "max_pos_err_m": 7.688286127197392e-05,
+        "max_ang_err_rad": 0.0,
+        "all_valid": true,
+        "within_limits": true,
+        "max_joint_step_rad": 0.03362746140295214
+      }
+    },
+    {
+      "leg_index": 4,
+      "kind": "transit",
+      "segment_ref": null,
+      "direction": null,
+      "roll_offset_rad": null,
+      "positions": [
+        [
+          1.7759126435886776e-06,
+          -1.6475733759161983,
+          -0.9623752572888508,
+          0.8856000445347614,
+          -4.920090335043606e-07,
+          1.047203000335695
+        ],
+        [
+          -0.00020585209187344846,
+          -1.6457206550100163,
+          -0.9628666413097302,
+          0.8867402109343109,
+          -5.657882880972322e-05,
+          1.0422030003356948
+        ],
+        [
+          -0.0008287361054245592,
+          -1.6401624922914697,
+          -0.9643407933723684,
+          0.8901607101329594,
+          -0.00022483928813837962,
+          1.0272030003356951
+        ],
+        [
+          -0.0018668761280097412,
+          -1.630898887760559,
+          -0.9667977134767656,
+          0.8958615421307067,
+          -0.0005052733870194729,
+          1.0022030003356952
+        ],
+        [
+          -0.003320271852396765,
+          -1.6179298441588004,
+          -0.9702374008958085,
+          0.903842705240421,
+          -0.000897881042459966,
+          0.9672030077343173
+        ],
+        [
+          -0.005188922898291872,
+          -1.601255364879658,
+          -0.9746598547294729,
+          0.9141041973737607,
+          -0.0014026621517306175,
+          0.9222030316896174
+        ],
+        [
+          -0.007472829777448611,
+          -1.5808754453566167,
+          -0.9800650761889034,
+          0.9266460213409644,
+          -0.0020196168530720697,
+          0.8672030598777867
+        ],
+        [
+          -0.010171992166010054,
+          -1.556790088479539,
+          -0.9864530645076418,
+          0.9414681753636072,
+          -0.002748745059000437,
+          0.8022031000977956
+        ],
+        [
+          -0.01328641016479228,
+          -1.528999293348816,
+          -0.9938238199242854,
+          0.9585706599953094,
+          -0.003590046796749294,
+          0.7272031499218388
+        ],
+        [
+          -0.01681608385164174,
+          -1.4975030592698026,
+          -1.0021773426230696,
+          0.9779534756635566,
+          -0.004543522087347404,
+          0.6422032074752546
+        ],
+        [
+          -0.02076101276389963,
+          -1.4623013903709288,
+          -1.0115136315090407,
+          0.9996166198277084,
+          -0.005609170805816148,
+          0.5472032838995746
+        ],
+        [
+          -0.024911754074249046,
+          -1.425263201713641,
+          -1.0213370075004158,
+          1.0224099601879877,
+          -0.006730415891963337,
+          0.4472470829043275
+        ],
+        [
+          -0.02881784020227518,
+          -1.3904081374963848,
+          -1.0305813688858438,
+          1.0438598034655417,
+          -0.007785571959193245,
+          0.3531825529987382
+        ],
+        [
+          -0.03230867032126722,
+          -1.3592585150914929,
+          -1.0388429622295132,
+          1.0630293139439968,
+          -0.008728554386870709,
+          0.2691180230931494
+        ],
+        [
+          -0.03538424443122516,
+          -1.3318143344989655,
+          -1.0461217875314237,
+          1.0799184916233528,
+          -0.009559363174995731,
+          0.19505349318756107
+        ],
+        [
+          -0.03804456253214901,
+          -1.3080755957188028,
+          -1.052417844791575,
+          1.0945273365036097,
+          -0.010277998323568308,
+          0.1309889632819732
+        ],
+        [
+          -0.04028962462403878,
+          -1.2880422987510043,
+          -1.0577311340099678,
+          1.1068558485847677,
+          -0.010884459832588445,
+          0.07692443337638563
+        ],
+        [
+          -0.04211943070689446,
+          -1.2717144435955705,
+          -1.0620616551866013,
+          1.1169040278668263,
+          -0.011378747702056139,
+          0.032859903470798445
+        ],
+        [
+          -0.043533980780716075,
+          -1.2590920302525006,
+          -1.0654094083214765,
+          1.1246718743497863,
+          -0.0117608619319714,
+          -0.0012046264347889534
+        ],
+        [
+          -0.044533274845503595,
+          -1.2501750587217952,
+          -1.0677743934145925,
+          1.1301593880336471,
+          -0.012030802522334221,
+          -0.025269156340376246
+        ],
+        [
+          -0.045117312901257055,
+          -1.244963529003454,
+          -1.0691566104659496,
+          1.133366568918409,
+          -0.012188569473144603,
+          -0.03933368624596352
+        ],
+        [
+          -0.04528791190956687,
+          -1.2434412278572058,
+          -1.0695603595982324,
+          1.1343033946492336,
+          -0.01223465360257277,
+          -0.043441971366428155
+        ]
+      ],
+      "waypoint_index_map": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "recheck": {
+        "max_pos_err_m": 0.0,
+        "max_ang_err_rad": 0.0,
+        "all_valid": true,
+        "within_limits": true,
+        "max_joint_step_rad": 0.0999562009952471
+      }
+    }
+  ],
+  "segments": [
+    {
+      "segment_ref": {
+        "component_id": "0",
+        "polyline_kind": "main",
+        "branch_index": null,
+        "segment_index": 0,
+        "sub_segment": null
+      },
+      "status": "full",
+      "reasons": [],
+      "candidates_tried": 24,
+      "chosen": {
+        "direction": "reverse",
+        "roll_offset_rad": 1.0471975511965976
+      },
+      "trace_waypoints": {
+        "total": 36,
+        "planned": 36
+      },
+      "trace_length_m": {
+        "total": 0.06485840479343989,
+        "planned": 0.06485840479343989
+      }
+    }
+  ],
+  "coverage": {
+    "trace_waypoints_total": 36,
+    "trace_waypoints_planned": 36,
+    "length_m_total": 0.06485840479343989,
+    "length_m_planned": 0.06485840479343989,
+    "fraction_by_length": 1.0,
+    "complete": true,
+    "upstream": {
+      "points": 105,
+      "valid": 105,
+      "invalid_by_reason": {}
+    }
+  },
+  "caveats": [
+    "Nominal recommendation only; the operator places the specimen and MOT-10 measures and supersedes this file with the real, as-placed pose.",
+    "tool_tip; production scene (§13.1)",
+    "This file is untimed geometric output, never executable directly; MOT-07 retimes it into a joint_trajectory file before execution.",
+    "Built from an execution-ineligible paths3d file; valid for sim/visualisation only (§10.6)."
+  ]
+}
