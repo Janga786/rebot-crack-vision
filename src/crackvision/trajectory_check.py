@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -80,7 +81,11 @@ def _load_yaml(path: Path) -> dict:
 
 
 def _is_number(value: Any) -> bool:
-    return isinstance(value, (int, float)) and not isinstance(value, bool)
+    return (
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and math.isfinite(value)
+    )
 
 
 def _is_number_list(value: Any, length: int) -> bool:
@@ -225,9 +230,11 @@ def validate_plan_schema(doc: Any) -> list[str]:
                 errors.append(f"plan.legs[{idx}].kind is invalid: {leg.get('kind')!r}")
             positions = leg.get("positions")
             if not isinstance(positions, list) or not positions or not all(
-                isinstance(p, list) and len(p) == 6 for p in positions
+                _is_number_list(p, 6) for p in positions
             ):
-                errors.append(f"plan.legs[{idx}].positions must be a non-empty list of 6-element lists")
+                errors.append(
+                    f"plan.legs[{idx}].positions must be a non-empty list of 6-element lists of finite numbers"
+                )
 
     for key in ("segments", "caveats"):
         if not isinstance(doc.get(key), list):
@@ -282,18 +289,46 @@ def check_provenance(traj: dict, plan: dict, files: dict) -> dict:
     if traj_paths3d != plan_paths3d:
         errors.append(f"trajectory.source.paths3d ({traj_paths3d!r}) != plan.sources.paths3d ({plan_paths3d!r})")
 
+    traj_points: list[dict] = traj.get("points") or []
+    plan_legs: list[dict] = plan.get("legs") or []
+    plan_start: list[float] | None = None
+    plan_end: list[float] | None = None
+    if plan_legs:
+        first_leg = min(plan_legs, key=lambda leg: leg["leg_index"])
+        last_leg = max(plan_legs, key=lambda leg: leg["leg_index"])
+        plan_start = first_leg["positions"][0]
+        plan_end = last_leg["positions"][-1]
+
+    traj_start = traj_points[0]["positions"] if traj_points else None
+    traj_end = traj_points[-1]["positions"] if traj_points else None
+
+    if plan_start is not None and traj_start is not None and list(traj_start) != list(plan_start):
+        errors.append(
+            f"trajectory.points[0].positions ({traj_start!r}) != plan's lowest-leg_index leg's first "
+            f"configuration ({plan_start!r})"
+        )
+    if plan_end is not None and traj_end is not None and list(traj_end) != list(plan_end):
+        errors.append(
+            f"trajectory.points[-1].positions ({traj_end!r}) != plan's last leg's last configuration "
+            f"({plan_end!r})"
+        )
+
     numbers = {
         "trajectory": {
             "limits_sha256": traj_limits_sha,
             "end_effector_config_sha256": traj_ee_sha,
             "scene_config_sha256": traj_scene_sha,
             "paths3d": traj_paths3d,
+            "start_positions": traj_start,
+            "end_positions": traj_end,
         },
         "plan": {
             "limits_sha256": plan_limits_sha,
             "end_effector_sha256": plan_ee_sha,
             "scene_sha256": plan_scene_sha,
             "paths3d": plan_paths3d,
+            "start_positions": plan_start,
+            "end_positions": plan_end,
         },
         "cli_files": {"limits_sha256": cli_limits_sha, "end_effector_sha256": cli_ee_sha},
     }

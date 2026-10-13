@@ -141,6 +141,38 @@ def test_schema_non_monotone_t_s_fails():
     assert any("t_s" in e for e in errors)
 
 
+def test_schema_nan_position_fails():
+    points = [
+        {"t_s": 0.0, "positions": [float("nan"), 0, 0, 0, 0, 0]},
+        {"t_s": 0.5, "positions": [0.1] * 6},
+    ]
+    errors = validate_trajectory_schema(_traj(points))
+    assert any("positions" in e for e in errors)
+
+
+def test_cli_nan_position_exits_precondition(tmp_path):
+    root = _project_root(tmp_path)
+    points = [
+        {"t_s": 0.0, "positions": [float("nan"), 0, 0, 0, 0, 0]},
+        {"t_s": 0.5, "positions": [0.1] * 6},
+    ]
+    traj_path, plan_path = _cli_files(tmp_path, root, points)
+    out_path = tmp_path / "out.check.json"
+
+    code = main(
+        [
+            "--root", str(root),
+            "--trajectory", str(traj_path),
+            "--plan", str(plan_path),
+            "--out", str(out_path),
+        ]
+    )
+    assert code == EXIT_PRECONDITION
+    report = json.loads(out_path.read_text(encoding="utf-8"))
+    by_check = {c["check"]: c["outcome"] for c in report["checks"]}
+    assert by_check["C-SCHEMA"] == "fail"
+
+
 def test_run_checks_schema_fail_skips_downstream_checks():
     points = [
         {"t_s": 0.0, "positions": [0] * 6},
@@ -184,6 +216,24 @@ def test_provenance_altered_paths3d_fails():
     result = check_provenance(traj, plan, files)
     assert result["outcome"] == "fail"
     assert "paths3d" in result["detail"]
+
+
+def test_provenance_start_mismatch_fails():
+    files = {"trajectory_sha256": "x" * 64, "limits": {"sha256": LIMITS_SHA}, "end_effector": {"sha256": EE_SHA}}
+    points = _clean_points()
+    points[0] = dict(points[0], positions=[0.5, 0, 0, 0, 0, 0])
+    result = check_provenance(_traj(points), _plan(), files)
+    assert result["outcome"] == "fail"
+    assert "points[0].positions" in result["detail"]
+
+
+def test_provenance_end_mismatch_fails():
+    files = {"trajectory_sha256": "x" * 64, "limits": {"sha256": LIMITS_SHA}, "end_effector": {"sha256": EE_SHA}}
+    points = _clean_points()
+    points[-1] = dict(points[-1], positions=[0.5, 0, 0, 0, 0, 0])
+    result = check_provenance(_traj(points), _plan(), files)
+    assert result["outcome"] == "fail"
+    assert "points[-1].positions" in result["detail"]
 
 
 # ---------------------------------------------------------------------------
