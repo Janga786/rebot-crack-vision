@@ -175,3 +175,49 @@ To inspect one run's artifacts afterward: `python3 -m json.tool
 logs/retime_execute/<stamp>/execute_mock.log` for the full `execute_trajectory` console output,
 `logs/retime_execute/<stamp>/headline.log` for the `retime_plan` headline numbers, and
 `logs/cartesian_synthetic/<stamp>/trajectory.json.retime.json` for the full retime report.
+
+## 7. View move (MOT-07.10, docs/INTERFACES.md §17)
+
+§4's "view-plan gap" caveat above is closed: `docs/INTERFACES.md#17` adds a third `purpose`,
+`"view_move"`, so `plan_view`'s own `home → view pose` transit leg can now be retimed and
+executed through exactly the same retimer/checker/gate chain as a `crack_task` trajectory, never
+a separate or looser path.
+
+- `retime_plan` gains `--view-plan PATH`, mutually exclusive with `--plan` (exactly one of the
+  two is required). It loads the `crackvision.view_plan/1` document with
+  `cartesian_plan.load_view_plan`, retimes `transit_leg` alone as a one-leg plan (`kind:
+  "transit"`, so `G-TOOLSPEED` is vacuous — there is no trace leg to profile), and writes a
+  `purpose: "view_move"` trajectory whose `source` is
+  `{"paths3d": null, "view_plan": {"path": ..., "sha256": ...}}`. `--out` defaults to
+  `data/trajectories/view_trajectory.json` under `--root` (there is no `case_id` to key off, since
+  a view plan is workcell-level, not per-case).
+- `crackvision.trajectory_check --plan PATH` now dispatches on the plan file's own `schema`
+  between `crackvision.cartesian_plan/1` and `crackvision.view_plan/1`; for a view plan, the
+  single `transit_leg.positions` polyline is checked the same way a concatenated multi-leg
+  polyline is for a `crack_task` plan (`C-TOOLSPEED` is a vacuous pass — there are no trace legs).
+- `execution_gate`'s `G-TRAJ` accepts the `purpose: "view_move"` schema shape (§17.1); its
+  `G-ELIGIBLE` for a view move first re-checks integrity (the `view_plan` file exists, its sha
+  matches, it loads, `chosen`/`transit_leg` are non-null, and the trajectory's first/last point
+  match `transit_leg`'s first/last configuration — any failure refuses in every mode), then ties
+  the view plan's own recorded `limits`/`end_effector`/`scene` shas to the trajectory's recorded
+  shas (`warn` outside `real`, `refuse` in `real`). Every other gate (`G-COMMISSIONING`,
+  `G-ESTOP`, `G-APPROVAL`, `G-SPEED`, `G-START-STATE`, `G-COLLISION`, `G-CONFIRM`, ...) applies to
+  a view move exactly as it does to a `crack_task` trajectory — a real view move remains gated by
+  commissioning precisely like a real crack-task move; MOT-09 commissioning is still the only
+  thing that can ever let a real view move run.
+
+Operator commands, mirroring §6 above (the synthetic case's own scene, scratch
+limits/end-effector copies, the repo's real `retime.yaml`/`execution.yaml` policy):
+
+```bash
+bash scripts/ros/build_ws.sh                    # build the overlay once
+bash scripts/ros/test_view_retime_execute.sh    # view_plan -> retime_plan --view-plan ->
+                                                 # trajectory_check -> execute_trajectory, headless mock
+```
+
+`scripts/ros/test_view_retime_execute.sh` runs `run_cartesian_synthetic.sh`'s own scratch
+`view_plan.json` through `retime_plan --view-plan`, `trajectory_check --plan view_plan.json`, and
+`execute_trajectory --mode dry` then `--mode mock` on the `moveit_mock` profile, verifies
+`--mode real` still refuses (exit 3, `G-ARM`, with `CRACKVISION_ARM_REAL` never set), and verifies
+a trajectory copy with a tampered `source.view_plan.sha256` is refused at `G-ELIGIBLE` (exit 3) in
+`mock`, with nothing sent to the arm.
