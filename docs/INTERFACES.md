@@ -1390,6 +1390,8 @@ config error (exit 2), and so is a `speed_scale` value outside `(0, 1]`.
 | `scene_config_sha256` | str\|null | sha256 of `config/scene/scene.yaml` at plan time; `null` allowed only outside `real` (`G-STALE-CONFIG`) |
 | `source.paths3d.path`, `.sha256`, `.execution_eligible` | str, str, bool \| null (whole `source.paths3d` object is `null` for a trajectory not derived from a §10 paths3d file) | provenance for `G-ELIGIBLE` (§11.7). `execution_eligible` is a copy, kept for the reader. The gate never trusts it and reads the file instead. `real` refuses a `crack_task` with `source.paths3d: null` |
 
+`purpose` also allows `"view_move"`; amended by §17.
+
 ### 11.3 (reserved — numbering continues at 11.4 to match the card's gate-id ordering)
 
 ### 11.4 Commissioning record `config/robot/commissioning.yaml` (schema `crackvision.commissioning/1`)
@@ -1508,6 +1510,8 @@ In the table, **refuse** = a violation is `fail`; **warn** = a violation is `war
 | `G-START-STATE` | online read-only | refuse | refuse | refuse | live `joint_states` on the profile topic are fresher than `timeouts.joint_state_s`, and the current position is within `tolerances.start_state_rad` of the first point (refuse in every mode). `vendor` profile only: the latched `/rebotarm/arm_status` must be received, with `enabled == true`, `state_machine == "IDLE"` and empty `error_codes`. A violation is **warn** in dry and **refuse** in real. The executor never calls `enable` |
 | `G-COLLISION` | online read-only | refuse | refuse | refuse | densified waypoints (§11.12) valid via the MOT-02 mock stack's `/check_state_validity`, production scene applied, explicit `RobotState` per query (§11.11) |
 | `G-CONFIRM` | confirmation | skip | skip | refuse | typed phrase (§11.8); asked only after every other gate passed |
+
+`G-TRAJ` and `G-ELIGIBLE` are amended for `purpose: "view_move"` by §17.2.
 
 ### 11.8 Confirmation, monitoring and e-stop
 
@@ -2824,4 +2828,178 @@ what makes a view move eligible to run in `real` without a `paths3d` binding —
 section deliberately leaves open rather than making unilaterally inside a time-parameterization
 card.
 
+Resolved by §17 (MOT-07.10).
+
 ---
+
+## 17. View-move trajectories (purpose "view_move"; amends §11.2, §11.7, §16.3–§16.6, resolves §16.8)
+
+**Normative source:** `docs/adr/019-time-parameterization.md`'s MOT-07.10 addendum. This section
+amends §11.2, §11.7, §16.3, §16.4, §16.5 and §16.6 exactly as named in each subsection below, in the
+append-only style §15/§16 already established: no rule text in §0–§16 is rewritten, only amended by
+the statements here. Everything §11/§16 already say about `crack_task`/`test` trajectories,
+`cartesian_plan`-derived retiming/checking, and the full gate catalogue is unchanged except where a
+subsection below explicitly names a new case for `purpose: "view_move"`.
+
+### 17.1 §11.2 amendment
+
+- `purpose` ∈ `{"crack_task", "test", "view_move"}`. The `crack_task`/`test` rows of §11.2's table
+  are unchanged.
+- For `purpose: "crack_task"` or `purpose: "test"`, `source` stays exactly `{paths3d}` (§11.2,
+  unchanged): `source.paths3d` is either `null` or `{path, sha256, execution_eligible}`, and
+  `source` carries no other key.
+- For `purpose: "view_move"`, `source` must be exactly
+  `{"paths3d": null, "view_plan": {"path": str non-empty, "sha256": 64-hex}}` — no
+  `execution_eligible` key on `view_plan` (a view plan has no such field, §13.14.1), and no other
+  key in `source`.
+- Schema errors (fail `G-TRAJ`, §17.2): `purpose: "view_move"` with `source.paths3d` non-null;
+  `purpose: "view_move"` with a missing `source.view_plan`, or one that is not
+  `{path: non-empty str, sha256: 64-hex str}`; `source.view_plan` present (even as `null`) when
+  `purpose` is `"crack_task"` or `"test"`.
+- `view_plan.path` follows the same convention as `source.paths3d.path` (§11.2): repo-relative
+  (POSIX) when the file lies under `--root`, otherwise absolute. Readers (the gate, `retime_plan`,
+  `trajectory_check`) resolve it against `--root` the same way.
+
+### 17.2 §11.7 amendment
+
+`G-TRAJ` (offline): a `view_move` trajectory that is schema-valid per §17.1 is **`pass`** in every
+mode (`mock`, `dry`, `real`). `view_move` is not `"test"`, so it is never the `purpose: "test"`
+`warn`/`refuse` case; a view_move's own schema errors (§17.1) are a `G-TRAJ` `fail`/`error` in every
+mode, the same "schema errors refuse everywhere" rule §11.7 already states for `crack_task`.
+
+`G-ELIGIBLE` (offline) for `purpose: "view_move"` (the `crack_task` rule, §11.7, is unchanged and
+does not apply to a view_move trajectory):
+
+- **Integrity (refuse in every mode, evaluated first):**
+  1. the file at `source.view_plan.path` (resolved against `--root`) exists;
+  2. its sha256 equals `source.view_plan.sha256`;
+  3. it loads via `cartesian_plan.load_view_plan` (§13.14/§17.3) against the current limits file
+     (`b601_dm_limits.yaml`) without raising;
+  4. the loaded view plan's `chosen` and `transit_leg` are both non-null (a view plan written on
+     refusal, §13.14.1, has both `null` and can never pass this check);
+  5. the trajectory's first `points[0].positions` is within `1e-9` rad (max-abs, per joint) of
+     `transit_leg.positions[0]`, and its last `points[-1].positions` is within `1e-9` rad of
+     `transit_leg.positions[-1]`.
+
+  Any one of 1–5 failing is a `G-ELIGIBLE` `fail`/`error` in `mock`, `dry` and `real` alike —
+  exactly the same "integrity refuses everywhere" category §11.7 already uses for the `crack_task`
+  sha/schema check.
+
+- **Eligibility (evaluated only once every integrity check above has passed; `warn` in `mock`/
+  `dry`, `refuse` in `real`):** the loaded view plan's `sources.limits.sha256`,
+  `sources.end_effector.sha256` and `sources.scene.sha256` (§13.14.1) each equal the trajectory's
+  own non-null `limits_file.sha256`, `end_effector_config_sha256` and `scene_config_sha256`
+  respectively. A mismatch on any one of the three is an eligibility failure. This check does not
+  itself read `b601_dm_limits.yaml`/`end_effector.yaml`/`scene.yaml` from disk — it only ties the
+  view plan's recorded shas to the trajectory's recorded shas. `G-LIMITS-HASH` (limits) and
+  `G-STALE-CONFIG` (end_effector/scene) independently bind those same trajectory-recorded shas to
+  the *live* files, so the three gates together close the chain: live file → trajectory's recorded
+  sha → view plan's recorded sha → the file that actually produced `transit_leg`.
+
+The existing `crack_task`/`test` rules for both gates are unchanged, including the `purpose: "test"`
+"nothing to check" pass in `G-ELIGIBLE`, which still applies only to `test`, never to `view_move`.
+
+No other gate changes for `view_move`. Listed explicitly, unchanged: `G-ARM`, `G-COMMISSIONING`,
+`G-ESTOP`, `G-APPROVAL`, `G-SPEED`, `G-START-STATE`, `G-COLLISION`, `G-CONFIRM` (and, not named by
+the card body but likewise untouched, `G-LIMITS`, `G-LIMITS-HASH`, `G-SCENE`, `G-EE`,
+`G-STALE-CONFIG`, `G-GRAPH`). A `view_move` trajectory passes or fails every one of these exactly as
+a `crack_task` trajectory would, under the same inputs — commissioning, the hardware e-stop record,
+execution approval, the speed-scale cap, live start-state agreement, collision validity and the
+typed confirmation phrase all still gate a real-mode view move, unchanged.
+
+### 17.3 `retime_plan` amendment (§16.3/§16.4/§16.6)
+
+- `retime_plan` gains `--view-plan PATH`. `--plan PATH` and `--view-plan PATH` are mutually
+  exclusive, and exactly one of the two is required; giving both, or neither, is exit 2.
+- Giving `--purpose` together with `--view-plan` is exit 2 (`--purpose` only makes sense for
+  `--plan`, where it already chooses between `crack_task` and `test`, §16.3/§16.6). `--view-plan`
+  always writes `purpose: "view_move"` to the output trajectory; it is not selectable via
+  `--purpose`.
+- The view plan is loaded with `cartesian_plan.load_view_plan` against the limits file §16.1 already
+  resolves (`--limits`, default `b601_dm_limits.yaml`). An invalid view plan (fails schema/sha
+  checks inside `load_view_plan`) is exit 3. A valid view plan whose `transit_leg` is `null`
+  (written on a `plan_view` refusal, §13.14.1) is also exit 3 — there is nothing to retime.
+- The loaded `transit_leg` is retimed as a **one-leg plan** `legs = [transit_leg]` through the
+  unchanged §16.2 algorithm (Steps 1–6, G-PATH/G-VEL/G-ACC/G-REST/G7/G-PERIOD/G-SELFCHECK/G8 all
+  apply exactly as to any other leg). The leg carries `kind: "transit"` (§13.11.2/§13.14.1), so Step
+  4's tool-speed profiling never selects it as a trace leg: there are no trace legs in a view-move
+  retime, and **G-TOOLSPEED is vacuous** (no leg to check, the same way §16.2 Step 4 already skips
+  any `kind != "trace"` leg).
+- Field mapping follows §16.3's existing rules, with these view-move-specific substitutions:
+  - `plan.sources` (as read by the §16.3 sha-agreement rules) is the view plan's own `sources` block
+    (§13.14.1: `sources.limits`, `sources.end_effector`, `sources.scene`). The same two refusal
+    rules apply: `limits_file.sha256` (the limits file `retime_plan` actually read) must equal
+    `view_plan.sources.limits.sha256`, refuse (exit 3) otherwise; `end_effector_config_sha256` (the
+    `end_effector.yaml` `retime_plan` actually used for `tool_fk`, here unused since there is no
+    trace leg, but still read and checked for consistency) must equal
+    `view_plan.sources.end_effector.sha256`, refuse (exit 3) otherwise.
+  - `scene_config_sha256` is `view_plan.sources.scene.sha256`, copied **unchecked**, exactly as
+    §16.3 already copies `plan.sources.scene.sha256` unchecked for a `cartesian_plan` retime.
+  - `source` is `{"paths3d": null, "view_plan": {"path": path, "sha256": sha256}}`, where `path` is
+    the `--view-plan` path given on the command line (in the same repo-relative/absolute convention
+    as `source.paths3d.path`, §17.1) and `sha256` is the sha256 of the file `retime_plan` actually
+    read.
+- `--out` default for a `--view-plan` run is `data/trajectories/view_trajectory.json` (there is no
+  `case_id` to key off, since `crackvision.view_plan/1` is workcell-level, §13.14) — distinct from
+  `--plan`'s existing `data/trajectories/{case}_trajectory.json` default (§16.6), which is unchanged.
+- The `crackvision.retime_report/1` sidecar (§16.4) is written exactly as for any other retime:
+  `input_shas.plan` is the view plan's own sha256 (the file `--view-plan` pointed at); `legs[]` has
+  exactly one entry, `{leg_index: 0, kind: "transit", point_range: [0, N], duration_s}`, with no
+  `tool_speed` block (that block is `kind == "trace"`-only, §16.4, and a view-move retime has no
+  trace leg).
+- `--dry-run` validates the view plan's paths/sha/schema and `transit_leg` non-nullness, and prints
+  the one-leg summary (duration, point count) the same way it prints a multi-leg summary for
+  `--plan` — without calling any ROS service or writing a file, exit 0 regardless, per §16.6's
+  existing `--dry-run` contract.
+
+### 17.4 `trajectory_check` amendment (§16.5)
+
+- `--plan PATH` accepts either a `crackvision.cartesian_plan/1` document or a
+  `crackvision.view_plan/1` document, dispatched on the file's own `schema` field. Every other
+  `trajectory_check` flag (`--trajectory`, `--limits`, `--end-effector-config`,
+  `--execution-config`, `--retime-config`, `--report`, `--out`) is unchanged.
+- `C-SCHEMA`: the trajectory parses with the §17.1 rules (so a `view_move` trajectory's `source`
+  shape is checked here, the same way a `crack_task` trajectory's `source.paths3d` shape already
+  is). For `--plan`, a `view_plan` document's minimal structure (sufficient for `C-SCHEMA` to pass
+  on the plan side) is: `schema == "crackvision.view_plan/1"`; `sources.scene`,
+  `sources.end_effector`, `sources.limits`, `sources.config` each `{path, sha256}`; `chosen` a
+  non-null object; `transit_leg` a non-null object with `kind == "transit"` and a `positions` field
+  that is a non-empty list of 6 finite floats (per point — i.e. `transit_leg` carries one leg's
+  `positions[]` the same §13.11.2 shape a `cartesian_plan` leg does).
+- For a `--plan` that is a view plan, the plan polyline used by every downstream check is
+  `P = transit_leg.positions` — one leg, no concatenation (§16.2 Step 1's leg-dropping rule is
+  vacuous with a single leg).
+- `C-PROVENANCE`: a `view_move` trajectory requires its `--plan` to be a `view_plan` (a `view_move`
+  trajectory checked against a `cartesian_plan`, or vice versa, is a provenance mismatch, `fail`); a
+  `crack_task`/`test` trajectory requires its `--plan` to be a `cartesian_plan`, unchanged from
+  §16.5. For a `view_move` trajectory: `trajectory.source.paths3d` must be `null` (`fail` if not),
+  and `trajectory.source.view_plan.sha256` must equal the sha256 of the `--plan` file as read by
+  `trajectory_check` (the `--plan` *path itself* is not compared, mirroring §16.5's existing
+  `trajectory.source.paths3d` comparison being field-for-field against the plan's own
+  `sources.paths3d`, not against the `--plan` flag's path string). Limits/end_effector/scene sha
+  comparisons are exactly §16.5's existing rule, with `plan.sources.limits.sha256`/
+  `.end_effector.sha256`/`.scene.sha256` read from the loaded `view_plan.sources` block (§13.14.1)
+  in place of a `cartesian_plan`'s `sources` block.
+- `C-LIMITS`, `C-MARGIN`, `C-REST`, `C-SAMPLING`, `C-PATH`: unchanged, applied to the single
+  transit-leg polyline `P` above exactly as to any other polyline.
+- `C-TOOLSPEED`: `pass` with `numbers: {trace_legs: []}` — there are no trace legs on a view-move
+  polyline (`kind == "transit"` only), so the check has nothing to evaluate and is a vacuous pass
+  (not `skip`: its precondition, `C-SCHEMA`, did run and succeed; `skip` is reserved for a check
+  whose own precondition failed, §16.5's outcome vocabulary).
+- `C-REPORT`: as §16.5, over the single transit leg's `point_range`/`duration_s` (no `tool_speed`
+  comparison, since the report's `legs[]` entry for a transit leg carries no `tool_speed` block,
+  §17.3).
+
+### 17.5 Non-goals and defaults
+
+- `--view-plan`'s default input path is `data/plans/view_plan.json` (`plan_view`'s own default
+  output path, §13.14/§13.15) when a future CLI wrapper chooses to default it; `retime_plan` itself
+  requires `--view-plan` explicitly, the same way it already requires `--plan` explicitly (§16.1,
+  §16.6).
+- Real-mode `view_move` execution remains blocked by commissioning exactly like `crack_task`: this
+  section grants no exemption from `G-COMMISSIONING`, `G-ESTOP`, `G-APPROVAL`, `G-START-STATE`,
+  `G-COLLISION` or `G-CONFIRM` (§17.2). Until MOT-09 commissions the arm, a `view_move` trajectory
+  refuses in `real` for exactly the same reason a `crack_task` trajectory does today.
+- §11.9's `crackvision.execution_record/1` is unchanged: it already carries whatever `purpose` the
+  trajectory file itself declared, so a `view_move` run's record simply carries that new value —
+  no new record field is added by this section.
