@@ -738,6 +738,9 @@ def _evaluate_eligible_view_move(traj: dict, root: Path, mode: str, limits_path:
         view_plan = load_view_plan(vp_path, limits_path)
     except CartesianPlanError as exc:
         return GateCheck(G_ELIGIBLE, "fail", f"source.view_plan.path does not load as a view plan: {exc}")
+    except UnicodeDecodeError as exc:
+        # sha matched, so this is the bound file -- it is just not UTF-8 text, not a view plan (integrity fail).
+        return GateCheck(G_ELIGIBLE, "fail", f"source.view_plan.path is not UTF-8 text, not a view plan: {exc}")
     except (OSError, KeyError, TypeError, ValueError, yaml.YAMLError) as exc:
         return GateCheck(G_ELIGIBLE, "error", f"source.view_plan.path or limits file unreadable: {exc}")
 
