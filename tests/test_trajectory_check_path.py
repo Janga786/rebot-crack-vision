@@ -9,6 +9,7 @@ paths and tool_tip traces built by hand from `crackvision.kinematics`'s own FK (
 from __future__ import annotations
 
 import json
+import math
 
 import numpy as np
 import pytest
@@ -17,7 +18,11 @@ import crackvision.kinematics as kin
 from crackvision.trajectory_check import (
     JOINT_NAMES,
     _build_projection,
+    _interior_vertices_with_turn,
     _leg_point_ranges,
+    _toolspeed_feasible_set,
+    _toolspeed_rule23_ok,
+    _vertex_segments_for_leg,
     build_plan_polyline,
     check_path,
     check_provenance,
@@ -606,3 +611,130 @@ def test_provenance_end_effector_sha_mismatch_still_fails_with_fk_files_recorded
     result = check_provenance(traj, plan, files)
     assert result["outcome"] == "fail"
     assert "end_effector_config_sha256" in result["detail"]
+
+
+# ---------------------------------------------------------------------------
+# G-TOOLSPEED vertex-tied dips (MOT-07.11, ADR-019 addendum): C-TOOLSPEED mirrors retime_plan
+# ---------------------------------------------------------------------------
+
+
+def _sharp_turn_joint_path(n_side: int, step: float, theta_deg: float = 20.0) -> list[list[float]]:
+    # Same pattern as ros2_ws/src/crackvision_motion/test/test_retime.py's helper of this name:
+    # three straight runs joined by two sharp joint-space turns at indices n_side and 2*n_side.
+    theta = math.radians(theta_deg)
+    dirs = [
+        np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
+        np.array([math.cos(theta), 0.0, 0.0, math.sin(theta), 0.0, 0.0]),
+        np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
+    ]
+    pts = [np.zeros(6)]
+    for d in dirs:
+        for _ in range(n_side):
+            pts.append(pts[-1] + step * d)
+    return [p.tolist() for p in pts]
+
+
+def test_toolspeed_rule23_vertex_tied_dips_mirror_retimer_case():
+    # Identical segment pattern, chords and outcomes to test_retime.py's
+    # test_check_toolspeed_vertex_tied_dips_bounded_and_unrelated_dip_refused.
+    configs = _sharp_turn_joint_path(n_side=60, step=0.005)
+    vertices = _interior_vertices_with_turn(configs)
+    assert vertices == [configs[60], configs[120]]  # straight-run rounding is not a turn
+    vertex_segments = _vertex_segments_for_leg(vertices, configs)
+    assert vertex_segments == frozenset({59, 60, 119, 120})
+
+    n = len(configs) - 1
+    v_c, tol, max_ramp_m = 0.02, 0.05, 0.005
+
+    def case(dips, tol_=tol):
+        speeds = [0.5 * v_c if i in set(dips) else v_c for i in range(n)]
+        taus = [0.0009 / s for s in speeds]  # every segment's tool arc length is 0.9 mm
+        return _toolspeed_rule23_ok(speeds, taus, tol_, v_c, max_ramp_m, vertex_segments)
+
+    assert case([59, 60, 119, 120])
+    assert not _toolspeed_rule23_ok(
+        [0.5 * v_c if i in {59, 60, 119, 120} else v_c for i in range(n)],
+        [0.0009 / (0.5 * v_c if i in {59, 60, 119, 120} else v_c) for i in range(n)],
+        tol, v_c, max_ramp_m, frozenset(),
+    )
+    assert not case([89, 90])  # mid-run dip, no vertex
+    assert not case(range(57, 63))  # vertex-tied but 5.4 mm > max_ramp_m
+    share = list(range(58, 63)) + list(range(118, 123))
+    assert not case(share)  # each 4.5 mm, together 5.6% of the leg > tol
+    assert case(share, tol_=0.06)
+
+
+def _build_sharp_turn_case(dip_segments, n_side=60, v=0.02):
+    """transit HOME->A, then a trace leg whose plan polyline is A -> V1 -> V2 -> E with 20 deg
+    joint-space turns at V1 and V2; the trajectory samples each straight run at `n_side` steps
+    (plan vertices bit-exact) and runs each trace segment at tool speed `v`, except
+    `dip_segments` (leg-local segment indices) at `0.5 * v`."""
+    a = np.asarray(A, dtype=float)
+    d0 = (np.asarray(B) - a) / np.linalg.norm(np.asarray(B) - a)
+    e = np.zeros(6)
+    e[5] = 1.0
+    perp = e - np.dot(e, d0) * d0
+    perp /= np.linalg.norm(perp)
+    theta = math.radians(20.0)
+    run = 0.3
+    v1 = (a + run * d0).tolist()
+    v2 = (np.asarray(v1) + run * (math.cos(theta) * d0 + math.sin(theta) * perp)).tolist()
+    end = (np.asarray(v2) + run * d0).tolist()
+    trace_plan = [list(A), v1, v2, end]
+    plan = _plan([_leg(0, "transit", [HOME, A]), _leg(1, "trace", trace_plan)])
+
+    configs = _joint_lerp(A, v1, n_side) + _joint_lerp(v1, v2, n_side)[1:] + _joint_lerp(v2, end, n_side)[1:]
+    points = [{"t_s": 0.0, "positions": HOME}, {"t_s": 1.0, "positions": list(A)}]
+    t = 1.0
+    chords = []
+    for i in range(len(configs) - 1):
+        chord = float(np.linalg.norm(_tool_tip(configs[i + 1]) - _tool_tip(configs[i])))
+        chords.append(chord)
+        t += chord / (0.5 * v if i in set(dip_segments) else v)
+        points.append({"t_s": t, "positions": configs[i + 1]})
+    return plan, _traj(points), chords
+
+
+def test_toolspeed_vertex_tied_dips_pass_and_mid_run_dip_fails():
+    dips = [59, 60, 119, 120]  # the segments either side of V1 (row 60) and V2 (row 120)
+    plan, traj, chords = _build_sharp_turn_case(dips)
+    max_ramp_m = RETIME_CFG["trace"]["max_ramp_m"]
+    tol = RETIME_CFG["trace"]["speed_tolerance"]
+    assert chords[59] + chords[60] <= max_ramp_m and chords[119] + chords[120] <= max_ramp_m
+    assert sum(chords[i] for i in dips) <= tol * sum(chords)
+
+    result = check_toolspeed(traj, plan, RETIME_CFG, CHAIN, END_EFFECTOR)
+    assert result["outcome"] == "pass", result["detail"]
+    leg1 = result["numbers"]["legs"][1]
+    assert leg1["vertex_segments"] == [59, 60, 119, 120]
+    assert leg1["F"] and leg1["F"][0][0] <= 0.02 <= leg1["F"][-1][1]
+    # The pre-MOT-07.11 rule (no vertex-tied dips) finds no feasible v_c for the same speeds.
+    first, last = leg1["point_range"]
+    taus = [traj["points"][i + 1]["t_s"] - traj["points"][i]["t_s"] for i in range(first, last)]
+    F_old, _L, _v0 = _toolspeed_feasible_set(
+        leg1["speeds"], taus, tol, RETIME_CFG["trace"]["min_tool_speed_m_s"],
+        RETIME_CFG["trace"]["tool_speed_m_s"], max_ramp_m,
+    )
+    assert F_old == []
+
+    plan, traj, _chords = _build_sharp_turn_case([89, 90])  # middle of the V1-V2 run
+    result = check_toolspeed(traj, plan, RETIME_CFG, CHAIN, END_EFFECTOR)
+    assert result["outcome"] == "fail"
+    assert result["numbers"]["legs"][1]["F"] == []
+
+
+def test_leg_ranges_do_not_claim_a_point_just_short_of_the_boundary():
+    # MOT-07.11: the fixture's retimed trajectory has a point 9.4e-6 rad before its
+    # retract->transit rest vertex; it lies on the earlier leg's own last segment only.
+    a = np.asarray(A, dtype=float)
+    near = (a + (np.asarray(HOME) - a) * (9.4e-6 / np.linalg.norm(np.asarray(HOME) - a))).tolist()
+    plan = _plan([_leg(0, "transit", [HOME, A]), _leg(1, "trace", [A, B])])
+    traj = _traj([
+        {"t_s": 0.0, "positions": HOME},
+        {"t_s": 1.0, "positions": near},
+        {"t_s": 1.1, "positions": list(A)},
+        {"t_s": 2.0, "positions": list(B)},
+    ])
+    ranges = _leg_point_ranges(_build_projection(traj, plan))
+    assert ranges[0][:2] == (0, 2)
+    assert ranges[1][:2] == (2, 3)
