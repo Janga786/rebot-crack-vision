@@ -35,6 +35,7 @@ setup(
             "survey_to_scene = crackvision_motion.survey_to_scene:main",
             "plan_crack_path = crackvision_motion.plan_crack_path:main",
             "plan_view = crackvision_motion.plan_view:main",
+            "retime_plan = crackvision_motion.retime_plan:main",
         ],
     },
 )
