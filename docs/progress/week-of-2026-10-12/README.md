@@ -1,6 +1,6 @@
 # Progress — week of Mon Oct 12 – Sun Oct 18, 2026
 
-**22 task(s) completed and independently audited this week** · project total **116/156** accepted
+**23 task(s) completed and independently audited this week** · project total **100/156** accepted
 
 ## Completed this week
 
@@ -43,10 +43,12 @@
 …[395 chars clipped]
 - **MOT-08.2 — Preview core: bind trajectory/plan/retime/check inputs, FK tool path, summary metrics and trajectory_preview/1 manifest (pure, no plotting)** ([details](MOT-08.2.md)): Built the pure-Python preview core (crackvision/preview_core.py) that validates and sha-binds a trajectory, plan, retime report and check report together, computes the per-joint velocity/acceleration 
 …[432 chars clipped]
+- **MOT-08.6 — preview_trajectory ROS node: DisplayTrajectory + tool-path/crack MarkerArray, latched, motion-free** ([details](MOT-08.6.md)): Added a new motion-free ROS node, preview_trajectory, that lets an operator see a planned arm trajectory and its crack-path overlay in RViz before approving a real run, without ever being able to comm
+…[297 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 32 / 338
+- Implementation/review sessions run: 33 / 339
 - Audits that rejected work with evidence-backed findings: 11 (repairs created: 12)
 - Re-verified after an upstream change: CAM-02, GEOM-01, GEOM-01.R1, GEOM-08.1, GEOM-09.1, GEOM-09.1.R1, GEOM-10, MOT-02, MOT-03, MOT-04.1, MOT-04.1.R1, MOT-04.2, MOT-04.3, MOT-04.3.R1, MOT-04.4, MOT-04.4.R1, MOT-04.5, MOT-04.6, MOT-04.6.R1, MOT-05.1, MOT-05.1.R1, MOT-05.2, MOT-05.3, MOT-05.3.R1, MOT-05.3.R2, MOT-05.4, MOT-05.4.R1, MOT-05.5, MOT-05.6, MOT-05.6.R1, MOT-05.7, MOT-05.7.R1, MOT-06.10, MOT-06.11, MOT-06.11.R1, MOT-06.2, MOT-06.2.R1, MOT-06.4, MOT-06.4.R1, MOT-06.6, MOT-06.6.R1, MOT-06.9, MOT-07.1, MOT-07.1.R1, MOT-07.10.1, MOT-07.10.1.R1, MOT-07.10.2, MOT-07.10.2.R1, MOT-07.10.2.R2, MOT-07.10.3, MOT-07.10.4, MOT-07.10.5, MOT-07.11, MOT-07.2, MOT-07.3, MOT-07.4, MOT-07.4.R1, MOT-07.5, MOT-07.5.R1, MOT-07.6, MOT-07.6.R1, MOT-07.7, MOT-07.7.R1, MOT-07.8, MOT-07.8.R1, MOT-07.9, MOT-10.1, MOT-10.1.R1, MOT-10.1.R2, MOT-10.3, PERC-03, PERC-03.R1
 
@@ -62,10 +64,10 @@
 |---|---|---|
 | Host platform & reproducibility (L-HOST) | 10 | 10 |
 | Local coding model (L-LLM) | 5 | 8 |
-| D405 capture (L-CAM) | 7 | 9 |
+| D405 capture (L-CAM) | 5 | 9 |
 | Perception (L-PERC) | 13 | 16 |
-| Geometry & calibration (L-GEOM) | 24 | 32 |
-| Motion planning (L-MOTION) | 54 | 66 |
+| Geometry & calibration (L-GEOM) | 23 | 32 |
+| Motion planning (L-MOTION) | 41 | 66 |
 | Integration & commissioning (L-INT) | 1 | 9 |
 | Operator workflow & handoff (L-OPS) | 1 | 4 |
 | Imitation learning (later phase) (L-IL) | 0 | 1 |
@@ -79,5 +81,3 @@
 …[2288 chars clipped]
 - LLM-06.1: dependency — The backlog currently has zero cards that are simultaneously unaccepted/ready, non-hardware, motion!=true, routing.conse
 …[181 chars clipped]
-- MOT-09: hardware — operator must declare: arm_powered_estop_verified, workspace_clear
-- MOT-10.4: hardware — operator must declare: workcell_measured
