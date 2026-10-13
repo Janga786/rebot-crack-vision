@@ -66,3 +66,6 @@
    - run the execution_gate offline evaluation (system python3, as MOT-05.3 tests do) for G-TRAJ/G-LIMITS;
    - then for each fault, `retime_fault_inject.py` (stdlib only) writes a mutated copy, and the script asserts the expected detections.
 3. Do not modify retimer or checker code here. A disagreement between them is a finding: report it and fail the script.
+
+## Debugger note (D0012, 2026-10-13T07:15:52Z)
+Debugger D0012: the G-TOOLSPEED refusal on this card's fixture is a retimer/contract gap, not a fixture problem. Joint-space turns of 1–18° at trace vertices cause acceleration-limited tool-speed dips that grow with v_c. Tool chord variation is not the cause: h/chord is uniform at 5.4–5.7 rad/m. With throwaway configs, speed_tolerance 0.10 still fails; 0.12 passes. The fix is in MOT-07.11, and this card waits on it. When it resumes: keep the committed fixture as is; keep test_retime_crosscheck.sh pointed at the committed config/motion/retime.yaml (never a loosened copy); rerun the full script. Fault-injection expectations must follow whatever G-TOOLSPEED/C-TOOLSPEED semantics MOT-07.11 records in INTERFACES §16. The mid-trace tool-speed-dip fault must still be caught, and must not be placed where MOT-07.11 allows a bounded vertex-localised dip.
