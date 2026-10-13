@@ -114,9 +114,16 @@ def _retime(args: argparse.Namespace, root: Path):
     return plan, trajectory_doc, report_doc
 
 
-def _print_leg_summary(report_doc: Dict[str, Any]) -> None:
+def _print_leg_summary(plan: Dict[str, Any], report_doc: Dict[str, Any]) -> None:
+    plan_legs = plan["legs"]
     for leg in report_doc["legs"]:
-        line = f"leg {leg['leg_index']} ({leg['kind']}): duration={leg['duration_s']:.4f}s"
+        n_configurations = len(plan_legs[leg["leg_index"]]["positions"])
+        first, last = leg["point_range"]
+        n_refined_points = last - first + 1
+        line = (
+            f"leg {leg['leg_index']} ({leg['kind']}): configurations={n_configurations} "
+            f"refined_points={n_refined_points} duration={leg['duration_s']:.4f}s"
+        )
         if leg["kind"] == "trace":
             line += f" v_c={leg['tool_speed']['constant']:.5f} m/s"
         print(line)
@@ -128,11 +135,11 @@ def _dry_run(args: argparse.Namespace) -> int:
     nothing -- exit 0 regardless of the outcome."""
     root = Path(args.root).expanduser().resolve() if args.root is not None else find_root()
     try:
-        _plan, _trajectory_doc, report_doc = _retime(args, root)
+        plan, _trajectory_doc, report_doc = _retime(args, root)
     except (PreconditionError, ConfigError) as exc:
         print(f"retime_plan --dry-run: refused: {exc}", file=sys.stderr)
         return EXIT_OK
-    _print_leg_summary(report_doc)
+    _print_leg_summary(plan, report_doc)
     return EXIT_OK
 
 
