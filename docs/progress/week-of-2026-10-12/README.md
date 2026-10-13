@@ -1,6 +1,6 @@
 # Progress — week of Mon Oct 12 – Sun Oct 18, 2026
 
-**3 task(s) completed and independently audited this week** · project total **100/138** accepted
+**4 task(s) completed and independently audited this week** · project total **100/138** accepted
 
 ## Completed this week
 
@@ -10,10 +10,12 @@
 …[249 chars clipped]
 - **MOT-07.3 — Retime core: retime config loader, plan polyline assembly, refinement and limit-constrained discrete time profile (pure Python)** ([details](MOT-07.3.md)): Built the core time-parameterization engine that turns an untimed robot-arm Cartesian plan into a timed joint trajectory respecting the arm's speed and acceleration limits, plus its config file and a 
 …[392 chars clipped]
+- **MOT-07.4 — Retimer: constant tool speed on trace legs + §11.2 trajectory and crackvision.retime_report/1 assembly with self-check** ([details](MOT-07.4.md)): Built the MOT-07.4 retimer: it takes a geometric crack-trace plan and produces a timed robot trajectory that moves at one steady, configurable speed along each trace while respecting every joint's spe
+…[398 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 4 / 50
+- Implementation/review sessions run: 5 / 51
 - Audits that rejected work with evidence-backed findings: 1 (repairs created: 1)
 - Re-verified after an upstream change: CAM-02, GEOM-01, GEOM-01.R1, GEOM-08.1, GEOM-09.1, GEOM-09.1.R1, GEOM-10, MOT-02, MOT-04.2, MOT-04.3, MOT-04.3.R1, MOT-04.6, MOT-04.6.R1, MOT-05.1, MOT-05.1.R1, MOT-06.11, MOT-06.11.R1, MOT-06.2, MOT-06.2.R1, MOT-10.1, MOT-10.1.R1, MOT-10.1.R2, PERC-03, PERC-03.R1
 
