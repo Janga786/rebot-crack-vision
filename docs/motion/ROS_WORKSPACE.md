@@ -292,3 +292,31 @@ end-to-end synthetic demonstration (`scripts/ros/run_cartesian_synthetic.sh`) an
   `coverage.complete` is false, or a required file/capture-record sha mismatch. `--dry-run`
   validates inputs and lists per-segment candidate counts/mismatches without touching ROS or
   writing a file.
+
+## 10. Time parameterization (MOT-07, ADR-019)
+
+### `retime_plan` (`crackvision_motion.retime_plan`, docs/INTERFACES.md §16.6)
+
+A ROS-free, system-`python3`-runnable CLI (console script `ros2 run crackvision_motion
+retime_plan`, dual-runnable as `python3 -m crackvision_motion.retime_plan` without a colcon
+build, same as `execution_gate`) that turns an untimed `plan_crack_path` output into a timed
+`crackvision.joint_trajectory/1` file `execute_trajectory` can gate and run — see
+`docs/motion/TIME_PARAMETERIZATION.md` for the method, why TOTG/Ruckig were ruled out, and a
+measured example run (`scripts/ros/test_retime_execute.sh`).
+
+- **Command:** `ros2 run crackvision_motion retime_plan --plan PATH [--out PATH]
+  [--purpose crack_task|test] [--retime-config PATH] [--limits PATH] [--end-effector-config PATH]
+  [--execution-config PATH] [--urdf PATH] [--root PATH] [--dry-run] [--skip-existing] [-v|-q]`
+- **Inputs:** a `crackvision.cartesian_plan/1` file (`--plan`, required —
+  `crackvision_motion.plan_crack_path`'s output, §13), `config/motion/retime.yaml` (or
+  `--retime-config`), `config/robot/b601_dm_limits.yaml`, `config/robot/end_effector.yaml`,
+  `config/motion/execution.yaml` and `presentation/sim/reBot_B601_DM_with_gripper.urdf` under
+  `--root` unless overridden. Imports no `rclpy`/`*_msgs` type and never touches a ROS graph.
+- **Output:** `crackvision.joint_trajectory/1` at `--out` (default
+  `data/trajectories/{case_id}_trajectory.json`) plus a `*.retime.json` report sidecar (per-leg
+  duration/tool-speed/ramp numbers, totals, peak velocity/acceleration fraction — §16.4).
+- **Exit codes:** `0` written; `2` (`EXIT_USAGE`) invalid/unknown `retime.yaml` key or an unreadable
+  plan/trajectory file; `3` (`EXIT_PRECONDITION`) a required file missing, a sha mismatch, or the
+  bounded profiling pass could not satisfy every §16.2 guarantee (e.g. no feasible constant trace
+  tool speed). `--dry-run` runs the whole pipeline in-process, prints the per-leg summary and
+  writes nothing, exiting `0` regardless of outcome.
