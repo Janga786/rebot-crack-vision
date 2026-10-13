@@ -907,12 +907,14 @@ def test_test_purpose_with_view_plan_key_fails_traj(tmp_path, mode):
 
 
 # --------------------------------------------------------------------------------------
-# MOT-05.3.R2 feedback: non-UTF-8 view_plan / unparseable limits_path become 'error'
-# ('fail' is also acceptable), never raise, on the view_move G-ELIGIBLE path.
+# MOT-07.10.2.R1 (finding c13b05680a0183f6): non-UTF-8 view_plan is a G-ELIGIBLE 'fail'
+# (sha matched, so it is the bound file -- just not a view plan); an unreadable or
+# missing limits file is a G-ELIGIBLE 'error' (or 'fail') with G-LIMITS/G-LIMITS-HASH
+# staying 'error' too. Neither case raises out of evaluate_offline.
 # --------------------------------------------------------------------------------------
 
 @pytest.mark.parametrize("mode", ["mock", "dry", "real"])
-def test_view_move_non_utf8_view_plan_does_not_raise(tmp_path, mode):
+def test_view_move_non_utf8_view_plan_fails_eligible(tmp_path, mode):
     vp_path = tmp_path / "view_plan.json"
     vp_path.write_bytes(b"\xff\xfe\x00bad")
     traj = _view_move_trajectory(vp_path)
@@ -920,7 +922,7 @@ def test_view_move_non_utf8_view_plan_does_not_raise(tmp_path, mode):
 
     report = evaluate_offline(mode, traj_path, **_view_move_kwargs(tmp_path))
     assert not report.passed
-    assert _get(report, G_ELIGIBLE).outcome in ("error", "fail")
+    assert _get(report, G_ELIGIBLE).outcome == "fail"
 
 
 @pytest.mark.parametrize("mode", ["mock", "dry", "real"])
@@ -936,3 +938,21 @@ def test_view_move_unparseable_limits_path_does_not_raise(tmp_path, mode):
     )
     assert not report.passed
     assert _get(report, G_ELIGIBLE).outcome in ("error", "fail")
+    assert _get(report, G_LIMITS).outcome == "error"
+    assert _get(report, G_LIMITS_HASH).outcome == "error"
+
+
+@pytest.mark.parametrize("mode", ["mock", "dry", "real"])
+def test_view_move_missing_limits_path_does_not_raise(tmp_path, mode):
+    vp_path = _write_view_plan(tmp_path)
+    traj = _view_move_trajectory(vp_path)
+    traj_path = _write_json(tmp_path / "trajectory.json", traj)
+    missing_limits = tmp_path / "no_such_limits.yaml"
+
+    report = evaluate_offline(
+        mode, traj_path, **_view_move_kwargs(tmp_path, limits_path=missing_limits)
+    )
+    assert not report.passed
+    assert _get(report, G_ELIGIBLE).outcome in ("error", "fail")
+    assert _get(report, G_LIMITS).outcome == "error"
+    assert _get(report, G_LIMITS_HASH).outcome == "error"
