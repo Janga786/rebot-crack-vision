@@ -1,6 +1,6 @@
 # Progress — week of Mon Oct 12 – Sun Oct 18, 2026
 
-**39 task(s) completed and independently audited this week** · project total **127/157** accepted
+**40 task(s) completed and independently audited this week** · project total **113/157** accepted
 
 ## Completed this week
 
@@ -66,10 +66,12 @@
 …[320 chars clipped]
 - **MOT-08.8 — Headless mock run: view plan → retime → check → preview → approve (pty) → execute_trajectory dry with G-APPROVAL pass, tamper refusals** ([details](MOT-08.8.md)): The headless mock test for the view→preview→approve→execute workflow (test_preview_approve.sh) now runs end-to-end successfully: it builds, previews and gets a typed pseudo-terminal approval for a syn
 …[446 chars clipped]
+- **MOT-08.9 — Document the preview → approval → execution workflow (PREVIEW_APPROVAL.md, EXECUTION.md, ROS_WORKSPACE.md)** ([details](MOT-08.9.md)): Added an operator runbook (docs/motion/PREVIEW_APPROVAL.md) walking the preview-and-approve workflow for trajectories before any dry/real execution, and cross-linked it from the existing EXECUTION.md 
+…[125 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 54 / 473
+- Implementation/review sessions run: 55 / 474
 - Audits that rejected work with evidence-backed findings: 17 (repairs created: 19)
 - Re-verified after an upstream change: CAM-02, CAM-05.2, GEOM-01, GEOM-01.R1, GEOM-08.1, GEOM-09.1, GEOM-09.1.R1, GEOM-10, MOT-02, MOT-03, MOT-04.1, MOT-04.1.R1, MOT-04.2, MOT-04.3, MOT-04.3.R1, MOT-04.4, MOT-04.4.R1, MOT-04.5, MOT-04.6, MOT-04.6.R1, MOT-05.1, MOT-05.1.R1, MOT-05.2, MOT-05.3, MOT-05.3.R1, MOT-05.3.R2, MOT-05.4, MOT-05.4.R1, MOT-05.5, MOT-05.5.R1, MOT-05.6, MOT-05.6.R1, MOT-05.7, MOT-05.7.R1, MOT-06.10, MOT-06.11, MOT-06.11.R1, MOT-06.2, MOT-06.2.R1, MOT-06.4, MOT-06.4.R1, MOT-06.6, MOT-06.6.R1, MOT-06.9, MOT-07.1, MOT-07.1.R1, MOT-07.10.1, MOT-07.10.1.R1, MOT-07.10.2, MOT-07.10.2.R1, MOT-07.10.2.R1.R1, MOT-07.10.2.R2, MOT-07.10.2.R2.R1, MOT-07.10.3, MOT-07.10.4, MOT-07.10.5, MOT-07.11, MOT-07.2, MOT-07.3, MOT-07.4, MOT-07.4.R1, MOT-07.5, MOT-07.5.R1, MOT-07.6, MOT-07.6.R1, MOT-07.7, MOT-07.7.R1, MOT-07.8, MOT-07.8.R1, MOT-07.9, MOT-08.1, MOT-08.1.R1, MOT-08.4, MOT-08.4.R1, MOT-08.6, MOT-10.1, MOT-10.1.R1, MOT-10.1.R2, MOT-10.3, PERC-03, PERC-03.R1
 
@@ -87,9 +89,9 @@
 | Local coding model (L-LLM) | 5 | 8 |
 | D405 capture (L-CAM) | 7 | 9 |
 | Perception (L-PERC) | 13 | 16 |
-| Geometry & calibration (L-GEOM) | 24 | 32 |
-| Motion planning (L-MOTION) | 61 | 67 |
-| Integration & commissioning (L-INT) | 5 | 9 |
+| Geometry & calibration (L-GEOM) | 23 | 32 |
+| Motion planning (L-MOTION) | 50 | 67 |
+| Integration & commissioning (L-INT) | 3 | 9 |
 | Operator workflow & handoff (L-OPS) | 1 | 4 |
 | Imitation learning (later phase) (L-IL) | 0 | 1 |
 
@@ -102,5 +104,3 @@
 …[2288 chars clipped]
 - LLM-06.1: dependency — The backlog currently has zero cards that are simultaneously unaccepted/ready, non-hardware, motion!=true, routing.conse
 …[181 chars clipped]
-- MOT-09: hardware — operator must declare: arm_powered_estop_verified, workspace_clear
-- MOT-10.4: hardware — operator must declare: workcell_measured
