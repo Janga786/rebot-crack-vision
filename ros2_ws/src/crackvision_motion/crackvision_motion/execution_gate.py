@@ -828,29 +828,38 @@ def _evaluate_preview_binding(
     artifacts: List[Dict[str, Any]], traj_sha: str, root: Path
 ) -> Optional[str]:
     """§18.3 `G-APPROVAL` checks 1-5: every artefact's sha matches on disk, and exactly one is a
-    bound, passing `crackvision.trajectory_preview/1` manifest. Returns a violation detail string,
-    or `None` when every check passes. Never raises: unreadable files, malformed JSON and non-UTF-8
-    bytes are each folded into a violation detail (§18.3)."""
+    bound, passing `crackvision.trajectory_preview/1` manifest. Returns a violation detail string
+    naming its check number, or `None` when every check passes. Never raises: unreadable files,
+    malformed JSON, non-UTF-8 bytes, and non-string/NUL-containing `path`/`sha256` values are each
+    folded into a check-2 violation detail (§18.3)."""
     if not artifacts:
-        return "approval.preview_artifacts is empty"
+        return "§18.3 check 1: approval.preview_artifacts is empty"
 
     violations: List[str] = []
     manifests: List[Dict[str, Any]] = []
     for i, artifact in enumerate(artifacts):
-        path = _resolve(root, artifact["path"])
+        raw_path = artifact["path"]
+        raw_sha = artifact["sha256"]
+        if not isinstance(raw_path, str) or "\x00" in raw_path or not isinstance(raw_sha, str):
+            violations.append(
+                f"§18.3 check 2: preview_artifacts[{i}] has a non-string or NUL-containing "
+                f"path/sha256: path={raw_path!r} sha256={raw_sha!r}"
+            )
+            continue
+        path = _resolve(root, raw_path)
         try:
             data = path.read_bytes()
         except OSError as exc:
-            violations.append(f"preview_artifacts[{i}] ({artifact['path']}) unreadable: {exc}")
+            violations.append(f"§18.3 check 2: preview_artifacts[{i}] ({raw_path}) unreadable: {exc}")
             continue
         actual_sha = hashlib.sha256(data).hexdigest()
-        if actual_sha != artifact["sha256"]:
+        if actual_sha != raw_sha:
             violations.append(
-                f"preview_artifacts[{i}] ({artifact['path']}) sha256 {artifact['sha256']} "
+                f"§18.3 check 2: preview_artifacts[{i}] ({raw_path}) sha256 {raw_sha} "
                 f"does not match current sha256 {actual_sha}"
             )
             continue
-        if Path(artifact["path"]).suffix != ".json":
+        if Path(raw_path).suffix != ".json":
             continue
         try:
             manifest = json.loads(data.decode("utf-8"))
@@ -863,16 +872,19 @@ def _evaluate_preview_binding(
         return "; ".join(violations)
 
     if len(manifests) != 1:
-        return f"expected exactly one {PREVIEW_SCHEMA!r} manifest among preview_artifacts, found {len(manifests)}"
+        return (
+            f"§18.3 check 3: expected exactly one {PREVIEW_SCHEMA!r} manifest among "
+            f"preview_artifacts, found {len(manifests)}"
+        )
 
     manifest = manifests[0]
     trajectory = manifest.get("trajectory")
     if not isinstance(trajectory, dict) or trajectory.get("sha256") != traj_sha:
-        return "preview manifest's trajectory.sha256 does not match the current trajectory"
+        return "§18.3 check 4: preview manifest's trajectory.sha256 does not match the current trajectory"
 
     check_report = manifest.get("check_report")
     if not isinstance(check_report, dict) or check_report.get("all_pass") is not True:
-        return "preview manifest's check_report.all_pass is not true"
+        return "§18.3 check 5: preview manifest's check_report.all_pass is not true"
 
     return None
 
