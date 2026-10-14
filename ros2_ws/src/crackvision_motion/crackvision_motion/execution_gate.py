@@ -830,8 +830,9 @@ def _evaluate_preview_binding(
     """§18.3 `G-APPROVAL` checks 1-5: every artefact's sha matches on disk, and exactly one is a
     bound, passing `crackvision.trajectory_preview/1` manifest. Returns a violation detail string
     naming its check number, or `None` when every check passes. Never raises: unreadable files,
-    malformed JSON, non-UTF-8 bytes, and non-string/NUL-containing `path`/`sha256` values are each
-    folded into a check-2 violation detail (§18.3)."""
+    malformed JSON, non-UTF-8 bytes, lone surrogates, recursion-limit-busting JSON, and
+    non-string/NUL-containing `path`/`sha256` values are each folded into a check-2 violation
+    detail (resolving/reading) or counted as a non-manifest (parsing), per §18.3."""
     if not artifacts:
         return "§18.3 check 1: approval.preview_artifacts is empty"
 
@@ -846,11 +847,11 @@ def _evaluate_preview_binding(
                 f"path/sha256: path={raw_path!r} sha256={raw_sha!r}"
             )
             continue
-        path = _resolve(root, raw_path)
         try:
+            path = _resolve(root, raw_path)
             data = path.read_bytes()
-        except OSError as exc:
-            violations.append(f"§18.3 check 2: preview_artifacts[{i}] ({raw_path}) unreadable: {exc}")
+        except Exception as exc:
+            violations.append(f"§18.3 check 2: preview_artifacts[{i}] ({raw_path!r}) unreadable: {exc}")
             continue
         actual_sha = hashlib.sha256(data).hexdigest()
         if actual_sha != raw_sha:
@@ -863,7 +864,9 @@ def _evaluate_preview_binding(
             continue
         try:
             manifest = json.loads(data.decode("utf-8"))
-        except (UnicodeDecodeError, ValueError):
+        except Exception:
+            # Not a manifest: non-UTF-8 bytes, invalid JSON, or JSON nested past the recursion
+            # limit all count as "zero manifests" for check 3, never an uncaught exception.
             continue
         if isinstance(manifest, dict) and manifest.get("schema") == PREVIEW_SCHEMA:
             manifests.append(manifest)
