@@ -338,6 +338,22 @@ def test_malformed_preview_artifact_path_or_sha256_does_not_raise(
 
 
 @pytest.mark.parametrize("mode", ["mock", "real"])
+def test_preview_artifact_lone_surrogate_path_does_not_raise(tmp_path, mode):
+    """§18.3/MOT-08.5.R1 finding 618b8cbbfb94227a: a path containing a lone surrogate must
+    become a G-APPROVAL violation detail, never an uncaught UnicodeEncodeError."""
+    traj_path, _traj, _approval, approval_path, kwargs = _passing_fixture_set(tmp_path)
+    approval = json.loads(approval_path.read_text())
+    approval["preview_artifacts"][1]["path"] = "\ud800bad.json"
+    _write_json(approval_path, approval)
+
+    report = evaluate_offline(mode, traj_path, **kwargs)
+    check = _get(report, G_APPROVAL)
+    assert check.outcome == ("fail" if mode == "real" else "warn")
+    assert "§18.3 check 2" in check.message
+    assert report.passed == (mode != "real")
+
+
+@pytest.mark.parametrize("mode", ["mock", "real"])
 def test_preview_manifest_invalid_json_counts_as_zero_manifests(tmp_path, mode):
     traj_path, _traj, _approval, approval_path, kwargs = _passing_fixture_set(tmp_path)
     approval = json.loads(approval_path.read_text())
@@ -362,6 +378,27 @@ def test_preview_manifest_non_utf8_counts_as_zero_manifests(tmp_path, mode):
     manifest_entry = approval["preview_artifacts"][0]
     manifest_path = tmp_path / manifest_entry["path"]
     manifest_path.write_bytes(b"\xff\xfe\x00bad")
+    manifest_entry["sha256"] = file_sha256(manifest_path)
+    _write_json(approval_path, approval)
+
+    report = evaluate_offline(mode, traj_path, **kwargs)
+    check = _get(report, G_APPROVAL)
+    assert check.outcome == ("fail" if mode == "real" else "warn")
+    assert "found 0" in check.message
+    assert "§18.3 check 3" in check.message
+    assert report.passed == (mode != "real")
+
+
+@pytest.mark.parametrize("mode", ["mock", "real"])
+def test_preview_manifest_deep_recursion_counts_as_zero_manifests(tmp_path, mode):
+    """§18.3/MOT-08.5.R1 finding 162b7e7961672c68: a manifest JSON nested deeper than
+    sys.getrecursionlimit() counts as zero manifests, never an uncaught RecursionError."""
+    traj_path, _traj, _approval, approval_path, kwargs = _passing_fixture_set(tmp_path)
+    approval = json.loads(approval_path.read_text())
+    manifest_entry = approval["preview_artifacts"][0]
+    manifest_path = tmp_path / manifest_entry["path"]
+    depth = sys.getrecursionlimit() + 100
+    manifest_path.write_text("[" * depth + "]" * depth)
     manifest_entry["sha256"] = file_sha256(manifest_path)
     _write_json(approval_path, approval)
 
