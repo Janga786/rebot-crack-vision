@@ -1,6 +1,6 @@
 # Progress — week of Mon Oct 12 – Sun Oct 18, 2026
 
-**43 task(s) completed and independently audited this week** · project total **131/170** accepted
+**44 task(s) completed and independently audited this week** · project total **132/170** accepted
 
 ## Completed this week
 
@@ -72,10 +72,12 @@
 …[167 chars clipped]
 - **OPS-01.2 — crackvision.operator_state: per-case run-state file library + status/reset CLI** ([details](OPS-01.2.md)): Built the per-case run-state library and CLI that tracks progress through the operator workflow's six stages (capture, segment, paths, plan, preview, execute), detecting when upstream changes or tampe
 …[245 chars clipped]
+- **INT-03.1 — Empty-mask failure-injection test (perception chain)** ([details](INT-03.1.md)): Built an automated test that feeds a legitimate "no crack detected" (all-zero) mask through the full perception pipeline (skeleton extraction, path tracing, 3D lifting) to verify it fails safely rathe
+…[354 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 57 / 535
+- Implementation/review sessions run: 58 / 536
 - Audits that rejected work with evidence-backed findings: 17 (repairs created: 19)
 - Re-verified after an upstream change: CAM-02, CAM-05.2, GEOM-01, GEOM-01.R1, GEOM-08.1, GEOM-09.1, GEOM-09.1.R1, GEOM-10, INT-01.3, MOT-02, MOT-03, MOT-04.1, MOT-04.1.R1, MOT-04.2, MOT-04.3, MOT-04.3.R1, MOT-04.4, MOT-04.4.R1, MOT-04.5, MOT-04.6, MOT-04.6.R1, MOT-05.1, MOT-05.1.R1, MOT-05.2, MOT-05.3, MOT-05.3.R1, MOT-05.3.R2, MOT-05.4, MOT-05.4.R1, MOT-05.5, MOT-05.5.R1, MOT-05.6, MOT-05.6.R1, MOT-05.7, MOT-05.7.R1, MOT-06.10, MOT-06.11, MOT-06.11.R1, MOT-06.2, MOT-06.2.R1, MOT-06.4, MOT-06.4.R1, MOT-06.6, MOT-06.6.R1, MOT-06.9, MOT-07.1, MOT-07.1.R1, MOT-07.10.1, MOT-07.10.1.R1, MOT-07.10.2, MOT-07.10.2.R1, MOT-07.10.2.R1.R1, MOT-07.10.2.R2, MOT-07.10.2.R2.R1, MOT-07.10.3, MOT-07.10.4, MOT-07.10.5, MOT-07.11, MOT-07.2, MOT-07.3, MOT-07.4, MOT-07.4.R1, MOT-07.5, MOT-07.5.R1, MOT-07.6, MOT-07.6.R1, MOT-07.7, MOT-07.7.R1, MOT-07.8, MOT-07.8.R1, MOT-07.9, MOT-08.1, MOT-08.1.R1, MOT-08.10, MOT-08.2, MOT-08.2.R1, MOT-08.3, MOT-08.4, MOT-08.4.R1, MOT-08.5, MOT-08.5.R1, MOT-08.5.R2, MOT-08.5.R3, MOT-08.6, MOT-08.7, MOT-08.8, MOT-08.9, MOT-10.1, MOT-10.1.R1, MOT-10.1.R2, MOT-10.3, PERC-03, PERC-03.R1
 
@@ -97,7 +99,7 @@
 | Perception (L-PERC) | 13 | 16 |
 | Geometry & calibration (L-GEOM) | 24 | 32 |
 | Motion planning (L-MOTION) | 63 | 67 |
-| Integration & commissioning (L-INT) | 5 | 14 |
+| Integration & commissioning (L-INT) | 6 | 14 |
 | Operator workflow & handoff (L-OPS) | 3 | 12 |
 | Imitation learning (later phase) (L-IL) | 0 | 1 |
 
