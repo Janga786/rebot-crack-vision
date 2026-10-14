@@ -22,6 +22,7 @@ calling `evaluate_offline(mode="real", ...)` a second time with the same inputs.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -54,6 +55,7 @@ EXECUTION_CONFIG_SCHEMA = "crackvision.execution_config/1"
 COMMISSIONING_SCHEMA = "crackvision.commissioning/1"
 APPROVAL_SCHEMA = "crackvision.execution_approval/1"
 PATHS3D_SCHEMA = "crackvision.paths3d/1"
+PREVIEW_SCHEMA = "crackvision.trajectory_preview/1"
 
 MODES = ("mock", "dry", "real")
 
@@ -642,7 +644,7 @@ def evaluate_offline(
     if not traj_ok or traj_sha is None:
         checks.append(GateCheck(G_APPROVAL, "error", "cannot evaluate: trajectory unavailable"))
     else:
-        checks.append(_evaluate_approval(approval_path, traj_sha, execution_config_path, mode))
+        checks.append(_evaluate_approval(approval_path, traj_sha, execution_config_path, mode, root))
 
     # G-STALE-CONFIG
     if not traj_ok:
@@ -778,7 +780,11 @@ def _evaluate_eligible_view_move(traj: dict, root: Path, mode: str, limits_path:
 
 
 def _evaluate_approval(
-    approval_path: Optional[Union[str, Path]], traj_sha: str, execution_config_path: Union[str, Path], mode: str
+    approval_path: Optional[Union[str, Path]],
+    traj_sha: str,
+    execution_config_path: Union[str, Path],
+    mode: str,
+    root: Path,
 ) -> GateCheck:
     violation_outcome = "fail" if mode == "real" else "warn"
     suffix = "" if mode == "real" else " (warn outside real)"
@@ -810,7 +816,65 @@ def _evaluate_approval(
             G_APPROVAL, violation_outcome,
             f"approval is {age_s:.0f}s old, exceeds approval_max_age_s={exec_cfg['approval_max_age_s']}" + suffix,
         )
-    return GateCheck(G_APPROVAL, "pass", "approval binds the current trajectory and is fresh")
+
+    preview_violation = _evaluate_preview_binding(approval["preview_artifacts"], traj_sha, root)
+    if preview_violation is not None:
+        return GateCheck(G_APPROVAL, violation_outcome, preview_violation + suffix)
+
+    return GateCheck(G_APPROVAL, "pass", "approval binds the current trajectory, is fresh, and preview artifacts verify")
+
+
+def _evaluate_preview_binding(
+    artifacts: List[Dict[str, Any]], traj_sha: str, root: Path
+) -> Optional[str]:
+    """§18.3 `G-APPROVAL` checks 1-5: every artefact's sha matches on disk, and exactly one is a
+    bound, passing `crackvision.trajectory_preview/1` manifest. Returns a violation detail string,
+    or `None` when every check passes. Never raises: unreadable files, malformed JSON and non-UTF-8
+    bytes are each folded into a violation detail (§18.3)."""
+    if not artifacts:
+        return "approval.preview_artifacts is empty"
+
+    violations: List[str] = []
+    manifests: List[Dict[str, Any]] = []
+    for i, artifact in enumerate(artifacts):
+        path = _resolve(root, artifact["path"])
+        try:
+            data = path.read_bytes()
+        except OSError as exc:
+            violations.append(f"preview_artifacts[{i}] ({artifact['path']}) unreadable: {exc}")
+            continue
+        actual_sha = hashlib.sha256(data).hexdigest()
+        if actual_sha != artifact["sha256"]:
+            violations.append(
+                f"preview_artifacts[{i}] ({artifact['path']}) sha256 {artifact['sha256']} "
+                f"does not match current sha256 {actual_sha}"
+            )
+            continue
+        if Path(artifact["path"]).suffix != ".json":
+            continue
+        try:
+            manifest = json.loads(data.decode("utf-8"))
+        except (UnicodeDecodeError, ValueError):
+            continue
+        if isinstance(manifest, dict) and manifest.get("schema") == PREVIEW_SCHEMA:
+            manifests.append(manifest)
+
+    if violations:
+        return "; ".join(violations)
+
+    if len(manifests) != 1:
+        return f"expected exactly one {PREVIEW_SCHEMA!r} manifest among preview_artifacts, found {len(manifests)}"
+
+    manifest = manifests[0]
+    trajectory = manifest.get("trajectory")
+    if not isinstance(trajectory, dict) or trajectory.get("sha256") != traj_sha:
+        return "preview manifest's trajectory.sha256 does not match the current trajectory"
+
+    check_report = manifest.get("check_report")
+    if not isinstance(check_report, dict) or check_report.get("all_pass") is not True:
+        return "preview manifest's check_report.all_pass is not true"
+
+    return None
 
 
 def _evaluate_stale_config(

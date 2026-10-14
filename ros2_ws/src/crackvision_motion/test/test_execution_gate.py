@@ -131,6 +131,29 @@ def _write_json(path: Path, obj: dict) -> Path:
     return path
 
 
+def _build_preview_artifacts(tmp_path: Path, traj_sha: str, *, all_pass: bool = True) -> list:
+    """Writes a minimal valid `crackvision.trajectory_preview/1` manifest plus three PNG
+    stand-ins bound to `traj_sha`, and returns the four `{path, sha256}` entries §18.2 says
+    `approve_trajectory` writes to `preview_artifacts[]` (manifest first, then the three PNGs)."""
+    stem = f"preview_{traj_sha[:8]}"
+    joints_png = tmp_path / f"{stem}_joints.png"
+    toolpath_png = tmp_path / f"{stem}_toolpath.png"
+    toolspeed_png = tmp_path / f"{stem}_toolspeed.png"
+    joints_png.write_bytes(b"\x89PNG-joints-stand-in")
+    toolpath_png.write_bytes(b"\x89PNG-toolpath-stand-in")
+    toolspeed_png.write_bytes(b"\x89PNG-toolspeed-stand-in")
+    manifest = {
+        "schema": "crackvision.trajectory_preview/1",
+        "trajectory": {"path": "trajectory.json", "sha256": traj_sha},
+        "check_report": {"all_pass": all_pass, "failed_checks": [] if all_pass else ["G-LIMITS"]},
+    }
+    manifest_path = _write_json(tmp_path / f"{stem}.json", manifest)
+    return [
+        {"path": p.name, "sha256": file_sha256(p)}
+        for p in (manifest_path, joints_png, toolpath_png, toolspeed_png)
+    ]
+
+
 def _passing_fixture_set(tmp_path):
     """Builds a self-consistent measured fixture set under tmp_path (root) that passes real
     mode offline, by computing real shas against the fixture files (never hardcoded, so this
@@ -167,7 +190,7 @@ def _passing_fixture_set(tmp_path):
         "trajectory_sha256": traj_sha,
         "approved_by": "fixture_operator",
         "approved_utc": datetime.now(timezone.utc).isoformat(),
-        "preview_artifacts": [],
+        "preview_artifacts": _build_preview_artifacts(tmp_path, traj_sha),
     }
     approval_path = _write_json(tmp_path / "approval.json", approval)
 
@@ -203,9 +226,11 @@ def test_limits_hash_mismatch_fails_only_limits_hash(tmp_path):
     traj = copy.deepcopy(traj)
     traj["limits_file"]["sha256"] = "a" * 64
     traj_path = _write_json(tmp_path / "trajectory_bad_hash.json", traj)
-    # approval must still bind the (new) trajectory sha
+    # approval must still bind the (new) trajectory sha, including a preview bound to it
+    new_sha = file_sha256(traj_path)
     approval = json.loads((tmp_path / "approval.json").read_text())
-    approval["trajectory_sha256"] = file_sha256(traj_path)
+    approval["trajectory_sha256"] = new_sha
+    approval["preview_artifacts"] = _build_preview_artifacts(tmp_path, new_sha)
     _write_json(tmp_path / "approval.json", approval)
 
     report = evaluate_offline("real", traj_path, **kwargs)
@@ -222,6 +247,154 @@ def test_stale_approval_fails_only_approval(tmp_path):
     assert set(report.refusals) == {G_APPROVAL}
 
 
+# --------------------------------------------------------------------------------------
+# §18.3 G-APPROVAL amendment: preview_artifacts verification (MOT-08.5)
+# --------------------------------------------------------------------------------------
+
+@pytest.mark.parametrize("mode", ["mock", "real"])
+def test_empty_preview_artifacts_violates_approval(tmp_path, mode):
+    traj_path, _traj, _approval, approval_path, kwargs = _passing_fixture_set(tmp_path)
+    approval = json.loads(approval_path.read_text())
+    approval["preview_artifacts"] = []
+    _write_json(approval_path, approval)
+
+    report = evaluate_offline(mode, traj_path, **kwargs)
+    check = _get(report, G_APPROVAL)
+    if mode == "real":
+        assert check.outcome == "fail"
+        assert not report.passed
+    else:
+        assert check.outcome == "warn"
+        assert report.passed
+    assert "preview_artifacts" in check.message and "empty" in check.message
+
+
+@pytest.mark.parametrize("mode", ["mock", "real"])
+def test_preview_artifact_sha_mismatch_violates_approval(tmp_path, mode):
+    traj_path, _traj, _approval, approval_path, kwargs = _passing_fixture_set(tmp_path)
+    approval = json.loads(approval_path.read_text())
+    approval["preview_artifacts"][0]["sha256"] = "a" * 64
+    _write_json(approval_path, approval)
+
+    report = evaluate_offline(mode, traj_path, **kwargs)
+    check = _get(report, G_APPROVAL)
+    assert check.outcome == ("fail" if mode == "real" else "warn")
+    assert "does not match current sha256" in check.message
+    assert report.passed == (mode != "real")
+
+
+@pytest.mark.parametrize("mode", ["mock", "real"])
+def test_preview_artifact_missing_file_does_not_raise(tmp_path, mode):
+    traj_path, _traj, _approval, approval_path, kwargs = _passing_fixture_set(tmp_path)
+    approval = json.loads(approval_path.read_text())
+    missing_entry = approval["preview_artifacts"][1]
+    (tmp_path / missing_entry["path"]).unlink()
+
+    report = evaluate_offline(mode, traj_path, **kwargs)
+    check = _get(report, G_APPROVAL)
+    assert check.outcome == ("fail" if mode == "real" else "warn")
+    assert "unreadable" in check.message
+    assert report.passed == (mode != "real")
+
+
+@pytest.mark.parametrize("mode", ["mock", "real"])
+def test_preview_manifest_invalid_json_counts_as_zero_manifests(tmp_path, mode):
+    traj_path, _traj, _approval, approval_path, kwargs = _passing_fixture_set(tmp_path)
+    approval = json.loads(approval_path.read_text())
+    manifest_entry = approval["preview_artifacts"][0]
+    manifest_path = tmp_path / manifest_entry["path"]
+    manifest_path.write_text("{this is not valid json")
+    manifest_entry["sha256"] = file_sha256(manifest_path)
+    _write_json(approval_path, approval)
+
+    report = evaluate_offline(mode, traj_path, **kwargs)
+    check = _get(report, G_APPROVAL)
+    assert check.outcome == ("fail" if mode == "real" else "warn")
+    assert "found 0" in check.message
+    assert report.passed == (mode != "real")
+
+
+@pytest.mark.parametrize("mode", ["mock", "real"])
+def test_preview_manifest_non_utf8_counts_as_zero_manifests(tmp_path, mode):
+    traj_path, _traj, _approval, approval_path, kwargs = _passing_fixture_set(tmp_path)
+    approval = json.loads(approval_path.read_text())
+    manifest_entry = approval["preview_artifacts"][0]
+    manifest_path = tmp_path / manifest_entry["path"]
+    manifest_path.write_bytes(b"\xff\xfe\x00bad")
+    manifest_entry["sha256"] = file_sha256(manifest_path)
+    _write_json(approval_path, approval)
+
+    report = evaluate_offline(mode, traj_path, **kwargs)
+    check = _get(report, G_APPROVAL)
+    assert check.outcome == ("fail" if mode == "real" else "warn")
+    assert "found 0" in check.message
+    assert report.passed == (mode != "real")
+
+
+@pytest.mark.parametrize("mode", ["mock", "real"])
+def test_two_preview_manifests_violates_approval(tmp_path, mode):
+    traj_path, _traj, _approval, approval_path, kwargs = _passing_fixture_set(tmp_path)
+    approval = json.loads(approval_path.read_text())
+    traj_sha = approval["trajectory_sha256"]
+    extra_manifest_path = tmp_path / "second_preview.json"
+    _write_json(extra_manifest_path, {
+        "schema": "crackvision.trajectory_preview/1",
+        "trajectory": {"sha256": traj_sha},
+        "check_report": {"all_pass": True},
+    })
+    approval["preview_artifacts"].append(
+        {"path": extra_manifest_path.name, "sha256": file_sha256(extra_manifest_path)}
+    )
+    _write_json(approval_path, approval)
+
+    report = evaluate_offline(mode, traj_path, **kwargs)
+    check = _get(report, G_APPROVAL)
+    assert check.outcome == ("fail" if mode == "real" else "warn")
+    assert "found 2" in check.message
+    assert report.passed == (mode != "real")
+
+
+@pytest.mark.parametrize("mode", ["mock", "real"])
+def test_preview_manifest_names_another_trajectory_violates_approval(tmp_path, mode):
+    traj_path, _traj, _approval, approval_path, kwargs = _passing_fixture_set(tmp_path)
+    approval = json.loads(approval_path.read_text())
+    manifest_entry = approval["preview_artifacts"][0]
+    manifest_path = tmp_path / manifest_entry["path"]
+    manifest = json.loads(manifest_path.read_text())
+    manifest["trajectory"]["sha256"] = "b" * 64
+    _write_json(manifest_path, manifest)
+    manifest_entry["sha256"] = file_sha256(manifest_path)
+    _write_json(approval_path, approval)
+
+    report = evaluate_offline(mode, traj_path, **kwargs)
+    check = _get(report, G_APPROVAL)
+    assert check.outcome == ("fail" if mode == "real" else "warn")
+    assert "trajectory.sha256 does not match" in check.message
+    assert report.passed == (mode != "real")
+
+
+@pytest.mark.parametrize("mode", ["mock", "real"])
+def test_preview_manifest_all_pass_false_violates_approval(tmp_path, mode):
+    traj_path, _traj, _approval, approval_path, kwargs = _passing_fixture_set(tmp_path)
+    approval = json.loads(approval_path.read_text())
+    traj_sha = approval["trajectory_sha256"]
+    approval["preview_artifacts"] = _build_preview_artifacts(tmp_path, traj_sha, all_pass=False)
+    _write_json(approval_path, approval)
+
+    report = evaluate_offline(mode, traj_path, **kwargs)
+    check = _get(report, G_APPROVAL)
+    assert check.outcome == ("fail" if mode == "real" else "warn")
+    assert "all_pass is not true" in check.message
+    assert report.passed == (mode != "real")
+
+
+def test_valid_preview_manifest_and_artifacts_pass_approval(tmp_path):
+    traj_path, _traj, _approval, _approval_path, kwargs = _passing_fixture_set(tmp_path)
+    report = evaluate_offline("real", traj_path, **kwargs)
+    assert _get(report, G_APPROVAL).outcome == "pass"
+    assert report.passed
+
+
 def test_ineligible_paths3d_fails_only_eligible(tmp_path):
     traj_path, traj, _approval, _approval_path, kwargs = _passing_fixture_set(tmp_path)
     ineligible = json.loads(PATHS3D_ELIGIBLE.read_text())
@@ -236,8 +409,10 @@ def test_ineligible_paths3d_fails_only_eligible(tmp_path):
         "execution_eligible": False,
     }
     traj_path = _write_json(tmp_path / "trajectory_ineligible.json", traj)
+    new_sha = file_sha256(traj_path)
     approval = json.loads((tmp_path / "approval.json").read_text())
-    approval["trajectory_sha256"] = file_sha256(traj_path)
+    approval["trajectory_sha256"] = new_sha
+    approval["preview_artifacts"] = _build_preview_artifacts(tmp_path, new_sha)
     _write_json(tmp_path / "approval.json", approval)
 
     report = evaluate_offline("real", traj_path, **kwargs)
@@ -258,8 +433,10 @@ def test_purpose_test_fails_only_traj(tmp_path):
     traj = copy.deepcopy(traj)
     traj["purpose"] = "test"
     traj_path = _write_json(tmp_path / "trajectory_test_purpose.json", traj)
+    new_sha = file_sha256(traj_path)
     approval = json.loads((tmp_path / "approval.json").read_text())
-    approval["trajectory_sha256"] = file_sha256(traj_path)
+    approval["trajectory_sha256"] = new_sha
+    approval["preview_artifacts"] = _build_preview_artifacts(tmp_path, new_sha)
     _write_json(tmp_path / "approval.json", approval)
 
     report = evaluate_offline("real", traj_path, **kwargs)
@@ -277,8 +454,10 @@ def test_nominal_scene_fails_only_scene(tmp_path):
     traj = json.loads(traj_path.read_text())
     traj["scene_config_sha256"] = file_sha256(PRODUCTION_SCENE)
     traj_path = _write_json(tmp_path / "trajectory_nominal_scene.json", traj)
+    new_sha = file_sha256(traj_path)
     approval = json.loads((tmp_path / "approval.json").read_text())
-    approval["trajectory_sha256"] = file_sha256(traj_path)
+    approval["trajectory_sha256"] = new_sha
+    approval["preview_artifacts"] = _build_preview_artifacts(tmp_path, new_sha)
     _write_json(tmp_path / "approval.json", approval)
 
     report = evaluate_offline("real", traj_path, **kwargs)
