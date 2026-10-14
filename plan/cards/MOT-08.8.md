@@ -78,3 +78,6 @@ Write scripts/ros/test_preview_approve.sh, modelled on scripts/ros/test_view_ret
 - Approval via pty: `printf 'APPROVE %s\n' "$SHA8" | script -qec "./env.sh python -m crackvision.approve_trajectory --preview ... --operator ci-mock --out $WORK/approval.json" /dev/null`. Assert the exit code and that the file exists. Repeat with a wrong phrase and assert exit 3 and no file.
 - Tamper cases work on copies (cp -r the preview dir and approval, rewrite the paths in the copy's preview_artifacts with python3 -c, then flip one byte of the PNG). Parse G-APPROVAL's outcome from the execution record JSON in --record-dir.
 - Print a PASS summary. Never write under data/ or config/.
+
+## Debugger note (D0013, 2026-10-14T06:28:26Z)
+Blocked on MOT-08.10. approve_trajectory's `_open_tty()` opened /dev/tty with 'r+', which always raises io.UnsupportedOperation on a tty, so the typed approval always refused with exit 3. Once MOT-08.10 is accepted, resume from partial commit 04308af (scripts/ros/test_preview_approve.sh already exists), re-run all three checks and fix only what still fails. Keep the `script -qec` pty approach the card specifies.
