@@ -383,6 +383,38 @@ assert_lt() {
     python3 -c "import sys; sys.exit(0 if float(sys.argv[1]) < float(sys.argv[2]) else 1)" "$1" "$2"
 }
 
+# run_execute LOG ARGS... -- `ros2 run crackvision_motion execute_trajectory ARGS...` into
+# LOG, retried at most once, and only when the attempt was refused before any motion
+# (record outcome "refused", exit 3) with G-COLLISION as the ONLY failing gate. Each
+# execute_trajectory run is a fresh rclpy client, and on a loaded host its first
+# /check_state_validity reply can be lost to a DDS discovery race (move_group logs "failed to
+# send response to /check_state_validity (timeout)"; the client then waits out
+# --service-timeout-s and counts that waypoint invalid). A genuine collision is
+# deterministic and fails the retry identically, so the retry cannot hide one; every retry
+# is announced. Sets RUN_EXECUTE_RC and RUN_EXECUTE_REC (the attempt's own record).
+run_execute() {
+    local log="$1"; shift
+    local attempt before
+    for attempt in 1 2; do
+        before="$(ls -t "$RECORD_DIR"/*.json 2>/dev/null | head -n1)"
+        ros2 run crackvision_motion execute_trajectory "$@" >"$log" 2>&1
+        RUN_EXECUTE_RC=$?
+        RUN_EXECUTE_REC="$(ls -t "$RECORD_DIR"/*.json 2>/dev/null | head -n1)"
+        [ "$RUN_EXECUTE_REC" = "$before" ] && RUN_EXECUTE_REC=""
+        [ "$RUN_EXECUTE_RC" -eq 3 ] && [ -n "$RUN_EXECUTE_REC" ] && [ "$attempt" -eq 1 ] || return 0
+        python3 -c '
+import json, sys
+record = json.load(open(sys.argv[1]))
+failed = sorted(c["gate"] for c in record["gate_report"] if c["outcome"] == "fail")
+sys.exit(0 if record.get("outcome") == "refused" and failed == ["G-COLLISION"] else 1)
+' "$RUN_EXECUTE_REC" || return 0
+        cat "$log"
+        echo "run_integration_e2e.sh: WARN: refused pre-motion on G-COLLISION alone (record $RUN_EXECUTE_REC); retrying once for a lost /check_state_validity reply" >&2
+        mv "$log" "$log.attempt1"
+        sleep 2
+    done
+}
+
 # -- 9a. a hand-written purpose:"test" move, home(all-zero, the mock hardware's own startup
 #    state) -> the plan's start_state, 3 points ramped like test_execution.sh's
 #    trajectory_smoke fixture, scaled so no joint exceeds ~0.3 rad/s (well under
@@ -432,13 +464,13 @@ PYEOF
 
 echo "-- mock mode (purpose test): home -> plan start_state --"
 TOSTART_LOG="$WORK/execute_to_start.log"
-ros2 run crackvision_motion execute_trajectory --mode mock --profile moveit_mock \
+run_execute "$TOSTART_LOG" --mode mock --profile moveit_mock \
     --trajectory "$TO_START" --scene-config "$SCENE_CFG" --execution-config "$EXECUTION_CONFIG" \
-    --record-dir "$RECORD_DIR" >"$TOSTART_LOG" 2>&1
-rc=$?
+    --record-dir "$RECORD_DIR"
+rc=$RUN_EXECUTE_RC
 cat "$TOSTART_LOG"
 [ "$rc" -eq 0 ] || fail "to_start move exit=$rc (expected 0); see $TOSTART_LOG"
-TOSTART_REC="$(ls -t "$RECORD_DIR"/*.json | head -n1)"
+TOSTART_REC="$RUN_EXECUTE_REC"
 python3 -c '
 import json, sys
 record = json.load(open(sys.argv[1]))
@@ -453,13 +485,13 @@ echo "run_integration_e2e.sh: to_start move OK"
 #    G-APPROVAL (no --approval given).
 echo "-- dry mode: retimed trajectory --"
 DRY_LOG="$WORK/execute_dry.log"
-ros2 run crackvision_motion execute_trajectory --mode dry --profile moveit_mock \
+run_execute "$DRY_LOG" --mode dry --profile moveit_mock \
     --trajectory "$TRAJECTORY" --root "$WORK" --scene-config "$SCENE_CFG" \
-    --execution-config "$EXECUTION_CONFIG" --record-dir "$RECORD_DIR" >"$DRY_LOG" 2>&1
-rc=$?
+    --execution-config "$EXECUTION_CONFIG" --record-dir "$RECORD_DIR"
+rc=$RUN_EXECUTE_RC
 cat "$DRY_LOG"
 [ "$rc" -eq 0 ] || fail "dry mode exit=$rc (expected 0); see $DRY_LOG"
-DRY_REC="$(ls -t "$RECORD_DIR"/*.json | head -n1)"
+DRY_REC="$RUN_EXECUTE_REC"
 python3 -c '
 import json, sys
 record = json.load(open(sys.argv[1]))
@@ -480,13 +512,13 @@ echo "run_integration_e2e.sh: dry mode OK, would_refuse_in_real includes G-ELIGI
 #    with what is actually read here -- never a production config edit).
 echo "-- mock mode: retimed trajectory --"
 MOCK_LOG="$WORK/execute_mock.log"
-ros2 run crackvision_motion execute_trajectory --mode mock --profile moveit_mock \
+run_execute "$MOCK_LOG" --mode mock --profile moveit_mock \
     --trajectory "$TRAJECTORY" --root "$WORK" --scene-config "$SCENE_CFG" \
-    --execution-config "$EXECUTION_CONFIG" --record-dir "$RECORD_DIR" >"$MOCK_LOG" 2>&1
-rc=$?
+    --execution-config "$EXECUTION_CONFIG" --record-dir "$RECORD_DIR"
+rc=$RUN_EXECUTE_RC
 cat "$MOCK_LOG"
 [ "$rc" -eq 0 ] || fail "mock mode exit=$rc (expected 0); see $MOCK_LOG"
-MOCK_REC="$(ls -t "$RECORD_DIR"/*.json | head -n1)"
+MOCK_REC="$RUN_EXECUTE_REC"
 python3 -c '
 import json, sys
 record = json.load(open(sys.argv[1]))
