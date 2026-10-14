@@ -267,6 +267,7 @@ def test_empty_preview_artifacts_violates_approval(tmp_path, mode):
         assert check.outcome == "warn"
         assert report.passed
     assert "preview_artifacts" in check.message and "empty" in check.message
+    assert "§18.3 check 1" in check.message
 
 
 @pytest.mark.parametrize("mode", ["mock", "real"])
@@ -280,6 +281,7 @@ def test_preview_artifact_sha_mismatch_violates_approval(tmp_path, mode):
     check = _get(report, G_APPROVAL)
     assert check.outcome == ("fail" if mode == "real" else "warn")
     assert "does not match current sha256" in check.message
+    assert "§18.3 check 2" in check.message
     assert report.passed == (mode != "real")
 
 
@@ -294,6 +296,44 @@ def test_preview_artifact_missing_file_does_not_raise(tmp_path, mode):
     check = _get(report, G_APPROVAL)
     assert check.outcome == ("fail" if mode == "real" else "warn")
     assert "unreadable" in check.message
+    assert "§18.3 check 2" in check.message
+    assert report.passed == (mode != "real")
+
+
+_UNSET = object()
+
+
+@pytest.mark.parametrize(
+    "bad_path,bad_sha256",
+    [
+        (5, _UNSET),
+        (None, _UNSET),
+        (["x"], _UNSET),
+        ("preview_\u0000bad.json", _UNSET),
+        (_UNSET, 5),
+    ],
+    ids=["int-path", "null-path", "list-path", "nul-path", "non-str-sha256"],
+)
+@pytest.mark.parametrize("mode", ["mock", "real"])
+def test_malformed_preview_artifact_path_or_sha256_does_not_raise(
+    tmp_path, mode, bad_path, bad_sha256
+):
+    """§18.3/MOT-08.5.R1 finding 6f6a3f33357e1085: a non-string, NUL-containing, or otherwise
+    malformed `path`/`sha256` value must become a G-APPROVAL violation detail, never an
+    uncaught TypeError/ValueError."""
+    traj_path, _traj, _approval, approval_path, kwargs = _passing_fixture_set(tmp_path)
+    approval = json.loads(approval_path.read_text())
+    entry = approval["preview_artifacts"][1]
+    if bad_path is not _UNSET:
+        entry["path"] = bad_path
+    if bad_sha256 is not _UNSET:
+        entry["sha256"] = bad_sha256
+    _write_json(approval_path, approval)
+
+    report = evaluate_offline(mode, traj_path, **kwargs)
+    check = _get(report, G_APPROVAL)
+    assert check.outcome == ("fail" if mode == "real" else "warn")
+    assert "§18.3 check 2" in check.message
     assert report.passed == (mode != "real")
 
 
@@ -311,6 +351,7 @@ def test_preview_manifest_invalid_json_counts_as_zero_manifests(tmp_path, mode):
     check = _get(report, G_APPROVAL)
     assert check.outcome == ("fail" if mode == "real" else "warn")
     assert "found 0" in check.message
+    assert "§18.3 check 3" in check.message
     assert report.passed == (mode != "real")
 
 
@@ -328,6 +369,7 @@ def test_preview_manifest_non_utf8_counts_as_zero_manifests(tmp_path, mode):
     check = _get(report, G_APPROVAL)
     assert check.outcome == ("fail" if mode == "real" else "warn")
     assert "found 0" in check.message
+    assert "§18.3 check 3" in check.message
     assert report.passed == (mode != "real")
 
 
@@ -351,6 +393,7 @@ def test_two_preview_manifests_violates_approval(tmp_path, mode):
     check = _get(report, G_APPROVAL)
     assert check.outcome == ("fail" if mode == "real" else "warn")
     assert "found 2" in check.message
+    assert "§18.3 check 3" in check.message
     assert report.passed == (mode != "real")
 
 
@@ -370,6 +413,7 @@ def test_preview_manifest_names_another_trajectory_violates_approval(tmp_path, m
     check = _get(report, G_APPROVAL)
     assert check.outcome == ("fail" if mode == "real" else "warn")
     assert "trajectory.sha256 does not match" in check.message
+    assert "§18.3 check 4" in check.message
     assert report.passed == (mode != "real")
 
 
@@ -385,6 +429,7 @@ def test_preview_manifest_all_pass_false_violates_approval(tmp_path, mode):
     check = _get(report, G_APPROVAL)
     assert check.outcome == ("fail" if mode == "real" else "warn")
     assert "all_pass is not true" in check.message
+    assert "§18.3 check 5" in check.message
     assert report.passed == (mode != "real")
 
 
