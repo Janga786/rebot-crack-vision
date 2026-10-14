@@ -2,7 +2,7 @@
 
 ```json card
 {
-  "kind": "integration",
+  "kind": "branch",
   "depends_on": [
     "INT-01",
     "MOT-05",
@@ -12,7 +12,6 @@
     "REQ-INT-2",
     "REQ-OPS-1"
   ],
-  "spec_state": "draft",
   "refine_after": [
     "INT-01"
   ],
@@ -25,3 +24,6 @@
 ```
 
 Draft.
+
+## Decomposed 2026-10-14T08:21:11Z by L-INT (claude-sonnet-5, high)
+Children: INT-03.1, INT-03.2, INT-03.3, INT-03.4, INT-03.5
