@@ -110,15 +110,27 @@ def verify_for_approval(
     check_entry = manifest["check_report"]
     check_path = _resolve(root, check_entry["path"])
     try:
-        check_text = check_path.read_text(encoding="utf-8")
+        check_bytes = check_path.read_bytes()
     except OSError as exc:
         errors.append(f"check report {check_entry['path']} cannot be read: {exc}")
     else:
+        check_doc: Any = None
         try:
-            check_doc = json.loads(check_text)
-        except json.JSONDecodeError as exc:
-            errors.append(f"check report {check_entry['path']} is not valid JSON: {exc}")
-            check_doc = None
+            check_text = check_bytes.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            errors.append(f"check report {check_entry['path']} is not valid UTF-8: {exc}")
+        else:
+            try:
+                check_doc = json.loads(check_text)
+            except json.JSONDecodeError as exc:
+                errors.append(f"check report {check_entry['path']} is not valid JSON: {exc}")
+                check_doc = None
+            if check_doc is not None and not isinstance(check_doc, dict):
+                errors.append(
+                    f"check report {check_entry['path']} must be a JSON object, got "
+                    f"{type(check_doc).__name__}"
+                )
+                check_doc = None
         if check_doc is not None:
             check_sha = file_sha256(check_path)
             if check_sha != check_entry["sha256"]:
@@ -132,7 +144,7 @@ def verify_for_approval(
                     f"{check_doc.get('trajectory_sha256')!r} != current trajectory sha256 {traj_sha!r}"
                 )
             failed = [
-                c.get("check")
+                c.get("check", "<unnamed check>")
                 for c in (check_doc.get("checks") or [])
                 if isinstance(c, dict) and c.get("outcome") == "fail"
             ]
