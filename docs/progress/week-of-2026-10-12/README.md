@@ -1,6 +1,6 @@
 # Progress — week of Mon Oct 12 – Sun Oct 18, 2026
 
-**46 task(s) completed and independently audited this week** · project total **134/170** accepted
+**47 task(s) completed and independently audited this week** · project total **135/170** accepted
 
 ## Completed this week
 
@@ -78,10 +78,12 @@
 …[378 chars clipped]
 - **INT-03.3 — Unreachable-path failure-injection test (mock-stack planning)** ([details](INT-03.3.md)): A new automated test now proves that when a crack is placed far outside the robot arm's reachable workspace, the planning software safely refuses to produce a plan rather than generating a bogus one: 
 …[386 chars clipped]
+- **INT-03.4 — Stale-calibration-config and limit-violation safety evidence** ([details](INT-03.4.md)): Documented how the system already safely refuses robot motion when calibration configs go stale or a trajectory exceeds joint/velocity/acceleration limits, backed by a fresh end-to-end test run. Re-ra
+…[353 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 60 / 539
+- Implementation/review sessions run: 61 / 540
 - Audits that rejected work with evidence-backed findings: 17 (repairs created: 19)
 - Re-verified after an upstream change: CAM-02, CAM-05.2, GEOM-01, GEOM-01.R1, GEOM-08.1, GEOM-09.1, GEOM-09.1.R1, GEOM-10, INT-01.3, MOT-02, MOT-03, MOT-04.1, MOT-04.1.R1, MOT-04.2, MOT-04.3, MOT-04.3.R1, MOT-04.4, MOT-04.4.R1, MOT-04.5, MOT-04.6, MOT-04.6.R1, MOT-05.1, MOT-05.1.R1, MOT-05.2, MOT-05.3, MOT-05.3.R1, MOT-05.3.R2, MOT-05.4, MOT-05.4.R1, MOT-05.5, MOT-05.5.R1, MOT-05.6, MOT-05.6.R1, MOT-05.7, MOT-05.7.R1, MOT-06.10, MOT-06.11, MOT-06.11.R1, MOT-06.2, MOT-06.2.R1, MOT-06.4, MOT-06.4.R1, MOT-06.6, MOT-06.6.R1, MOT-06.9, MOT-07.1, MOT-07.1.R1, MOT-07.10.1, MOT-07.10.1.R1, MOT-07.10.2, MOT-07.10.2.R1, MOT-07.10.2.R1.R1, MOT-07.10.2.R2, MOT-07.10.2.R2.R1, MOT-07.10.3, MOT-07.10.4, MOT-07.10.5, MOT-07.11, MOT-07.2, MOT-07.3, MOT-07.4, MOT-07.4.R1, MOT-07.5, MOT-07.5.R1, MOT-07.6, MOT-07.6.R1, MOT-07.7, MOT-07.7.R1, MOT-07.8, MOT-07.8.R1, MOT-07.9, MOT-08.1, MOT-08.1.R1, MOT-08.10, MOT-08.2, MOT-08.2.R1, MOT-08.3, MOT-08.4, MOT-08.4.R1, MOT-08.5, MOT-08.5.R1, MOT-08.5.R2, MOT-08.5.R3, MOT-08.6, MOT-08.7, MOT-08.8, MOT-08.9, MOT-10.1, MOT-10.1.R1, MOT-10.1.R2, MOT-10.3, PERC-03, PERC-03.R1
 
@@ -103,7 +105,7 @@
 | Perception (L-PERC) | 13 | 16 |
 | Geometry & calibration (L-GEOM) | 24 | 32 |
 | Motion planning (L-MOTION) | 63 | 67 |
-| Integration & commissioning (L-INT) | 8 | 14 |
+| Integration & commissioning (L-INT) | 9 | 14 |
 | Operator workflow & handoff (L-OPS) | 3 | 12 |
 | Imitation learning (later phase) (L-IL) | 0 | 1 |
 
