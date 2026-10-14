@@ -1,6 +1,6 @@
 # Progress — week of Mon Oct 12 – Sun Oct 18, 2026
 
-**48 task(s) completed and independently audited this week** · project total **136/170** accepted
+**49 task(s) completed and independently audited this week** · project total **137/170** accepted
 
 ## Completed this week
 
@@ -82,10 +82,12 @@
 …[353 chars clipped]
 - **OPS-01.3 — doctor stage: aggregate check_env/check_host/check_realsense into one operator report** ([details](OPS-01.3.md)): Added a single `operator_doctor.py` command that runs the existing environment, host, and RealSense camera diagnostics plus a ROS workspace build check, and prints one combined pass/warn/fail report w
 …[160 chars clipped]
+- **OPS-01.4 — segment + paths stages: single-case wrapper over prepare_inputs/inference/skeleton/paths/visualize_paths** ([details](OPS-01.4.md)): Built a command-line tool that runs crack-image segmentation and path-extraction for one case at a time by calling the existing, already-tested segmentation and skeleton/path modules directly, and rec
+…[528 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 62 / 541
+- Implementation/review sessions run: 63 / 542
 - Audits that rejected work with evidence-backed findings: 17 (repairs created: 19)
 - Re-verified after an upstream change: CAM-02, CAM-05.2, GEOM-01, GEOM-01.R1, GEOM-08.1, GEOM-09.1, GEOM-09.1.R1, GEOM-10, INT-01.3, MOT-02, MOT-03, MOT-04.1, MOT-04.1.R1, MOT-04.2, MOT-04.3, MOT-04.3.R1, MOT-04.4, MOT-04.4.R1, MOT-04.5, MOT-04.6, MOT-04.6.R1, MOT-05.1, MOT-05.1.R1, MOT-05.2, MOT-05.3, MOT-05.3.R1, MOT-05.3.R2, MOT-05.4, MOT-05.4.R1, MOT-05.5, MOT-05.5.R1, MOT-05.6, MOT-05.6.R1, MOT-05.7, MOT-05.7.R1, MOT-06.10, MOT-06.11, MOT-06.11.R1, MOT-06.2, MOT-06.2.R1, MOT-06.4, MOT-06.4.R1, MOT-06.6, MOT-06.6.R1, MOT-06.9, MOT-07.1, MOT-07.1.R1, MOT-07.10.1, MOT-07.10.1.R1, MOT-07.10.2, MOT-07.10.2.R1, MOT-07.10.2.R1.R1, MOT-07.10.2.R2, MOT-07.10.2.R2.R1, MOT-07.10.3, MOT-07.10.4, MOT-07.10.5, MOT-07.11, MOT-07.2, MOT-07.3, MOT-07.4, MOT-07.4.R1, MOT-07.5, MOT-07.5.R1, MOT-07.6, MOT-07.6.R1, MOT-07.7, MOT-07.7.R1, MOT-07.8, MOT-07.8.R1, MOT-07.9, MOT-08.1, MOT-08.1.R1, MOT-08.10, MOT-08.2, MOT-08.2.R1, MOT-08.3, MOT-08.4, MOT-08.4.R1, MOT-08.5, MOT-08.5.R1, MOT-08.5.R2, MOT-08.5.R3, MOT-08.6, MOT-08.7, MOT-08.8, MOT-08.9, MOT-10.1, MOT-10.1.R1, MOT-10.1.R2, MOT-10.3, PERC-03, PERC-03.R1
 
@@ -108,7 +110,7 @@
 | Geometry & calibration (L-GEOM) | 24 | 32 |
 | Motion planning (L-MOTION) | 63 | 67 |
 | Integration & commissioning (L-INT) | 9 | 14 |
-| Operator workflow & handoff (L-OPS) | 4 | 12 |
+| Operator workflow & handoff (L-OPS) | 5 | 12 |
 | Imitation learning (later phase) (L-IL) | 0 | 1 |
 
 ## Waiting on the operator / hardware (snapshot)
