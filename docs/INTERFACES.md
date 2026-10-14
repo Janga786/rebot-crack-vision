@@ -3312,3 +3312,160 @@ approval revocation list — an approval's validity window is already bounded by
 (§11.5/§11.12), and revoking a specific past approval is not a problem this section solves. No
 multi-operator sign-off — `approved_by` is a single free-text identifier, and §11.5's schema has no
 second-approver field; a future card would need its own ADR to add one.
+
+---
+
+## 19. Operator CLI workflow (`crackvision.operator_run/1`)
+
+**Normative source:** `docs/adr/021-operator-cli-workflow.md`. OPS-01.2–.8 implement this section
+verbatim. Nothing here edits §0–§18: this section only sequences CLIs/ROS entry points those
+sections already define, and adds one new, non-committed run-state file format.
+
+### 19.1 Stage list, fixed order, and delegation
+
+| Order | Stage | `case_id`-scoped? | Delegates to (no new logic) |
+|---|---|---|---|
+| 1 | `doctor` | no (global) | `scripts/check_env.py`, `scripts/check_host.py`, `scripts/check_realsense.py`, plus a presence check for `ros2_ws/install/setup.bash` |
+| 2 | `capture` | yes | §8.4/§9: `crackvision.realsense_capture` (§3.10), `ros2 run crackvision_camera capture_joint_state`, `ros2 run crackvision_camera capture_optical_tf`, `./env.sh python -m crackvision.capture_record assemble` (§9); optionally preceded by a view-move trajectory run (§19.4) when the wrist camera is not already at its view pose |
+| 3 | `segment` | yes | `crackvision.prepare_inputs` (§3.1) then `crackvision.inference` (§3.2) |
+| 4 | `paths` | yes | `crackvision.skeleton` (§3.4) then `crackvision.paths` (§3.13) then `crackvision.visualize_paths` |
+| 5 | `plan` | yes | `crackvision.path3d` (§10) then `ros2 run crackvision_motion plan_crack_path` (§13) then `retime_plan --plan` (§16) then `trajectory_check` (§16.5) |
+| 6 | `preview` | yes | `trajectory_preview` (§18.1) |
+| 7 | `execute` | yes | `approve_trajectory` (§18.2) then `execute_trajectory` (§11) |
+
+`doctor` always runs first and is never skipped by the per-case freshness rule (§19.3) because it has
+no `case_id` and declares no case-scoped outputs; an operator workflow script runs it once per
+invocation, independent of which case stages follow. Stages 2–7 run in this fixed order per case;
+nothing in this section lets a later stage run before an earlier one for the same case (the
+`--stage NAME` escape in §19.3 checks, rather than removes, that ordering constraint).
+
+### 19.2 Run-state file: `data/operator_runs/{case_id}_run_state.json`
+
+Never committed — git-ignored, the same way `data/captures/` already is (§9). One file per
+`case_id`; `doctor`'s own result is never written here (it is global, §19.1).
+
+```json
+{
+  "schema": "crackvision.operator_run/1",
+  "case_id": "Deck_Crack_01",
+  "created_utc": "2026-10-14T18:04:11Z",
+  "updated_utc": "2026-10-14T18:22:40Z",
+  "stages": {
+    "capture": {
+      "status": "done",
+      "updated_utc": "2026-10-14T18:05:02Z",
+      "outputs": [{"path": "data/captures/Deck_Crack_01_capture.json", "sha256": "…64 hex…"}],
+      "depends_on": [],
+      "notes": ""
+    },
+    "segment": {
+      "status": "done",
+      "updated_utc": "2026-10-14T18:06:10Z",
+      "outputs": [
+        {"path": "data/predictions/Deck_Crack_01.png", "sha256": "…64 hex…"},
+        {"path": "data/overlays/Deck_Crack_01_overlay.png", "sha256": "…64 hex…"}
+      ],
+      "depends_on": ["capture"],
+      "notes": ""
+    },
+    "paths": {"status": "pending", "updated_utc": null, "outputs": [], "depends_on": ["segment"], "notes": ""},
+    "plan": {"status": "pending", "updated_utc": null, "outputs": [], "depends_on": ["paths"], "notes": ""},
+    "preview": {"status": "pending", "updated_utc": null, "outputs": [], "depends_on": ["plan"], "notes": ""},
+    "execute": {"status": "failed", "updated_utc": "2026-10-14T18:22:40Z", "outputs": [], "depends_on": ["preview"], "notes": "G-COLLISION refused: see logs/execution/…"}
+  }
+}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `schema` | str | `"crackvision.operator_run/1"` |
+| `case_id` | str | §1 case id |
+| `created_utc` | str | ISO-8601 UTC, set once, on first write |
+| `updated_utc` | str | ISO-8601 UTC of the most recent write to this file |
+| `stages.<stage>.status` | str | `pending \| done \| failed` — `<stage>` ∈ `{capture, segment, paths, plan, preview, execute}` (§19.1; `doctor` never appears here) |
+| `stages.<stage>.updated_utc` | str \| null | ISO-8601 UTC of the last status change for this stage; `null` while `pending` and never run |
+| `stages.<stage>.outputs[]` | list[{path, sha256}] | every file this stage declares as its output, as the stage itself wrote it; `[]` for a `pending` or `failed` stage |
+| `stages.<stage>.depends_on[]` | list[str] | the fixed upstream-stage list from §19.1's order (`capture: []`, `segment: ["capture"]`, `paths: ["segment"]`, `plan: ["paths"]`, `preview: ["plan"]`, `execute: ["preview"]`) — written by the tool, not operator-editable input |
+| `stages.<stage>.notes` | str | free-text; empty on success, a short failure summary (e.g. the failing gate id) on `failed` |
+
+### 19.3 Freshness, resumability and `--force`/`--stage`
+
+A stage's recorded `done` status is **skippable** (the stage's CLIs are not re-run) if and only if
+**all** of the following hold:
+
+1. its recorded `status` is `"done"`;
+2. every entry in its `outputs[]` still exists at that path, and its current sha256 equals the
+   recorded `sha256`;
+3. every stage named in its `depends_on[]` is **itself** still fresh by this same rule, checked
+   recursively — a stage is never treated as fresh merely because its own files are untouched if any
+   upstream stage it depends on is not also fresh.
+
+**Cascade-invalidation example.** An operator re-runs `capture` for a case whose `segment`, `paths`,
+`plan`, `preview` and `execute` stages are all recorded `done` from an earlier session. `capture`'s
+own output file (the §9 capture record) now has a new sha256, so rule 2 fails for `segment` (whose
+`depends_on` includes `capture`), making `segment` not fresh — even though `segment`'s own output
+files (`data/predictions/...`) were never touched. By rule 3, `paths` (depends on `segment`) is then
+also not fresh, then `plan` (depends on `paths`), then `preview` (depends on `plan`), then `execute`
+(depends on `preview`) — the whole downstream chain is invalidated by the one upstream change,
+without any of those stages' own output files having been edited or deleted.
+
+**`--force STAGE`** always re-runs the named stage regardless of its recorded status or freshness,
+and — because re-running it changes its own output sha256s — the same cascade above then applies to
+every stage downstream of it on the next check.
+
+**`--stage NAME`** runs exactly the one named stage and nothing else. If any stage upstream of it
+(per §19.1's fixed order and `depends_on` chain) is not currently fresh by the rule above, `--stage
+NAME` exits **3** (§0.2 precondition) rather than running that prerequisite itself — an operator
+workflow script never silently does more than the stage the operator asked for.
+
+A workflow run with neither `--force` nor `--stage` runs every stage from `doctor` through the first
+stage (in §19.1 order) that is not currently fresh, then continues forward through every later stage.
+
+### 19.4 Gate non-bypass rule
+
+`execute_trajectory`'s gate catalogue (§11.7, amended by §17.2 for view moves and §18.3 for
+`G-APPROVAL`) is the **only** authority on whether real motion happens. OPS-01 never adds a flag,
+mode or code path that skips `trajectory_preview` or `approve_trajectory`, never sets
+`CRACKVISION_ARM_REAL` itself (`G-ARM`, §11.7, reads only the operator's own process environment),
+and defaults every `--mode` flag it passes to any of `retime_plan`, `trajectory_check`,
+`execute_trajectory` to `mock`, in every OPS-01 code path, with no exception. OPS-01's `plan` and
+`execute` stages (§19.1) only sequence the existing CLIs in the exact order `docs/motion/
+EXECUTION.md` and `docs/motion/PREVIEW_APPROVAL.md` already specify: `retime_plan → trajectory_check
+→ trajectory_preview → approve_trajectory → execute_trajectory`. No OPS-01 script may ever invoke
+`execute_trajectory` without that sequence having already produced, for the exact trajectory sha256
+being executed, both a `trajectory_preview` manifest (§18.1) and a matching
+`crackvision.execution_approval/1` file (§18.2) — for every `--mode`, including `mock`/`dry`. This
+is not a new rule: it restates, in this workflow's own terms, what §11.7 `G-APPROVAL` and §18.3
+already enforce; OPS-01 earns no exemption and adds no shortcut around either gate.
+
+**The capture-time view move is not a special case.** When `capture` (§19.1) needs the wrist camera
+at a pose it is not already at, that move is itself a trajectory run — `plan_view` (§13.14) →
+`retime_plan --view-plan` (§17.3) → `trajectory_check` (§17.4) → `trajectory_preview` (§18.1, which
+accepts a `view_plan`, §18.1) → `approve_trajectory` (§18.2) → `execute_trajectory` (§11, `purpose:
+"view_move"`, §17) — subject to exactly the same five-step sequence and exactly the same gate
+catalogue (§17.2: `G-COMMISSIONING`, `G-ESTOP`, `G-APPROVAL`, `G-SPEED`, `G-START-STATE`,
+`G-COLLISION`, `G-CONFIRM` and the rest, unchanged) as the final crack-trace trajectory. `capture`
+never treats the view move as a shortcut, a special "just move the camera" path, or anything exempt
+from §11.7/§18.3.
+
+### 19.5 ROS-sourced vs. pure `./env.sh` stages
+
+| Stage (or sub-step) | Requires ROS sourced | Pure `./env.sh python` |
+|---|---|---|
+| `doctor` | — (reads `ros2_ws/install/setup.bash`'s presence only, never sources it) | all three `check_*` scripts |
+| `capture`: joint-state/optical-tf read, and the optional view move | `capture_joint_state`, `capture_optical_tf`, `plan_view`, `retime_plan --view-plan`, `execute_trajectory` for the view move | `crackvision.realsense_capture`, `crackvision.capture_record assemble` |
+| `segment` | — | both sub-steps |
+| `paths` | — | all three sub-steps |
+| `plan`: `plan_crack_path` | `plan_crack_path` only | `path3d`, `retime_plan --plan`, `trajectory_check` |
+| `preview` | — | `trajectory_preview` |
+| `execute` | `execute_trajectory` | `approve_trajectory` |
+
+A ROS-sourced sub-step runs under `source scripts/ros/env_ros.sh; set +u; source
+ros2_ws/install/setup.bash` (§11.10's invocation convention), never under `./env.sh`. A pure
+`./env.sh` sub-step never sources ROS. A single stage may therefore mix both within itself (e.g.
+`plan`: `path3d` under `./env.sh`, then `plan_crack_path` under ROS, then `retime_plan`/
+`trajectory_check` back under `./env.sh`) — OPS-01's sequencer invokes each sub-step with whichever
+environment that sub-step's own contract (cited in §19.1) already requires, never a third, OPS-01-
+specific environment.
+
+---
