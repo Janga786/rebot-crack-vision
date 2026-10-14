@@ -59,6 +59,16 @@ An `ament_python` package:
   scene) and exits 0 iff `MoveItErrorCodes.SUCCESS` comes back, 1 otherwise. It never sets
   `plan_only=False`, so no trajectory is ever executed — nothing here can move the mock
   (let alone real) arm.
+- `crackvision_motion/preview_trajectory.py` (console script `preview_trajectory`, §18.4) — an
+  `rclpy` node that reads a trajectory file and publishes `/display_planned_path`
+  (`moveit_msgs/msg/DisplayTrajectory`) and `/crackvision/preview_markers`
+  (`visualization_msgs/msg/MarkerArray`), both `TRANSIENT_LOCAL`/`RELIABLE`. Motion-free by
+  construction: it never constructs an `ActionClient` or a ROS service client and never publishes
+  on `/joint_states` or any `/rebotarm/**` topic.
+- `launch/preview_rviz.launch.py` — composes `mock_planning.launch.py` with `rviz2 -d
+  rviz/preview.rviz` (no `MotionPlanning` display, so no Plan/Execute button at all) and
+  `preview_trajectory`, so an operator with a display can look at a trajectory in 3D before
+  approving it. See `docs/motion/PREVIEW_APPROVAL.md`.
 
 ## 3. `scripts/ros/build_ws.sh`
 
