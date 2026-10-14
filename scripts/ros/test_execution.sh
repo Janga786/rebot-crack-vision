@@ -468,18 +468,36 @@ with open(traj_path, "w") as fh:
 print(file_sha256(traj_path))
 ')"
 
+# §18.3 G-APPROVAL requires exactly one preview_artifacts entry to parse as a bound, passing
+# crackvision.trajectory_preview/1 manifest (trajectory.sha256 == current trajectory, and
+# check_report.all_pass == true) -- write a minimal such manifest here; this card only needs the
+# offline G-APPROVAL check to pass so the online G-GRAPH check is actually reached.
 python3 -c '
 import json
 import sys
 from datetime import datetime, timezone
 
+from crackvision_motion.joint_trajectory import file_sha256
+
 out_dir, traj_sha = sys.argv[1], sys.argv[2]
+preview = {
+    "schema": "crackvision.trajectory_preview/1",
+    "created_utc": datetime.now(timezone.utc).isoformat(),
+    "producer": "test_execution.sh (MOT-05.5)",
+    "trajectory": {"path": "trajectory.json", "sha256": traj_sha, "purpose": "crack_task"},
+    "check_report": {"all_pass": True, "failed_checks": []},
+}
+preview_path = f"{out_dir}/preview.json"
+with open(preview_path, "w") as fh:
+    json.dump(preview, fh, indent=2)
+preview_sha = file_sha256(preview_path)
+
 approval = {
     "schema": "crackvision.execution_approval/1",
     "trajectory_sha256": traj_sha,
     "approved_by": "test_execution.sh",
     "approved_utc": datetime.now(timezone.utc).isoformat(),
-    "preview_artifacts": [],
+    "preview_artifacts": [{"path": "preview.json", "sha256": preview_sha}],
 }
 with open(f"{out_dir}/approval.json", "w") as fh:
     json.dump(approval, fh, indent=2)
