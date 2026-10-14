@@ -1,6 +1,6 @@
 # Progress — week of Mon Oct 12 – Sun Oct 18, 2026
 
-**23 task(s) completed and independently audited this week** · project total **117/156** accepted
+**24 task(s) completed and independently audited this week** · project total **118/156** accepted
 
 ## Completed this week
 
@@ -45,10 +45,12 @@
 …[432 chars clipped]
 - **MOT-08.6 — preview_trajectory ROS node: DisplayTrajectory + tool-path/crack MarkerArray, latched, motion-free** ([details](MOT-08.6.md)): Added a new motion-free ROS node, preview_trajectory, that lets an operator see a planned arm trajectory and its crack-path overlay in RViz before approving a real run, without ever being able to comm
 …[297 chars clipped]
+- **INT-01.1 — Synthetic RGB-D case through the real segmentation-to-paths-to-3D chain (no ROS)** ([details](INT-01.1.md)): Built a single script that runs a synthetic test crack scene through the project's real image-processing pipeline (mask -> skeleton -> path tracing -> 3D lifting), using the actual command-line tools 
+…[247 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 33 / 357
+- Implementation/review sessions run: 34 / 358
 - Audits that rejected work with evidence-backed findings: 11 (repairs created: 12)
 - Re-verified after an upstream change: CAM-02, CAM-05.2, GEOM-01, GEOM-01.R1, GEOM-08.1, GEOM-09.1, GEOM-09.1.R1, GEOM-10, MOT-02, MOT-03, MOT-04.1, MOT-04.1.R1, MOT-04.2, MOT-04.3, MOT-04.3.R1, MOT-04.4, MOT-04.4.R1, MOT-04.5, MOT-04.6, MOT-04.6.R1, MOT-05.1, MOT-05.1.R1, MOT-05.2, MOT-05.3, MOT-05.3.R1, MOT-05.3.R2, MOT-05.4, MOT-05.4.R1, MOT-05.5, MOT-05.6, MOT-05.6.R1, MOT-05.7, MOT-05.7.R1, MOT-06.10, MOT-06.11, MOT-06.11.R1, MOT-06.2, MOT-06.2.R1, MOT-06.4, MOT-06.4.R1, MOT-06.6, MOT-06.6.R1, MOT-06.9, MOT-07.1, MOT-07.1.R1, MOT-07.10.1, MOT-07.10.1.R1, MOT-07.10.2, MOT-07.10.2.R1, MOT-07.10.2.R2, MOT-07.10.3, MOT-07.10.4, MOT-07.10.5, MOT-07.11, MOT-07.2, MOT-07.3, MOT-07.4, MOT-07.4.R1, MOT-07.5, MOT-07.5.R1, MOT-07.6, MOT-07.6.R1, MOT-07.7, MOT-07.7.R1, MOT-07.8, MOT-07.8.R1, MOT-07.9, MOT-10.1, MOT-10.1.R1, MOT-10.1.R2, MOT-10.3, PERC-03, PERC-03.R1
 
@@ -68,7 +70,7 @@
 | Perception (L-PERC) | 13 | 16 |
 | Geometry & calibration (L-GEOM) | 24 | 32 |
 | Motion planning (L-MOTION) | 55 | 66 |
-| Integration & commissioning (L-INT) | 1 | 9 |
+| Integration & commissioning (L-INT) | 2 | 9 |
 | Operator workflow & handoff (L-OPS) | 1 | 4 |
 | Imitation learning (later phase) (L-IL) | 0 | 1 |
 
