@@ -320,3 +320,11 @@ measured example run (`scripts/ros/test_retime_execute.sh`).
   bounded profiling pass could not satisfy every §16.2 guarantee (e.g. no feasible constant trace
   tool speed). `--dry-run` runs the whole pipeline in-process, prints the per-leg summary and
   writes nothing, exiting `0` regardless of outcome.
+
+## 11. One-command synthetic-to-limits-checked-mock-execution run (INT-01.2)
+
+`scripts/ros/run_integration_e2e.sh` chains the real perception leg
+(`scripts/perc/run_synthetic_perception.sh`, INT-01.1) into `plan_view`/`plan_crack_path`,
+`retime_plan`, `crackvision.trajectory_check` and `execute_trajectory --mode dry` then `--mode
+mock` on the headless `moveit_mock` stack — see `docs/motion/INTEGRATION_E2E.md` for the method,
+a measured example run and its caveats.
