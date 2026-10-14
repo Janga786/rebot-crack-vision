@@ -307,6 +307,50 @@ def test_check_report_failing_entry_without_check_key_refuses(case, monkeypatch)
     assert not _default_out_path(case).is_file()
 
 
+def test_check_report_null_refuses(case, monkeypatch):
+    _inject_approving_reader(monkeypatch, case)
+    case["check"].write_bytes(b"null")
+    _resync_check_report_sha(case)
+
+    rc = mod.main(_argv(case))
+    assert rc == 3
+    assert not _default_out_path(case).is_file()
+    assert any("must be a JSON object" in e for e in _latest_run_errors(case))
+
+
+def test_check_report_checks_not_a_list_refuses(case, monkeypatch):
+    _inject_approving_reader(monkeypatch, case)
+    check_doc = {
+        "schema": "crackvision.trajectory_check/1",
+        "created_utc": "2026-01-01T00:00:00Z",
+        "trajectory_sha256": case["traj_sha"],
+        "checks": 5,
+    }
+    case["check"].write_text(json.dumps(check_doc), encoding="utf-8")
+    _resync_check_report_sha(case)
+
+    rc = mod.main(_argv(case))
+    assert rc == 3
+    assert not _default_out_path(case).is_file()
+
+
+@pytest.mark.parametrize("bad_name", [None, 5])
+def test_check_report_failing_entry_non_string_check_refuses(case, monkeypatch, bad_name):
+    _inject_approving_reader(monkeypatch, case)
+    check_doc = {
+        "schema": "crackvision.trajectory_check/1",
+        "created_utc": "2026-01-01T00:00:00Z",
+        "trajectory_sha256": case["traj_sha"],
+        "checks": [{"check": bad_name, "outcome": "fail", "detail": "exceeded", "numbers": {}}],
+    }
+    case["check"].write_text(json.dumps(check_doc), encoding="utf-8")
+    _resync_check_report_sha(case)
+
+    rc = mod.main(_argv(case))
+    assert rc == 3
+    assert not _default_out_path(case).is_file()
+
+
 def test_purpose_test_refuses(case, monkeypatch):
     _inject_approving_reader(monkeypatch, case)
     manifest = json.loads(case["manifest"].read_text(encoding="utf-8"))

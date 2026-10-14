@@ -115,6 +115,7 @@ def verify_for_approval(
         errors.append(f"check report {check_entry['path']} cannot be read: {exc}")
     else:
         check_doc: Any = None
+        check_doc_ok = False
         try:
             check_text = check_bytes.decode("utf-8")
         except UnicodeDecodeError as exc:
@@ -124,14 +125,15 @@ def verify_for_approval(
                 check_doc = json.loads(check_text)
             except json.JSONDecodeError as exc:
                 errors.append(f"check report {check_entry['path']} is not valid JSON: {exc}")
-                check_doc = None
-            if check_doc is not None and not isinstance(check_doc, dict):
-                errors.append(
-                    f"check report {check_entry['path']} must be a JSON object, got "
-                    f"{type(check_doc).__name__}"
-                )
-                check_doc = None
-        if check_doc is not None:
+            else:
+                if not isinstance(check_doc, dict):
+                    errors.append(
+                        f"check report {check_entry['path']} must be a JSON object, got "
+                        f"{type(check_doc).__name__}"
+                    )
+                else:
+                    check_doc_ok = True
+        if check_doc_ok:
             check_sha = file_sha256(check_path)
             if check_sha != check_entry["sha256"]:
                 errors.append(
@@ -143,13 +145,25 @@ def verify_for_approval(
                     f"check report {check_entry['path']} trajectory_sha256 "
                     f"{check_doc.get('trajectory_sha256')!r} != current trajectory sha256 {traj_sha!r}"
                 )
-            failed = [
-                c.get("check", "<unnamed check>")
-                for c in (check_doc.get("checks") or [])
-                if isinstance(c, dict) and c.get("outcome") == "fail"
-            ]
-            if failed:
-                errors.append(f"check report {check_entry['path']} has failing check(s): {', '.join(failed)}")
+            checks_raw = check_doc.get("checks")
+            if checks_raw is not None and not isinstance(checks_raw, list):
+                errors.append(
+                    f"check report {check_entry['path']} 'checks' must be a list, got "
+                    f"{type(checks_raw).__name__}"
+                )
+            else:
+                failed = []
+                for c in checks_raw or []:
+                    if not isinstance(c, dict) or c.get("outcome") != "fail":
+                        continue
+                    name = c.get("check")
+                    if not isinstance(name, str):
+                        name = f"<unnamed check: {name!r}>"
+                    failed.append(name)
+                if failed:
+                    errors.append(
+                        f"check report {check_entry['path']} has failing check(s): {', '.join(failed)}"
+                    )
 
     purpose = traj_entry["purpose"]
     if purpose not in _APPROVED_PURPOSES:
