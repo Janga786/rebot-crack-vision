@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
+import pty
 import sys
 import types
 from pathlib import Path
@@ -499,6 +501,67 @@ def _load_execution_gate(repo_root: Path):
     _load_module_from_path("crackvision_motion.cartesian_plan", motion_dir / "cartesian_plan.py")
     _load_module_from_path("crackvision_description.end_effector", desc_dir / "end_effector.py")
     return _load_module_from_path("crackvision_motion.execution_gate", motion_dir / "execution_gate.py")
+
+
+# ---------------------------------------------------------------------------
+# real-pty regression test for make_tty_reader / confirm (bug: text-mode 'r+' on /dev/tty
+# raised io.UnsupportedOperation because tty/pty devices are not seekable)
+# ---------------------------------------------------------------------------
+
+
+def _run_confirm_in_pty(sha8: str, typed_line: str) -> int:
+    """Forks a child whose controlling terminal is a real pty slave, runs
+    make_tty_reader/confirm there with no monkeypatching, and returns the child's exit status
+    (0 = confirm() was True, 1 = confirm() was False)."""
+    module_path = Path(__file__).resolve().parents[1] / "src" / "crackvision" / "approve_trajectory.py"
+
+    pid, master_fd = pty.fork()
+    if pid == 0:
+        try:
+            child_mod = _load_module_from_path("crackvision_approve_trajectory_ptychild", module_path)
+            reader = child_mod.make_tty_reader(
+                trajectory_path="data/trajectories/case1_trajectory.json",
+                purpose="crack_task",
+                duration_scaled_s=40.0,
+                manifest_path="data/previews/case1_deadbeef/preview.json",
+            )
+            ok = child_mod.confirm(sha8, reader)
+        except Exception:
+            os._exit(2)
+        os._exit(0 if ok else 1)
+
+    try:
+        prompt = b""
+        deadline = 5.0
+        import select
+        import time
+
+        start = time.monotonic()
+        while b"confirmation phrase" not in prompt and time.monotonic() - start < deadline:
+            ready, _, _ = select.select([master_fd], [], [], deadline - (time.monotonic() - start))
+            if not ready:
+                break
+            try:
+                prompt += os.read(master_fd, 4096)
+            except OSError:
+                break
+
+        os.write(master_fd, (typed_line + "\n").encode("utf-8"))
+
+        _, status = os.waitpid(pid, 0)
+        return os.waitstatus_to_exitcode(status)
+    finally:
+        os.close(master_fd)
+
+
+def test_make_tty_reader_confirm_on_real_pty_approves():
+    rc = _run_confirm_in_pty("deadbeef", "APPROVE deadbeef")
+    assert rc == 0
+
+
+def test_make_tty_reader_confirm_on_real_pty_wrong_phrase_refuses():
+    rc = _run_confirm_in_pty("deadbeef", "nope")
+    assert rc == 1
 
 
 def test_approval_file_loads_via_execution_gate(case, monkeypatch, tmp_path):

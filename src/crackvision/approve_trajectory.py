@@ -224,8 +224,17 @@ def build_approval(verified: dict, operator: str, now_utc: str) -> dict:
     }
 
 
-def _open_tty():
-    return open("/dev/tty", "r+", encoding="utf-8")
+def _open_tty() -> tuple[Any, Any]:
+    """Opens `/dev/tty` as two separate text handles, one for reading and one for writing.
+    A single text-mode 'r+' handle wraps a seekable `io.BufferedRandom`, but tty/pty devices
+    are not seekable, so that open always raises; two one-way handles avoid it."""
+    tty_in = open("/dev/tty", "r", encoding="utf-8")
+    try:
+        tty_out = open("/dev/tty", "w", encoding="utf-8")
+    except OSError:
+        tty_in.close()
+        raise
+    return tty_in, tty_out
 
 
 def make_tty_reader(
@@ -236,17 +245,18 @@ def make_tty_reader(
     reads one line. An `OSError` while opening means there is no controlling terminal."""
 
     def reader() -> str:
-        tty = _open_tty()
+        tty_in, tty_out = _open_tty()
         try:
-            tty.write(f"Trajectory: {trajectory_path}\n")
-            tty.write(f"Purpose: {purpose}\n")
-            tty.write(f"Duration at preview speed scale: {duration_scaled_s:.3f} s\n")
-            tty.write(f"Manifest: {manifest_path}\n")
-            tty.write("Type the confirmation phrase: ")
-            tty.flush()
-            return tty.readline()
+            tty_out.write(f"Trajectory: {trajectory_path}\n")
+            tty_out.write(f"Purpose: {purpose}\n")
+            tty_out.write(f"Duration at preview speed scale: {duration_scaled_s:.3f} s\n")
+            tty_out.write(f"Manifest: {manifest_path}\n")
+            tty_out.write("Type the confirmation phrase: ")
+            tty_out.flush()
+            return tty_in.readline()
         finally:
-            tty.close()
+            tty_in.close()
+            tty_out.close()
 
     return reader
 
