@@ -254,6 +254,59 @@ def test_failing_check_report_refuses(case, monkeypatch):
     assert not _default_out_path(case).is_file()
 
 
+def _resync_check_report_sha(case):
+    manifest = json.loads(case["manifest"].read_text(encoding="utf-8"))
+    manifest["check_report"]["sha256"] = file_sha256(case["check"])
+    case["manifest"].write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+
+
+def _latest_run_errors(case):
+    log_path = case["root"] / "logs" / "approve_trajectory_latest.json"
+    summary = json.loads(log_path.read_text(encoding="utf-8"))
+    return summary["errors"]
+
+
+def test_check_report_json_array_refuses(case, monkeypatch):
+    _inject_approving_reader(monkeypatch, case)
+    case["check"].write_text(json.dumps([{"check": "C-SCHEMA", "outcome": "pass"}]), encoding="utf-8")
+    _resync_check_report_sha(case)
+
+    rc = mod.main(_argv(case))
+    assert rc == 3
+    assert not _default_out_path(case).is_file()
+    assert any("JSON object" in e for e in _latest_run_errors(case))
+
+
+def test_check_report_non_utf8_refuses(case, monkeypatch):
+    _inject_approving_reader(monkeypatch, case)
+    case["check"].write_bytes(b"\xff\xfe\x00\x01")
+    _resync_check_report_sha(case)
+
+    rc = mod.main(_argv(case))
+    assert rc == 3
+    assert not _default_out_path(case).is_file()
+    assert any("not valid UTF-8" in e for e in _latest_run_errors(case))
+
+
+def test_check_report_failing_entry_without_check_key_refuses(case, monkeypatch):
+    _inject_approving_reader(monkeypatch, case)
+    check_doc = {
+        "schema": "crackvision.trajectory_check/1",
+        "created_utc": "2026-01-01T00:00:00Z",
+        "trajectory_sha256": case["traj_sha"],
+        "checks": [{"outcome": "fail", "detail": "exceeded", "numbers": {}}],
+    }
+    case["check"].write_text(json.dumps(check_doc), encoding="utf-8")
+    manifest = json.loads(case["manifest"].read_text(encoding="utf-8"))
+    manifest["check_report"]["sha256"] = file_sha256(case["check"])
+    manifest["check_report"]["all_pass"] = False
+    case["manifest"].write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+
+    rc = mod.main(_argv(case))
+    assert rc == 3
+    assert not _default_out_path(case).is_file()
+
+
 def test_purpose_test_refuses(case, monkeypatch):
     _inject_approving_reader(monkeypatch, case)
     manifest = json.loads(case["manifest"].read_text(encoding="utf-8"))
