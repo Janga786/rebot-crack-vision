@@ -1,6 +1,6 @@
 # Progress — week of Mon Oct 12 – Sun Oct 18, 2026
 
-**38 task(s) completed and independently audited this week** · project total **126/157** accepted
+**39 task(s) completed and independently audited this week** · project total **127/157** accepted
 
 ## Completed this week
 
@@ -64,10 +64,12 @@
 …[399 chars clipped]
 - **MOT-08.10 — approve_trajectory: open /dev/tty as separate read/write handles so the typed APPROVE prompt works on a real (pseudo-)terminal** ([details](MOT-08.10.md)): Fixed a bug where the trajectory-approval tool could never actually accept a typed APPROVE confirmation on any real terminal, because it opened /dev/tty in a text mode that always errors on non-seekab
 …[320 chars clipped]
+- **MOT-08.8 — Headless mock run: view plan → retime → check → preview → approve (pty) → execute_trajectory dry with G-APPROVAL pass, tamper refusals** ([details](MOT-08.8.md)): The headless mock test for the view→preview→approve→execute workflow (test_preview_approve.sh) now runs end-to-end successfully: it builds, previews and gets a typed pseudo-terminal approval for a syn
+…[446 chars clipped]
 
 ## Quality loop
 
-- Implementation/review sessions run: 53 / 472
+- Implementation/review sessions run: 54 / 473
 - Audits that rejected work with evidence-backed findings: 17 (repairs created: 19)
 - Re-verified after an upstream change: CAM-02, CAM-05.2, GEOM-01, GEOM-01.R1, GEOM-08.1, GEOM-09.1, GEOM-09.1.R1, GEOM-10, MOT-02, MOT-03, MOT-04.1, MOT-04.1.R1, MOT-04.2, MOT-04.3, MOT-04.3.R1, MOT-04.4, MOT-04.4.R1, MOT-04.5, MOT-04.6, MOT-04.6.R1, MOT-05.1, MOT-05.1.R1, MOT-05.2, MOT-05.3, MOT-05.3.R1, MOT-05.3.R2, MOT-05.4, MOT-05.4.R1, MOT-05.5, MOT-05.5.R1, MOT-05.6, MOT-05.6.R1, MOT-05.7, MOT-05.7.R1, MOT-06.10, MOT-06.11, MOT-06.11.R1, MOT-06.2, MOT-06.2.R1, MOT-06.4, MOT-06.4.R1, MOT-06.6, MOT-06.6.R1, MOT-06.9, MOT-07.1, MOT-07.1.R1, MOT-07.10.1, MOT-07.10.1.R1, MOT-07.10.2, MOT-07.10.2.R1, MOT-07.10.2.R1.R1, MOT-07.10.2.R2, MOT-07.10.2.R2.R1, MOT-07.10.3, MOT-07.10.4, MOT-07.10.5, MOT-07.11, MOT-07.2, MOT-07.3, MOT-07.4, MOT-07.4.R1, MOT-07.5, MOT-07.5.R1, MOT-07.6, MOT-07.6.R1, MOT-07.7, MOT-07.7.R1, MOT-07.8, MOT-07.8.R1, MOT-07.9, MOT-08.1, MOT-08.1.R1, MOT-08.4, MOT-08.4.R1, MOT-08.6, MOT-10.1, MOT-10.1.R1, MOT-10.1.R2, MOT-10.3, PERC-03, PERC-03.R1
 
@@ -86,7 +88,7 @@
 | D405 capture (L-CAM) | 7 | 9 |
 | Perception (L-PERC) | 13 | 16 |
 | Geometry & calibration (L-GEOM) | 24 | 32 |
-| Motion planning (L-MOTION) | 60 | 67 |
+| Motion planning (L-MOTION) | 61 | 67 |
 | Integration & commissioning (L-INT) | 5 | 9 |
 | Operator workflow & handoff (L-OPS) | 1 | 4 |
 | Imitation learning (later phase) (L-IL) | 0 | 1 |
