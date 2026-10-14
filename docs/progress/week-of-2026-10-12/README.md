@@ -1,6 +1,6 @@
 # Progress — week of Mon Oct 12 – Sun Oct 18, 2026
 
-**30 task(s) completed and independently audited this week** · project total **116/156** accepted
+**31 task(s) completed and independently audited this week** · project total **117/156** accepted
 
 ## Completed this week
 
@@ -38,7 +38,8 @@
 …[328 chars clipped]
 - **MOT-07.10.5 — Headless mock run: view_plan → retime_plan --view-plan → trajectory_check → execute_trajectory dry/mock** ([details](MOT-07.10.5.md)): Wrote scripts/ros/test_view_retime_execute.sh (modelled on test_retime_execute.sh) proving the headless mock chain view_plan -> retime_plan --view-plan -> trajectory_check -> execute_trajectory (dry, 
 …[146 chars clipped]
-- **MOT-07.10 — Retime the view-plan transit leg and settle the §11.2 purpose for view moves** ([details](MOT-07.10.md)): All sub-tasks of this work package were completed and audited together: MOT-07.10.1, MOT-07.10.1.R1, MOT-07.10.2, MOT-07.10.2.R1, MOT-07.10.2.R1.R1, MOT-07.10.2.R2, MOT-07.10.3, MOT-07.10.4, MOT-07.10.5.
+- **MOT-07.10 — Retime the view-plan transit leg and settle the §11.2 purpose for view moves** ([details](MOT-07.10.md)): All sub-tasks of this work package were completed and audited together: MOT-07.10.1, MOT-07.10.1.R1, MOT-07.10.2, MOT-07.10.2.R1, MOT-07.10.2.R1.R1, MOT-07.10.2.R2, MOT-07.10.2.R2.R1, MOT-07.10.3, MOT
+…[22 chars clipped]
 - **MOT-08.1 — Decision + contract: trajectory preview manifest, approval CLI and G-APPROVAL preview binding (ADR-020, INTERFACES §18)** ([details](MOT-08.1.md)): Defined the full written contract (ADR-020 plus a new §18 in INTERFACES.md) for how a planned robot trajectory gets previewed and approved before it can run on the real arm: a rendered preview (JSON +
 …[395 chars clipped]
 - **MOT-08.2 — Preview core: bind trajectory/plan/retime/check inputs, FK tool path, summary metrics and trajectory_preview/1 manifest (pure, no plotting)** ([details](MOT-08.2.md)): Built the pure-Python preview core (crackvision/preview_core.py) that validates and sha-binds a trajectory, plan, retime report and check report together, computes the per-joint velocity/acceleration 
@@ -56,7 +57,7 @@
 
 ## Quality loop
 
-- Implementation/review sessions run: 43 / 406
+- Implementation/review sessions run: 44 / 408
 - Audits that rejected work with evidence-backed findings: 17 (repairs created: 19)
 - Re-verified after an upstream change: CAM-02, CAM-05.2, GEOM-01, GEOM-01.R1, GEOM-08.1, GEOM-09.1, GEOM-09.1.R1, GEOM-10, MOT-02, MOT-03, MOT-04.1, MOT-04.1.R1, MOT-04.2, MOT-04.3, MOT-04.3.R1, MOT-04.4, MOT-04.4.R1, MOT-04.5, MOT-04.6, MOT-04.6.R1, MOT-05.1, MOT-05.1.R1, MOT-05.2, MOT-05.3, MOT-05.3.R1, MOT-05.3.R2, MOT-05.4, MOT-05.4.R1, MOT-05.5, MOT-05.5.R1, MOT-05.6, MOT-05.6.R1, MOT-05.7, MOT-05.7.R1, MOT-06.10, MOT-06.11, MOT-06.11.R1, MOT-06.2, MOT-06.2.R1, MOT-06.4, MOT-06.4.R1, MOT-06.6, MOT-06.6.R1, MOT-06.9, MOT-07.1, MOT-07.1.R1, MOT-07.10.1, MOT-07.10.1.R1, MOT-07.10.2, MOT-07.10.2.R1, MOT-07.10.2.R1.R1, MOT-07.10.2.R2, MOT-07.10.3, MOT-07.10.4, MOT-07.10.5, MOT-07.11, MOT-07.2, MOT-07.3, MOT-07.4, MOT-07.4.R1, MOT-07.5, MOT-07.5.R1, MOT-07.6, MOT-07.6.R1, MOT-07.7, MOT-07.7.R1, MOT-07.8, MOT-07.8.R1, MOT-07.9, MOT-08.1, MOT-08.1.R1, MOT-08.4, MOT-08.4.R1, MOT-10.1, MOT-10.1.R1, MOT-10.1.R2, MOT-10.3, PERC-03, PERC-03.R1
 
@@ -75,7 +76,7 @@
 | D405 capture (L-CAM) | 7 | 9 |
 | Perception (L-PERC) | 13 | 16 |
 | Geometry & calibration (L-GEOM) | 24 | 32 |
-| Motion planning (L-MOTION) | 53 | 66 |
+| Motion planning (L-MOTION) | 54 | 66 |
 | Integration & commissioning (L-INT) | 2 | 9 |
 | Operator workflow & handoff (L-OPS) | 1 | 4 |
 | Imitation learning (later phase) (L-IL) | 0 | 1 |
