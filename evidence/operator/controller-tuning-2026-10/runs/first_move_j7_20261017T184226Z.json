@@ -1,0 +1,187 @@
+{
+  "tool": "first_move_j1.py",
+  "version": "2026-10-14.1",
+  "mode": "first_move_j7",
+  "simulated": false,
+  "started_utc": "20261017T184226Z",
+  "port": "/dev/ttyACM0",
+  "params": {
+    "kp": 40.0,
+    "kd": 0.5,
+    "target_rad": 0.1,
+    "ramp_s": 8.0,
+    "hold_s": 1.0,
+    "settle_s": 0.5,
+    "loop_hz": 200.0,
+    "torque_limit_nm": 4.75,
+    "track_abort_rad": 0.1,
+    "stale_abort_s": 0.2,
+    "vel_abort_rad_s": 0.5,
+    "others_drift_abort_rad": 0.3
+  },
+  "precheck": {
+    "j1": {
+      "motor_id": 1,
+      "feedback_id": 17,
+      "model": "4340P",
+      "ctrl_mode": 1,
+      "timeout_raw": 0,
+      "pmax_vmax_tmax": [
+        12.5,
+        10.0,
+        28.0
+      ],
+      "status": 0,
+      "status_name": "DISABLED",
+      "pos": 0.058175086975097656,
+      "vel": -0.0024423599243164062,
+      "torq": 0.0068378448486328125,
+      "t_mos": 25.0,
+      "t_rotor": 23.0
+    },
+    "j2": {
+      "motor_id": 2,
+      "feedback_id": 18,
+      "model": "4340P",
+      "ctrl_mode": 1,
+      "timeout_raw": 0,
+      "pmax_vmax_tmax": [
+        12.5,
+        10.0,
+        28.0
+      ],
+      "status": 0,
+      "status_name": "DISABLED",
+      "pos": 0.00438690185546875,
+      "vel": -0.0024423599243164062,
+      "torq": -0.020513534545898438,
+      "t_mos": 24.0,
+      "t_rotor": 22.0
+    },
+    "j3": {
+      "motor_id": 3,
+      "feedback_id": 19,
+      "model": "4340P",
+      "ctrl_mode": 1,
+      "timeout_raw": 0,
+      "pmax_vmax_tmax": [
+        12.5,
+        10.0,
+        28.0
+      ],
+      "status": 0,
+      "status_name": "DISABLED",
+      "pos": -0.00438690185546875,
+      "vel": -0.0024423599243164062,
+      "torq": -0.0068378448486328125,
+      "t_mos": 24.0,
+      "t_rotor": 23.0
+    },
+    "j4": {
+      "motor_id": 4,
+      "feedback_id": 20,
+      "model": "4310",
+      "ctrl_mode": 1,
+      "timeout_raw": 0,
+      "pmax_vmax_tmax": [
+        12.5,
+        30.0,
+        10.0
+      ],
+      "status": 0,
+      "status_name": "DISABLED",
+      "pos": -0.00019073486328125,
+      "vel": -0.0073261260986328125,
+      "torq": -0.0073261260986328125,
+      "t_mos": 26.0,
+      "t_rotor": 23.0
+    },
+    "j5": {
+      "motor_id": 5,
+      "feedback_id": 21,
+      "model": "4310",
+      "ctrl_mode": 1,
+      "timeout_raw": 0,
+      "pmax_vmax_tmax": [
+        12.5,
+        30.0,
+        10.0
+      ],
+      "status": 0,
+      "status_name": "DISABLED",
+      "pos": 0.050164222717285156,
+      "vel": -0.0073261260986328125,
+      "torq": -0.0024423599243164062,
+      "t_mos": 25.0,
+      "t_rotor": 23.0
+    },
+    "j6": {
+      "motor_id": 6,
+      "feedback_id": 22,
+      "model": "4310",
+      "ctrl_mode": 1,
+      "timeout_raw": 0,
+      "pmax_vmax_tmax": [
+        12.5,
+        30.0,
+        10.0
+      ],
+      "status": 0,
+      "status_name": "DISABLED",
+      "pos": -0.02307891845703125,
+      "vel": -0.0073261260986328125,
+      "torq": -0.0024423599243164062,
+      "t_mos": 25.0,
+      "t_rotor": 23.0
+    },
+    "j7": {
+      "motor_id": 7,
+      "feedback_id": 23,
+      "model": "4310",
+      "ctrl_mode": 1,
+      "timeout_raw": 0,
+      "pmax_vmax_tmax": [
+        12.5,
+        30.0,
+        10.0
+      ],
+      "status": 0,
+      "status_name": "DISABLED",
+      "pos": 0.00057220458984375,
+      "vel": -0.0073261260986328125,
+      "torq": -0.0024423599243164062,
+      "t_mos": 26.0,
+      "t_rotor": 23.0
+    }
+  },
+  "confirmation": {
+    "method": "operator_go_in_chat",
+    "operator_go": "go"
+  },
+  "outcome": "aborted",
+  "trigger": {
+    "id": "velocity",
+    "detail": "|vel| = 0.505 rad/s > 0.5"
+  },
+  "stats": {
+    "n_cmd": 624,
+    "max_abs_err": 0.011617502946600189,
+    "max_abs_torque": 0.4517707824707031,
+    "max_abs_vel": 0.5054950714111328,
+    "max_gap_s": 0.005078156013041735,
+    "peak_pos": 0.00057220458984375,
+    "min_pos": -0.19398021697998047,
+    "first_cmd_rad": 0.00057220458984375,
+    "abort_hold_rad": -0.19398021697998047,
+    "abort_hold_source": "measured",
+    "disabled_confirmed": true,
+    "heartbeats_ok": 1,
+    "heartbeats_failed": 0,
+    "mean_rate_hz": 172.37519967321052
+  },
+  "csv": "/home/boosterk1/rebot_setup/runs/first_move_j7_20261017T184226Z.csv",
+  "q_start": 0.00057220458984375,
+  "q_target": -0.9994277954101562,
+  "exit_code": 1,
+  "finished_utc": "20261017T184230Z"
+}

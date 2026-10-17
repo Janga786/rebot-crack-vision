@@ -1,0 +1,26 @@
+{
+  "tool": "first_move_j1.py",
+  "version": "2026-10-14.1",
+  "mode": "first_move_j3",
+  "simulated": false,
+  "started_utc": "20261014T164348Z",
+  "port": "/dev/ttyACM0",
+  "params": {
+    "kp": 100.0,
+    "kd": 1.0,
+    "target_rad": -0.1,
+    "ramp_s": 2.0,
+    "hold_s": 1.0,
+    "settle_s": 0.5,
+    "loop_hz": 200.0,
+    "torque_limit_nm": 11.0,
+    "track_abort_rad": 0.1,
+    "stale_abort_s": 0.2,
+    "vel_abort_rad_s": 0.5,
+    "others_drift_abort_rad": 0.1
+  },
+  "outcome": "refused",
+  "refusal": "j1: |pos| = 0.0875 rad >= 0.05 (not at rest at zero)",
+  "exit_code": 3,
+  "finished_utc": "20261014T164348Z"
+}

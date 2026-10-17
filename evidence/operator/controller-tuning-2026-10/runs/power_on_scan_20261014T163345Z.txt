@@ -1,0 +1,42 @@
+command=scan vendor=damiao transport=dm-serial serial_port=/dev/ttyACM0 serial_baud=921600 model=4340 id_range=[0x1,0x20] timeout_ms=80
+[scan:damiao] serial_port=/dev/ttyACM0 serial_baud=921600 model=4340 id_range=[0x1,0x20] timeout_ms=80
+[hit] vendor=damiao probe=0x01 esc_id=0x1 mst_id=0x11
+[hit] vendor=damiao probe=0x02 esc_id=0x2 mst_id=0x12
+[hit] vendor=damiao probe=0x03 esc_id=0x3 mst_id=0x13
+[hit] vendor=damiao probe=0x04 esc_id=0x4 mst_id=0x14
+[hit] vendor=damiao probe=0x05 esc_id=0x5 mst_id=0x15
+[hit] vendor=damiao probe=0x06 esc_id=0x6 mst_id=0x16
+[hit] vendor=damiao probe=0x07 esc_id=0x7 mst_id=0x17
+[.. ] vendor=damiao probe=0x08 no reply
+[.. ] vendor=damiao probe=0x09 no reply
+[.. ] vendor=damiao probe=0x0A no reply
+[.. ] vendor=damiao probe=0x0B no reply
+[.. ] vendor=damiao probe=0x0C no reply
+[.. ] vendor=damiao probe=0x0D no reply
+[.. ] vendor=damiao probe=0x0E no reply
+[.. ] vendor=damiao probe=0x0F no reply
+[.. ] vendor=damiao probe=0x10 no reply
+[.. ] vendor=damiao probe=0x11 no reply
+[.. ] vendor=damiao probe=0x12 no reply
+[.. ] vendor=damiao probe=0x13 no reply
+[.. ] vendor=damiao probe=0x14 no reply
+[.. ] vendor=damiao probe=0x15 no reply
+[.. ] vendor=damiao probe=0x16 no reply
+[.. ] vendor=damiao probe=0x17 no reply
+[.. ] vendor=damiao probe=0x18 no reply
+[.. ] vendor=damiao probe=0x19 no reply
+[.. ] vendor=damiao probe=0x1A no reply
+[.. ] vendor=damiao probe=0x1B no reply
+[.. ] vendor=damiao probe=0x1C no reply
+[.. ] vendor=damiao probe=0x1D no reply
+[.. ] vendor=damiao probe=0x1E no reply
+[.. ] vendor=damiao probe=0x1F no reply
+[.. ] vendor=damiao probe=0x20 no reply
+scan done: 7 motor(s) found
+  probe=0x01 vendor=damiao esc_id=0x1 mst_id=0x11
+  probe=0x02 vendor=damiao esc_id=0x2 mst_id=0x12
+  probe=0x03 vendor=damiao esc_id=0x3 mst_id=0x13
+  probe=0x04 vendor=damiao esc_id=0x4 mst_id=0x14
+  probe=0x05 vendor=damiao esc_id=0x5 mst_id=0x15
+  probe=0x06 vendor=damiao esc_id=0x6 mst_id=0x16
+  probe=0x07 vendor=damiao esc_id=0x7 mst_id=0x17

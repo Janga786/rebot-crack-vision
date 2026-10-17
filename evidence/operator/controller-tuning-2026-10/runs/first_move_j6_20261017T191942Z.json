@@ -1,0 +1,254 @@
+{
+  "tool": "first_move_j1.py",
+  "version": "2026-10-17.1",
+  "mode": "first_move_j6",
+  "simulated": false,
+  "started_utc": "20261017T191942Z",
+  "port": "/dev/ttyACM0",
+  "params": {
+    "kp": 100.0,
+    "kd": 1.0,
+    "target_rad": 0.1,
+    "ramp_s": 1.0,
+    "hold_s": 1.0,
+    "settle_s": 0.5,
+    "loop_hz": 200.0,
+    "gains": [
+      [
+        20.0,
+        0.5
+      ],
+      [
+        30.0,
+        0.5
+      ],
+      [
+        40.0,
+        1.0
+      ]
+    ],
+    "gravity": true,
+    "gravity_scale": 1.0,
+    "gravity_joint_scale": {
+      "j2": 0.6,
+      "j3": 2.5,
+      "j4": 2.5
+    },
+    "friction_nm": 0.3,
+    "tau_ff": 0.0,
+    "track_abort_rad": 0.1,
+    "stale_abort_s": 0.2,
+    "vel_abort_rad_s": 0.5,
+    "others_drift_abort_rad": 0.3
+  },
+  "precheck": {
+    "j1": {
+      "motor_id": 1,
+      "feedback_id": 17,
+      "model": "4340P",
+      "ctrl_mode": 1,
+      "timeout_raw": 0,
+      "pmax_vmax_tmax": [
+        12.5,
+        10.0,
+        28.0
+      ],
+      "status": 0,
+      "status_name": "DISABLED",
+      "pos": 0.058175086975097656,
+      "vel": -0.0024423599243164062,
+      "torq": 0.020513534545898438,
+      "t_mos": 28.0,
+      "t_rotor": 26.0
+    },
+    "j2": {
+      "motor_id": 2,
+      "feedback_id": 18,
+      "model": "4340P",
+      "ctrl_mode": 1,
+      "timeout_raw": 0,
+      "pmax_vmax_tmax": [
+        12.5,
+        10.0,
+        28.0
+      ],
+      "status": 0,
+      "status_name": "DISABLED",
+      "pos": -0.00209808349609375,
+      "vel": -0.0024423599243164062,
+      "torq": 0.03418731689453125,
+      "t_mos": 27.0,
+      "t_rotor": 25.0
+    },
+    "j3": {
+      "motor_id": 3,
+      "feedback_id": 19,
+      "model": "4340P",
+      "ctrl_mode": 1,
+      "timeout_raw": 0,
+      "pmax_vmax_tmax": [
+        12.5,
+        10.0,
+        28.0
+      ],
+      "status": 0,
+      "status_name": "DISABLED",
+      "pos": -0.045586585998535156,
+      "vel": -0.0024423599243164062,
+      "torq": -0.047863006591796875,
+      "t_mos": 27.0,
+      "t_rotor": 28.0
+    },
+    "j4": {
+      "motor_id": 4,
+      "feedback_id": 20,
+      "model": "4310",
+      "ctrl_mode": 1,
+      "timeout_raw": 0,
+      "pmax_vmax_tmax": [
+        12.5,
+        30.0,
+        10.0
+      ],
+      "status": 0,
+      "status_name": "DISABLED",
+      "pos": 0.10967445373535156,
+      "vel": -0.0073261260986328125,
+      "torq": 0.0073261260986328125,
+      "t_mos": 30.0,
+      "t_rotor": 28.0
+    },
+    "j5": {
+      "motor_id": 5,
+      "feedback_id": 21,
+      "model": "4310",
+      "ctrl_mode": 1,
+      "timeout_raw": 0,
+      "pmax_vmax_tmax": [
+        12.5,
+        30.0,
+        10.0
+      ],
+      "status": 0,
+      "status_name": "DISABLED",
+      "pos": 0.06580448150634766,
+      "vel": -0.0073261260986328125,
+      "torq": -0.0024423599243164062,
+      "t_mos": 29.0,
+      "t_rotor": 27.0
+    },
+    "j6": {
+      "motor_id": 6,
+      "feedback_id": 22,
+      "model": "4310",
+      "ctrl_mode": 1,
+      "timeout_raw": 0,
+      "pmax_vmax_tmax": [
+        12.5,
+        30.0,
+        10.0
+      ],
+      "status": 0,
+      "status_name": "DISABLED",
+      "pos": -0.02346038818359375,
+      "vel": -0.0073261260986328125,
+      "torq": -0.0024423599243164062,
+      "t_mos": 29.0,
+      "t_rotor": 27.0
+    },
+    "j7": {
+      "motor_id": 7,
+      "feedback_id": 23,
+      "model": "4310",
+      "ctrl_mode": 1,
+      "timeout_raw": 0,
+      "pmax_vmax_tmax": [
+        12.5,
+        30.0,
+        10.0
+      ],
+      "status": 0,
+      "status_name": "DISABLED",
+      "pos": -0.20199108123779297,
+      "vel": -0.0073261260986328125,
+      "torq": 0.0024423599243164062,
+      "t_mos": 30.0,
+      "t_rotor": 27.0
+    }
+  },
+  "confirmation": {
+    "method": "operator_go_in_chat",
+    "operator_go": "go"
+  },
+  "outcome": "completed",
+  "trigger": null,
+  "stats": {
+    "n_cmd": 2691,
+    "max_abs_err": 0.012893026848834727,
+    "max_abs_torque": 0.1782665252685547,
+    "max_abs_vel": 0.34432220458984375,
+    "max_gap_s": 0.015565881971269846,
+    "peak_pos": 0.08335208892822266,
+    "min_pos": -0.034142494201660156,
+    "held_at": {
+      "j1": 0.058175086975097656,
+      "j2": -0.00209808349609375,
+      "j3": -0.045586585998535156,
+      "j4": 0.10967445373535156,
+      "j5": 0.06580448150634766,
+      "j7": -0.20199108123779297
+    },
+    "first_cmd_rad": -0.02346038818359375,
+    "hold_err_sum": -1.440849304199205,
+    "hold_err_n": 600,
+    "held_disabled_confirmed": true,
+    "disabled_confirmed": true,
+    "heartbeats_ok": 36,
+    "heartbeats_failed": 1,
+    "mean_rate_hz": 199.21048369459905,
+    "hold_mean_err_rad": -0.002401415506998675
+  },
+  "csv": "/home/boosterk1/rebot_setup/runs/first_move_j6_20261017T191942Z.csv",
+  "q_start": -0.02346038818359375,
+  "q_target": 0.07653961181640626,
+  "sweep": [
+    {
+      "seg": 0,
+      "kp": 20.0,
+      "kd": 0.5,
+      "rms_track_rad": 0.00914284548739667,
+      "hold_err_rad": -0.0026468276977539007,
+      "overshoot_rad": 0.004905128479003901,
+      "osc_flips": 1,
+      "peak_torque_nm": 0.17338180541992188,
+      "complete": true,
+      "score": 0.03159993014315837
+    },
+    {
+      "seg": 1,
+      "kp": 30.0,
+      "kd": 0.5,
+      "rms_track_rad": 0.006088131649001838,
+      "hold_err_rad": -0.0026163101196289007,
+      "overshoot_rad": 0.0026163101196289007,
+      "osc_flips": 0,
+      "peak_torque_nm": 0.1782665252685547,
+      "complete": true,
+      "score": 0.01393706200788854
+    },
+    {
+      "seg": 2,
+      "kp": 40.0,
+      "kd": 1.0,
+      "rms_track_rad": 0.004570778876748932,
+      "hold_err_rad": -0.0019411087036132757,
+      "overshoot_rad": 0.0022348403930664007,
+      "osc_flips": 0,
+      "peak_torque_nm": 0.16361427307128906,
+      "complete": true,
+      "score": 0.010981568366495009
+    }
+  ],
+  "exit_code": 0,
+  "finished_utc": "20261017T191956Z"
+}
