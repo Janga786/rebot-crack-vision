@@ -68,6 +68,22 @@ It matches the MIT frame encoding exactly, with the PMAX/VMAX/TMAX registers rea
 | velocity | 12 bit over ±VMAX | 20/4095 = **0.00488 rad/s** | 60/4095 = **0.01465 rad/s** |
 | torque | 12 bit over ±TMAX | 56/4095 = **0.0137 Nm** | 20/4095 = **0.0049 Nm** |
 
+**What the resolution means** (a sanity check, not a design choice — the encoding is fixed by the Damiao firmware
+and motorbridge):
+- *The logs are raw motor feedback.* Every logged value sits exactly on the MIT grid, which also confirms that the
+  PMAX/VMAX/TMAX ranges read from the registers are the ones in use.
+- *Sensing is not what limits the tuning.* Position resolution is 0.00038 rad (0.02°); the tuned tracking errors are
+  10–60× larger. Friction and gravity-model error dominate (§2, §6).
+- *Velocity is coarse on the DM4310s.* 0.0147 rad/s per step against moves of 0.1–1.2 rad/s, which is part of why
+  their velocity read-outs are noisy. The aborting spikes (§11) were **19 and 26 steps** above the neighbouring
+  samples (0.549 vs 0.271 and 0.506 vs 0.125 rad/s), so they are genuine jumps in the motor's velocity estimate, not
+  rounding.
+- *Possible improvement (not done):* the DM4310s encode velocity over ±30 rad/s while the arm never exceeds about
+  1.2 rad/s, so ~96 % of the range is unused; a lower VMAX would give proportionally finer velocity feedback. It is a
+  motor register write (commissioning-level), and the scripts deliberately refuse to run when PMAX/VMAX/TMAX differ
+  from the per-model values the host is configured with, so it would also need confirming that motorbridge scales
+  its MIT frames from the registers rather than from the model table (not verified).
+
 **Loop timing** (figure f11): mean cycle 5.02 ms, 99th percentile 5.10 ms, worst 13 ms (single-joint sweep with 7
 motors live) / 15 ms (7-joint demo). The slow cycles are most likely register "heartbeat" reads (§4) — not
 verified; the 50 ms stream-gap abort never came close.
@@ -364,7 +380,7 @@ J5, J6 kp 30 tracked well; J7 gripper aborted on a velocity reading. One run abo
 **2026-10-17 — tuning.** In order:
 
 1. **J7 velocity spikes.** Two aborts at 0.549 and 0.505 rad/s while the gripper actually moved ~0.17 rad/s (f07):
-   single samples, 30–40 LSB jumps — not quantisation. ⇒ per-joint velocity abort (DM4310 1.0 rad/s), tracking
+   single samples, jumps of 19 and 26 LSB (0.0147 rad/s) above their neighbours — not quantisation. ⇒ per-joint velocity abort (DM4310 1.0 rad/s), tracking
    error stays the real guard. *Process error:* after this code change one run (`…184241Z`) was started without a
    fresh operator go; it completed safely; the rule "never re-run after a code change without a new go" was
    re-affirmed.
@@ -407,6 +423,7 @@ removed. Worth investigating (bus timing after the previous run's disable), not 
 - **Gains are for 0.1 rad test moves and the two demos**; crack-tracing speeds and contact forces were not tested.
 - **kp/kd units** are taken as Nm/rad, Nm·s/rad per the Damiao MIT convention; not independently verified.
 - **Missed register reads** before enable (§11) are unexplained.
+- **DM4310 velocity resolution** (0.0147 rad/s) could be improved ~25× by a lower VMAX (§1); not attempted.
 
 ## 13. Figure catalogue
 
