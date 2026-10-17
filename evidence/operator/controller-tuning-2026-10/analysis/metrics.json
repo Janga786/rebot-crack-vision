@@ -1,0 +1,519 @@
+{
+  "n_runs": 41,
+  "n_runs_by_outcome": {
+    "aborted": 6,
+    "check_ok": 2,
+    "completed": 28,
+    "refused": 5
+  },
+  "j3_progression_hold_err": [
+    [
+      "kp100, no feed-forward, others free",
+      -0.050427099999999996
+    ],
+    [
+      "kp100 + tau_ff -2.8 (URDF), others free",
+      -0.021797000000000004
+    ],
+    [
+      "all held, URDF gravity x1",
+      -0.06719300000000002
+    ],
+    [
+      "all held, gravity j3 x2.5 (faded in)",
+      -0.020270999999999997
+    ],
+    [
+      "+ friction ff",
+      -0.008827999999999975
+    ]
+  ],
+  "j3_hysteresis": {
+    "stick_up_nm": -8.8684,
+    "stick_down_nm": -4.3282,
+    "gravity_est_nm": -6.5983,
+    "friction_est_nm": 2.2701,
+    "ff_nm": -6.787,
+    "urdf_gravity_nm": -2.7244896445045472
+  },
+  "sweeps": {
+    "J1 (kp)": [
+      {
+        "seg": 0,
+        "kp": 60.0,
+        "kd": 0.5,
+        "rms_track_rad": 0.003982964380164931,
+        "hold_err_rad": 0.001197433471679693,
+        "overshoot_rad": 0.0,
+        "osc_flips": 0,
+        "peak_torque_nm": 1.4974365234375,
+        "complete": true,
+        "score": 0.005180397851844624
+      },
+      {
+        "seg": 1,
+        "kp": 80.0,
+        "kd": 1.0,
+        "rms_track_rad": 0.002023518617069365,
+        "hold_err_rad": 0.001197433471679693,
+        "overshoot_rad": 0.0,
+        "osc_flips": 0,
+        "peak_torque_nm": 1.1692314147949219,
+        "complete": true,
+        "score": 0.003220952088749058
+      },
+      {
+        "seg": 2,
+        "kp": 100.0,
+        "kd": 1.0,
+        "rms_track_rad": 0.001603974938498886,
+        "hold_err_rad": 0.001197433471679693,
+        "overshoot_rad": 0.0,
+        "osc_flips": 0,
+        "peak_torque_nm": 1.1965808868408203,
+        "complete": true,
+        "score": 0.002801408410178579
+      }
+    ],
+    "J2 (kp, gravity x1, fric 1.5)": [
+      {
+        "seg": 0,
+        "kp": 60.0,
+        "kd": 0.5,
+        "rms_track_rad": 0.013026837557535215,
+        "hold_err_rad": 0.007969399654504019,
+        "overshoot_rad": 0.008339309692382807,
+        "osc_flips": 0,
+        "peak_torque_nm": 2.536752700805664,
+        "complete": true,
+        "score": 0.03767485659680485
+      },
+      {
+        "seg": 1,
+        "kp": 80.0,
+        "kd": 1.0,
+        "rms_track_rad": 0.00944155672980935,
+        "hold_err_rad": 0.0076393127441406194,
+        "overshoot_rad": 0.009483718872070307,
+        "osc_flips": 0,
+        "peak_torque_nm": 2.290597915649414,
+        "complete": true,
+        "score": 0.03604830721809058
+      },
+      {
+        "seg": 2,
+        "kp": 100.0,
+        "kd": 1.0,
+        "rms_track_rad": 0.007622709224129738,
+        "hold_err_rad": 0.006813430786132807,
+        "overshoot_rad": 0.006813430786132807,
+        "osc_flips": 0,
+        "peak_torque_nm": 2.2358970642089844,
+        "complete": true,
+        "score": 0.02806300158252816
+      }
+    ],
+    "J2 (gravity x0.6, fric 1.0)": [
+      {
+        "seg": 0,
+        "kp": 80.0,
+        "kd": 1.0,
+        "rms_track_rad": 0.006345948557544286,
+        "hold_err_rad": -0.003486251831054693,
+        "overshoot_rad": 0.0,
+        "osc_flips": 0,
+        "peak_torque_nm": 2.290597915649414,
+        "complete": true,
+        "score": 0.009832200388598979
+      },
+      {
+        "seg": 1,
+        "kp": 100.0,
+        "kd": 1.0,
+        "rms_track_rad": 0.005170279677690601,
+        "hold_err_rad": -0.004249191284179693,
+        "overshoot_rad": 0.0,
+        "osc_flips": 0,
+        "peak_torque_nm": 2.3042736053466797,
+        "complete": true,
+        "score": 0.009419470961870294
+      }
+    ],
+    "J3 (kp/kd)": [
+      {
+        "seg": 0,
+        "kp": 60.0,
+        "kd": 0.5,
+        "rms_track_rad": 0.013605714649179,
+        "hold_err_rad": 0.006812477111816401,
+        "overshoot_rad": 0.006812477111816401,
+        "osc_flips": 0,
+        "peak_torque_nm": 10.755556106567383,
+        "complete": true,
+        "score": 0.0340431459846282
+      },
+      {
+        "seg": 1,
+        "kp": 80.0,
+        "kd": 1.0,
+        "rms_track_rad": 0.00997270302945544,
+        "hold_err_rad": -0.0031057357788085993,
+        "overshoot_rad": 0.0,
+        "osc_flips": 0,
+        "peak_torque_nm": 10.837606430053711,
+        "complete": true,
+        "score": 0.013078438808264039
+      },
+      {
+        "seg": 2,
+        "kp": 100.0,
+        "kd": 0.5,
+        "rms_track_rad": 0.008636511236100939,
+        "hold_err_rad": -0.0084463119506836,
+        "overshoot_rad": 0.0,
+        "osc_flips": 0,
+        "peak_torque_nm": 10.741880416870117,
+        "complete": true,
+        "score": 0.017082823186784536
+      },
+      {
+        "seg": 3,
+        "kp": 100.0,
+        "kd": 1.0,
+        "rms_track_rad": 0.008552385339407666,
+        "hold_err_rad": -0.0088277816772461,
+        "overshoot_rad": 0.0,
+        "osc_flips": 0,
+        "peak_torque_nm": 10.700855255126953,
+        "complete": true,
+        "score": 0.017380167016653764
+      }
+    ],
+    "J4": [
+      {
+        "seg": 0,
+        "kp": 20.0,
+        "kd": 0.5,
+        "rms_track_rad": 0.015903500718292177,
+        "hold_err_rad": -0.00911483764648438,
+        "overshoot_rad": 0.0,
+        "osc_flips": 0,
+        "peak_torque_nm": 2.268620491027832,
+        "complete": true,
+        "score": 0.025018338364776557
+      },
+      {
+        "seg": 1,
+        "kp": 30.0,
+        "kd": 0.5,
+        "rms_track_rad": 0.013842672101587789,
+        "hold_err_rad": -0.005786514282226568,
+        "overshoot_rad": 0.0,
+        "osc_flips": 1,
+        "peak_torque_nm": 2.3028082847595215,
+        "complete": true,
+        "score": 0.029629186383814357
+      },
+      {
+        "seg": 2,
+        "kp": 40.0,
+        "kd": 1.0,
+        "rms_track_rad": 0.010700999657658163,
+        "hold_err_rad": -0.005000686645507818,
+        "overshoot_rad": 0.0,
+        "osc_flips": 0,
+        "peak_torque_nm": 2.2735042572021484,
+        "complete": true,
+        "score": 0.01570168630316598
+      }
+    ],
+    "J5": [
+      {
+        "seg": 0,
+        "kp": 20.0,
+        "kd": 0.5,
+        "rms_track_rad": 0.007996189317489565,
+        "hold_err_rad": 0.007289505004882818,
+        "overshoot_rad": 0.0,
+        "osc_flips": 0,
+        "peak_torque_nm": 0.4273500442504883,
+        "complete": true,
+        "score": 0.015285694322372383
+      },
+      {
+        "seg": 1,
+        "kp": 30.0,
+        "kd": 0.5,
+        "rms_track_rad": 0.005252737072330571,
+        "hold_err_rad": 0.0057235717773437556,
+        "overshoot_rad": 0.0,
+        "osc_flips": 0,
+        "peak_torque_nm": 0.40293025970458984,
+        "complete": true,
+        "score": 0.010976308849674326
+      },
+      {
+        "seg": 2,
+        "kp": 40.0,
+        "kd": 1.0,
+        "rms_track_rad": 0.00397510704991833,
+        "hold_err_rad": 0.003745651245117193,
+        "overshoot_rad": 0.0,
+        "osc_flips": 0,
+        "peak_torque_nm": 0.3833942413330078,
+        "complete": true,
+        "score": 0.007720758295035523
+      }
+    ],
+    "J6": [
+      {
+        "seg": 0,
+        "kp": 20.0,
+        "kd": 0.5,
+        "rms_track_rad": 0.00914284548739667,
+        "hold_err_rad": -0.0026468276977539007,
+        "overshoot_rad": 0.004905128479003901,
+        "osc_flips": 1,
+        "peak_torque_nm": 0.17338180541992188,
+        "complete": true,
+        "score": 0.03159993014315837
+      },
+      {
+        "seg": 1,
+        "kp": 30.0,
+        "kd": 0.5,
+        "rms_track_rad": 0.006088131649001838,
+        "hold_err_rad": -0.0026163101196289007,
+        "overshoot_rad": 0.0026163101196289007,
+        "osc_flips": 0,
+        "peak_torque_nm": 0.1782665252685547,
+        "complete": true,
+        "score": 0.01393706200788854
+      },
+      {
+        "seg": 2,
+        "kp": 40.0,
+        "kd": 1.0,
+        "rms_track_rad": 0.004570778876748932,
+        "hold_err_rad": -0.0019411087036132757,
+        "overshoot_rad": 0.0022348403930664007,
+        "osc_flips": 0,
+        "peak_torque_nm": 0.16361427307128906,
+        "complete": true,
+        "score": 0.010981568366495009
+      }
+    ],
+    "J1 (kd 1/2/4)": [
+      {
+        "seg": 0,
+        "kp": 100.0,
+        "kd": 1.0,
+        "rms_track_rad": 0.002918419081597724,
+        "hold_err_rad": 0.001197433471679693,
+        "overshoot_rad": 0.0,
+        "osc_flips": 0,
+        "peak_torque_nm": 1.6341876983642578,
+        "complete": true,
+        "score": 0.004115852553277417
+      },
+      {
+        "seg": 1,
+        "kp": 100.0,
+        "kd": 2.0,
+        "rms_track_rad": 0.0018927265738038971,
+        "hold_err_rad": 0.001197433471679693,
+        "overshoot_rad": 0.0,
+        "osc_flips": 0,
+        "peak_torque_nm": 1.333333969116211,
+        "complete": true,
+        "score": 0.00309016004548359
+      },
+      {
+        "seg": 2,
+        "kp": 100.0,
+        "kd": 4.0,
+        "rms_track_rad": 0.0012918695880702422,
+        "hold_err_rad": 0.001197433471679693,
+        "overshoot_rad": 0.0,
+        "osc_flips": 0,
+        "peak_torque_nm": 1.0598297119140625,
+        "complete": true,
+        "score": 0.002489303059749935
+      }
+    ],
+    "J2 (kd 1/2/4)": [
+      {
+        "seg": 0,
+        "kp": 100.0,
+        "kd": 1.0,
+        "rms_track_rad": 0.006209590837412543,
+        "hold_err_rad": -2.34603881835993e-05,
+        "overshoot_rad": 0.0003274917602539007,
+        "osc_flips": 0,
+        "peak_torque_nm": 2.2222213745117188,
+        "complete": true,
+        "score": 0.006888034746103944
+      },
+      {
+        "seg": 1,
+        "kp": 100.0,
+        "kd": 2.0,
+        "rms_track_rad": 0.006376515007695333,
+        "hold_err_rad": -0.0008169174194335993,
+        "overshoot_rad": 0.0,
+        "osc_flips": 0,
+        "peak_torque_nm": 2.3042736053466797,
+        "complete": true,
+        "score": 0.0071934324271289325
+      },
+      {
+        "seg": 2,
+        "kp": 100.0,
+        "kd": 4.0,
+        "rms_track_rad": 0.006190810617978424,
+        "hold_err_rad": -0.001579856872558599,
+        "overshoot_rad": 0.0,
+        "osc_flips": 0,
+        "peak_torque_nm": 2.2358970642089844,
+        "complete": true,
+        "score": 0.0077706674905370235
+      }
+    ],
+    "J3 (kd 1/2/4)": [
+      {
+        "seg": 0,
+        "kp": 80.0,
+        "kd": 1.0,
+        "rms_track_rad": 0.01002729709077134,
+        "hold_err_rad": 0.0010904312133789007,
+        "overshoot_rad": 0.0010904312133789007,
+        "osc_flips": 0,
+        "peak_torque_nm": 10.24957275390625,
+        "complete": true,
+        "score": 0.013298590730908041
+      },
+      {
+        "seg": 1,
+        "kp": 80.0,
+        "kd": 2.0,
+        "rms_track_rad": 0.009521418950741472,
+        "hold_err_rad": -0.006157493591308599,
+        "overshoot_rad": 0.0,
+        "osc_flips": 0,
+        "peak_torque_nm": 10.071794509887695,
+        "complete": true,
+        "score": 0.01567891254205007
+      },
+      {
+        "seg": 2,
+        "kp": 80.0,
+        "kd": 4.0,
+        "rms_track_rad": 0.009213635621918669,
+        "hold_err_rad": -0.006538963317871099,
+        "overshoot_rad": 0.0,
+        "osc_flips": 0,
+        "peak_torque_nm": 9.989744186401367,
+        "complete": true,
+        "score": 0.015752598939789766
+      }
+    ]
+  },
+  "feedback_lsb_measured": {
+    "j1": {
+      "pos_rad": 0.00038099999999999246,
+      "vel_rad_s": 0.0048799999999999955,
+      "torque_nm": 0.013599999999999834
+    },
+    "j3": {
+      "pos_rad": 0.00038099999999999246,
+      "vel_rad_s": 0.0048799999999999955,
+      "torque_nm": 0.013599999999998502
+    },
+    "j4": {
+      "pos_rad": 0.00038099999999999246,
+      "vel_rad_s": 0.014649999999999996,
+      "torque_nm": 0.0047999999999999154
+    },
+    "j7": {
+      "pos_rad": 0.0003809999999999647,
+      "vel_rad_s": 0.01464999999999994,
+      "torque_nm": 0.004799999999999971
+    }
+  },
+  "demo_wave": {
+    "j1": {
+      "max_abs": 0.00782,
+      "rms": 0.0055720883814770914
+    },
+    "j2": {
+      "max_abs": 0.019589999999999996,
+      "rms": 0.013338702188100847
+    },
+    "j3": {
+      "max_abs": 0.02117,
+      "rms": 0.013169771261962766
+    },
+    "j4": {
+      "max_abs": 0.015990000000000004,
+      "rms": 0.01032023649438624
+    },
+    "j5": {
+      "max_abs": 0.00973,
+      "rms": 0.006111586898359915
+    },
+    "j6": {
+      "max_abs": 0.008250000000000007,
+      "rms": 0.0010087812232476775
+    },
+    "j7": {
+      "max_abs": 0.012970000000000037,
+      "rms": 0.0033318089024177897
+    }
+  },
+  "demo_wave_gripper_cartesian_dev_m": {
+    "max": 0.012324997583111322,
+    "rms": 0.008606284757971662
+  },
+  "demo_show": {
+    "j1": {
+      "max_abs": 0.007359999999999811,
+      "rms": 0.0031668468460019214
+    },
+    "j2": {
+      "max_abs": 0.024460000000000037,
+      "rms": 0.010864445655845231
+    },
+    "j3": {
+      "max_abs": 0.025060000000000082,
+      "rms": 0.013132602032597794
+    },
+    "j4": {
+      "max_abs": 0.017280000000000018,
+      "rms": 0.005385147170829657
+    },
+    "j5": {
+      "max_abs": 0.010770000000000002,
+      "rms": 0.0024778058550149005
+    },
+    "j6": {
+      "max_abs": 0.019889999999999963,
+      "rms": 0.002241031695206015
+    },
+    "j7": {
+      "max_abs": 0.018440000000000012,
+      "rms": 0.0041028301672782885
+    }
+  },
+  "demo_show_gripper_cartesian_dev_m": {
+    "max": 0.012911241085451502,
+    "rms": 0.007409901336018807
+  },
+  "loop_timing_ms": {
+    "sweep_mean": 5.019246861924686,
+    "sweep_p99": 5.1000000000000005,
+    "sweep_max": 13.0,
+    "demo_mean": 5.010720973782771,
+    "demo_p99": 5.100000000002325,
+    "demo_max": 15.000000000000568
+  }
+}

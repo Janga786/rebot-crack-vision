@@ -1,0 +1,17 @@
+# Per-joint MIT gains from the 2026-10-17 tuning sweeps (first_move_j1.py --sweep, --hold-others --gravity).
+# Operator workspace only: NOT commissioning, NOT config/robot/*. Runs: runs/first_move_j*_20261017T19*.
+# Gravity: URDF (gravity.py) x scale; the real arm is heavier distally than the URDF (camera/mount?).
+# Friction: Coulomb feed-forward along the commanded velocity (tanh(v/0.02)).
+# Hold error = mean |target - pos| while holding 0.10 rad from the start (j7: 1.0 rad gripper open).
+joints:
+  j1: {kp: 100, kd: 4.0, gravity_scale: 1.0, friction_nm: 1.0, hold_err_rad: 0.0012}   # kp at cap; kd 4 won the 1/2/4 kd sweep (J2, J3: kd made no difference)
+  j2: {kp: 100, kd: 1.0, gravity_scale: 0.6, friction_nm: 1.0, hold_err_rad: 0.0042}   # kp at script cap
+  j3: {kp: 80,  kd: 1.0, gravity_scale: 2.5, friction_nm: 2.0, hold_err_rad: 0.0031}   # measured +-2.3 Nm friction
+  j4: {kp: 40,  kd: 1.0, gravity_scale: 2.5, friction_nm: 0.5, hold_err_rad: 0.0050}
+  j5: {kp: 40,  kd: 1.0, gravity_scale: 1.0, friction_nm: 0.3, hold_err_rad: 0.0037}
+  j6: {kp: 40,  kd: 1.0, gravity_scale: 1.0, friction_nm: 0.1, hold_err_rad: 0.0019}   # swept at 0.3 (slight overshoot); 0.1 used in the demos
+  j7: {kp: 40,  kd: 0.5, gravity_scale: 0.0, friction_nm: 0.0, max_err_rad: 0.013}     # gripper; vendor kp 8 kd 1
+notes:
+  - KD_MAX raised to 5. kd 1/2/4 sweep: J1 best at 4; J2, J3 friction-limited (kd made no difference).
+  - kp 100 (J1, J2) and kp 40 (J4-J6) were the top of the tested range.
+  - Velocity readings on DM4310 (j4-j7) spike single samples; their abort is 1.0 rad/s.

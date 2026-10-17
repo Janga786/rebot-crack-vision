@@ -1,0 +1,35 @@
+pre-checks OK; path OK: 23 segments, 51.5 s + settle/hold, gripper stays >= 0.12 m above the base plane
+start: j1 -3.767, j2 +0.000, j3 +0.000, j4 +0.000, j5 +0.000, j6 +0.000, j7 +0.000
+ABORT -> controlled PARK back to this start pose, then all motors off. 24 V switch = e-stop: cutting it while raised DROPS the arm.
+confirmation: the operator's go, given in chat: 'go'
+mode: enable, move to zero over 3.0 s, HOLD; the demo starts when /home/boosterk1/rebot_setup/runs/DEMO_GO appears (the operator's second go), or everything is disabled after 300 s
+all 7 motors ENABLED, holding the start pose; settling 1.0 s
+at zero, HOLDING; waiting for the operator's go
+second go received: 'go'; starting the demo
+  segment 0: 2.0 s
+  segment 1: 4.0 s
+  segment 2: 0.5 s
+  segment 3: 2.5 s
+  segment 4: 3.5 s
+  segment 5: 2.0 s
+  segment 6: 2.0 s
+  segment 7: 2.5 s
+  segment 8: 5.0 s
+  segment 9: 2.5 s
+  segment 10: 1.0 s
+  segment 11: 1.6 s
+  segment 12: 1.6 s
+  segment 13: 1.6 s
+  segment 14: 1.0 s
+  segment 15: 1.6 s
+  segment 16: 1.6 s
+  segment 17: 1.6 s
+  segment 18: 1.6 s
+  segment 19: 3.0 s
+  segment 20: 0.8 s
+  segment 21: 3.0 s
+  segment 22: 5.0 s
+all motors DISABLED (confirmed): j1, j2, j3, j4, j5, j6, j7
+outcome: completed
+max |ref-pos| per joint: j1 0.007, j2 0.024, j3 0.025, j4 0.017, j5 0.011, j6 0.020, j7 0.018; max gap 15.7 ms; csv /home/boosterk1/rebot_setup/runs/demo_show_20261017T195627Z.csv
+summary: /home/boosterk1/rebot_setup/runs/demo_show_20261017T195627Z.json

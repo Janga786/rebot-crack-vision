@@ -1,0 +1,2 @@
+t_s,phase,target_rad,target_vel_rad_s,pos_rad,vel_rad_s,torque_nm,status,fb_age_s,cmd_gap_s,others_max_dev_rad,seg,kp,kd,tau_ff_nm
+0.0000,settle,-0.015450,+0.000000,-0.015450,-0.00733,-0.1162,1,0.0000,0.0000,0.0000,0,100.0,1.0,-2.792
