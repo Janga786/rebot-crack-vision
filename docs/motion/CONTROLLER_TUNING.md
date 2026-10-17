@@ -423,7 +423,7 @@ removed. Worth investigating (bus timing after the previous run's disable), not 
 - **Gains are for 0.1 rad test moves and the two demos**; crack-tracing speeds and contact forces were not tested.
 - **kp/kd units** are taken as Nm/rad, Nm·s/rad per the Damiao MIT convention; not independently verified.
 - **Missed register reads** before enable (§11) are unexplained.
-- **DM4310 velocity resolution** (0.0147 rad/s) could be improved ~25× by a lower VMAX (§1); not attempted.
+- **DM4310 velocity resolution** (0.0147 rad/s) could be improved roughly 10× (VMAX 3 rad/s, keeping headroom) to 25× (VMAX 1.2) by a lower VMAX (§1); not attempted.
 
 ## 13. Figure catalogue
 
