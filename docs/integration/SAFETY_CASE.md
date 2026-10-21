@@ -3,7 +3,7 @@
 ## Scope
 
 This document is the index for the project's mock/dry failure-injection safety case: it
-ties each of five fault classes to the mechanism that refuses it, the evidence that this
+ties each of six fault classes to the mechanism that refuses it, the evidence that this
 refusal was exercised, and the single command an operator runs to reproduce the whole
 suite.
 
@@ -12,7 +12,7 @@ mock stacks (MoveIt mock planning, `rebot_motion`'s mock vendor driver), and **n
 drives real hardware. `CRACKVISION_ARM_REAL` is never set by any script this document
 references. This satisfies the mock/dry half of **REQ-INT-2** (separately gated hardware
 commissioning) and the failure-recovery half of **REQ-OPS-1** (operator workflow with
-failure recovery) for these five fault classes.
+failure recovery) for these six fault classes.
 
 REQ-INT-2 also requires a *separately gated* hardware-commissioning path — verified
 limits, collision checks, e-stop, under controlled conditions, with operator-sourced
@@ -27,7 +27,7 @@ bash scripts/safety/run_safety_case.sh
 ```
 
 This builds `ros2_ws/install` first if it is missing (`scripts/ros/build_ws.sh`), then runs
-the four stages below in order, stopping and reporting the failing stage on the first
+the five stages below in order, stopping and reporting the failing stage on the first
 non-zero exit, and otherwise prints a one-line PASS/FAIL summary per fault class and exits
 0.
 
@@ -40,6 +40,7 @@ non-zero exit, and otherwise prints a one-line PASS/FAIL summary per fault class
 | Unreachable path | `scripts/ros/test_safety_unreachable.sh` translates the synthetic specimen/crack +5.0 m along base_link's X axis, far outside `docs/motion/REACHABILITY.md`'s documented envelope, then runs `plan_view` and `plan_crack_path` against it on the headless mock MoveIt stack. | `cli_common.py`'s `PreconditionError` → `EXIT_PRECONDITION` mapping: no IK candidate/trace waypoint can be found, so both CLIs refuse cleanly instead of fabricating or silently truncating a plan; no `view_plan.json`/`cartesian_plan.json` is written. | `plan_view`, `plan_crack_path`: exit 3 (`EXIT_PRECONDITION`). | [docs/integration/safety/UNREACHABLE_PATH.md](safety/UNREACHABLE_PATH.md) |
 | Stale calibration/config | `scripts/ros/test_execution.sh`'s offline-mode phases exercise `execute_trajectory` with end-effector/scene config sha256 mismatches and nulls, per the driver-profile matrix. | `G-STALE-CONFIG` (`ros2_ws/src/crackvision_motion/crackvision_motion/execution_gate.py`, `docs/INTERFACES.md` §11.7): a non-null config sha256 mismatch refuses in every mode; a null sha256 warns in mock/dry and refuses in real. Evaluated alongside the other offline gates (`G-ARM`, `G-TRAJ`, `G-LIMITS-HASH`, `G-SCENE`, `G-EE`, `G-COMMISSIONING`, `G-ESTOP`, `G-APPROVAL`) every run, independent of ordering (§11.7: an earlier gate's refusal never skips a later one). | Offline refusal: exit 3, `outcome=refused`, refusal id set includes `G-STALE-CONFIG` as documented. | [docs/integration/safety/STALE_CALIBRATION_AND_LIMITS.md](safety/STALE_CALIBRATION_AND_LIMITS.md) |
 | Limit violations | `scripts/ros/test_execution.sh` checks a trajectory's positions, velocities and accelerations twice (unscaled and scaled), re-deriving limits independently of the offline trajectory checker. | `G-LIMITS` (`execution_gate.py`, `docs/INTERFACES.md` §11.7/§11.6 margin policy): any out-of-limit trajectory is refused, independent of and cross-checked against the offline trajectory-checker's own limit faults (MOT-07.8's 7 injected faults). | Offline refusal: exit 3, `outcome=refused`, refusal id set `{G-LIMITS}` (or superset), no ROS contact attempted. | [docs/integration/safety/STALE_CALIBRATION_AND_LIMITS.md](safety/STALE_CALIBRATION_AND_LIMITS.md) |
+| Any bad motor command (garbage IK, branch/wrist flip, out-of-range target, overspeed, excessive gains/feed-forward, keep-out intrusion, stale/faulted motor), from any caller | `scripts/safety/test_arm_guard.sh`: fuzzes 180 000 random/adversarial commands, runs closed-loop hostile-planner simulations through the patched `motorbridge` classes, replays all 34 real logged runs, and exercises the fail-closed start-up hook. | `arm_guard` ([docs/motion/ARM_GUARD.md](../motion/ARM_GUARD.md)): the last-line filter installed in every env that can reach the motors; a violating command is never sent, the joint is held and the guard latches. | Violations: hold command sent, `GuardFault` raised, latched until `reset()`; setup/permission violations: `GuardRefused`, nothing sent. Script exit 0 when all 155 tests pass and the hook is active in `rebot`/`lerobot`. | [docs/motion/ARM_GUARD.md](../motion/ARM_GUARD.md#verification) |
 
 ## Traceability
 
@@ -58,5 +59,6 @@ non-zero exit, and otherwise prints a one-line PASS/FAIL summary per fault class
 - `scripts/perc/test_safety_empty_mask.sh`
 - `scripts/perc/test_safety_invalid_depth.sh`
 - `scripts/ros/test_safety_unreachable.sh`
+- `scripts/safety/test_arm_guard.sh`
 - `scripts/ros/test_execution.sh`
 - `scripts/safety/run_safety_case.sh` (orchestrates the four above, in this order)

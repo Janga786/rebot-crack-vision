@@ -1,0 +1,7 @@
+{
+  "config_sha256": "3528f507abdc5a22ddd7d7aab6911fcbe77bbe059029cfdaa17c2e518495df2f",
+  "urdf_sha256": "697012de95acb99bda4a257d327c955a174a5b528dbefd2e9a9aafc1851e5c5b",
+  "approved_by": "Janga786 (initial approval at creation, 2026-10-21)",
+  "approved_at": "2026-10-21T23:46:50+00:00",
+  "note": "vendor-URDF joint ranges (not measured, see TODO.md); keep-out values nominal (MOT-10)"
+}

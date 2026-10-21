@@ -1,0 +1,201 @@
+# config/robot/arm_guard.toml — limits enforced by arm_guard, the last-line filter in front of every motor command
+# (packages/arm_guard, docs/motion/ARM_GUARD.md). Any edit changes this file's SHA-256 and the guard then refuses
+# all motion until an operator re-approves: `python -m arm_guard approve --by <name>`.
+#
+# These limits sit slightly OUTSIDE the planner's (b601_dm_limits.yaml: 1.0 rad/s, 0.03 rad margin) so normal
+# planned motion never trips them; they catch what the planner and validator missed.
+# Sources: joint ranges = vendor URDF (config/robot/b601_dm_limits.yaml) — NOT yet measured on the arm (MOT-09;
+# see TODO.md); gains/feed-forward caps/speeds = docs/motion/CONTROLLER_TUNING.md (2026-10-14/17 tuning, §4 abort
+# envelope); gripper motor range = first_move_j1.py URDF_LIMITS["j7"] (widest opening seen -1.776 rad).
+
+[guard]
+urdf = "../../presentation/sim/reBot_B601_DM_with_gripper.urdf"   # relative to this file
+urdf_sha256 = "697012de95acb99bda4a257d327c955a174a5b528dbefd2e9a9aafc1851e5c5b"
+stale_feedback_s = 0.25        # no new feedback (and no heartbeat register read) for this long = fault
+rest_tolerance_rad = 0.05      # the fold rests slightly past a limit (J2 +0.02 rad measured 2026-10-17)
+rest_slack_rad = 0.01          # holding such a rest pose: the reading wanders around the hold target
+require_full_arm = true        # arm commands need all six arm motors registered (keep-out FK needs the whole pose)
+recent_command_s = 0.10        # other joints' last command counts toward the checked pose for this long
+hold_vlim_rad_s = 0.2          # vlim used for POS_VEL hold commands after a fault
+min_vlim_rad_s = 0.05          # floor of the stopping-distance speed bound (stops within 1 mm)
+allow_velocity_mode = false    # VEL mode keeps spinning if the host dies (CAN TIMEOUT is 0): refused
+force_pos_ratio_max = 0.5
+torque_margin_nm = 0.5
+
+[models.4340P]                 # MIT mapping ranges; must match the motor registers (checked at enable)
+pmax = 12.5
+vmax = 10.0
+tmax = 28.0
+
+[models.4310]
+pmax = 12.5
+vmax = 30.0
+tmax = 10.0
+
+# Per joint: lower/upper (rad), vel_cap (commanded rad/s), vel_abort (measured rad/s), accel_stop (rad/s^2,
+# stopping-distance bound; 4x MoveIt's 1.0 so planned motion never trips it, and still below what the tuning
+# runs' min-jerk returns-to-fold needed), max_step (|target - measured| rad), kp_max / kd_max / tau_ff_max (MIT),
+# torque_abort (|measured torque| Nm), hold_kp / hold_kd (gains used to hold after a fault).
+
+[joints.j1]
+urdf_joint = "joint1"
+arm = true
+motor_id = 0x01
+feedback_id = 0x11
+model = "4340P"
+lower = -2.8
+upper = 2.8
+vel_cap = 1.2
+vel_abort = 1.5
+accel_stop = 4.0
+max_step = 0.15
+kp_max = 150.0
+kd_max = 5.0
+tau_ff_max = 10.0
+torque_abort = 22.0
+hold_kp = 100.0
+hold_kd = 4.0
+
+[joints.j2]
+urdf_joint = "joint2"
+arm = true
+motor_id = 0x02
+feedback_id = 0x12
+model = "4340P"
+lower = -3.14
+upper = 0.0
+vel_cap = 1.2
+vel_abort = 1.5
+accel_stop = 4.0
+max_step = 0.15
+kp_max = 150.0
+kd_max = 5.0
+tau_ff_max = 10.0
+torque_abort = 22.0
+hold_kp = 100.0
+hold_kd = 1.0
+
+[joints.j3]
+urdf_joint = "joint3"
+arm = true
+motor_id = 0x03
+feedback_id = 0x13
+model = "4340P"
+lower = -3.14
+upper = 0.0
+vel_cap = 1.2
+vel_abort = 1.5
+accel_stop = 4.0
+max_step = 0.15
+kp_max = 150.0
+kd_max = 5.0
+tau_ff_max = 10.0
+torque_abort = 22.0
+hold_kp = 80.0
+hold_kd = 1.0
+
+[joints.j4]
+urdf_joint = "joint4"
+arm = true
+motor_id = 0x04
+feedback_id = 0x14
+model = "4310"
+lower = -1.87
+upper = 1.57
+vel_cap = 2.0
+vel_abort = 2.5
+accel_stop = 8.0
+max_step = 0.15
+kp_max = 50.0
+kd_max = 5.0
+tau_ff_max = 2.5
+torque_abort = 6.5
+hold_kp = 40.0
+hold_kd = 1.0
+
+[joints.j5]
+urdf_joint = "joint5"
+arm = true
+motor_id = 0x05
+feedback_id = 0x15
+model = "4310"
+lower = -1.57
+upper = 1.57
+vel_cap = 2.0
+vel_abort = 2.5
+accel_stop = 8.0
+max_step = 0.15
+kp_max = 50.0
+kd_max = 5.0
+tau_ff_max = 2.5
+torque_abort = 6.5
+hold_kp = 40.0
+hold_kd = 1.0
+
+[joints.j6]
+urdf_joint = "joint6"
+arm = true
+motor_id = 0x06
+feedback_id = 0x16
+model = "4310"
+lower = -3.14
+upper = 3.14
+vel_cap = 2.0
+vel_abort = 2.5
+accel_stop = 8.0
+max_step = 0.15
+kp_max = 50.0
+kd_max = 5.0
+tau_ff_max = 2.5
+torque_abort = 6.5
+hold_kp = 40.0
+hold_kd = 1.0
+
+[joints.j7]                    # gripper motor angle (open = negative); not a URDF joint, no keep-out role
+urdf_joint = ""
+arm = false
+motor_id = 0x07
+feedback_id = 0x17
+model = "4310"
+lower = -1.8
+upper = 0.1
+vel_cap = 3.0
+vel_abort = 4.0
+accel_stop = 10.0
+max_step = 0.3
+kp_max = 40.0
+kd_max = 5.0
+tau_ff_max = 2.5
+torque_abort = 6.5
+hold_kp = 40.0
+hold_kd = 0.5
+
+# Keep-out (metres, base_link frame; z = 0 is the mounting plane). Coarse proxies, not a mesh check: the planner
+# (MoveIt, mesh collision) and the offline validator stay the precise layer; these catch gross errors.
+# Values are NOT measured against the real workcell yet (MOT-10, scene.yaml is nominal).
+[[keepout.floor]]
+link = "gripper_link"
+z_min = 0.12                   # the 2026-10-17 demo's table-clearance rule
+[[keepout.floor]]
+link = "link6"
+z_min = 0.08
+[[keepout.floor]]
+link = "link5"
+z_min = 0.08
+[[keepout.floor]]
+link = "link4"
+z_min = 0.06
+
+[keepout.base_cylinder]        # wrist/gripper must not enter the column around the base below the shoulder
+radius = 0.09
+z_max = 0.13
+links = ["link5", "link6", "gripper_link"]
+
+[keepout.segment]              # wrist/gripper must keep clear of the upper arm (link2 -> link3)
+from_link = "link2"
+to_link = "link3"
+min_distance = 0.06
+links = ["link5", "link6", "gripper_link"]
+
+[register_writes]              # allowed outside config_writes(): the vendor SDK rewrites loop gains on every mode switch
+allowed = { "25" = [0.0, 0.1], "26" = [0.0, 0.05], "27" = [0.0, 200.0], "28" = [0.0, 5.0] }

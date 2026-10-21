@@ -1,0 +1,19 @@
+diff --git a/src/rebotarmcontroller/rebotarmcontroller/hardware_manager.py b/src/rebotarmcontroller/rebotarmcontroller/hardware_manager.py
+index 3e77586..a9a5771 100644
+--- a/src/rebotarmcontroller/rebotarmcontroller/hardware_manager.py
++++ b/src/rebotarmcontroller/rebotarmcontroller/hardware_manager.py
+@@ -11,6 +11,14 @@ import yaml
+ 
+ from .conversions import fk_to_pose
+ 
++# arm_guard (rebot_crack_vision/packages/arm_guard, docs/motion/ARM_GUARD.md): every motorbridge call this driver
++# makes (trajectories, move_to_pose_ik, safe_home/park, cmd/* passthrough, gravity comp, gripper) goes through the
++# last-line safety filter. Fail closed: if the guard cannot be imported or installed, the driver does not start.
++# Make it importable in the driver's interpreter with `python -m arm_guard install-hook --python <that python>`.
++import arm_guard
++
++arm_guard.install()
++
+ _GC_VEL_THRESHOLD = 0.04
+ _GC_W_VEL_THRESHOLD = 0.08
+ _GC_KP = 7.0

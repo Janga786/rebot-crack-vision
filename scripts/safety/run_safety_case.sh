@@ -6,6 +6,7 @@
 #   2. scripts/perc/test_safety_invalid_depth.sh   (invalid depth)
 #   3. scripts/ros/test_safety_unreachable.sh      (unreachable path)
 #   4. scripts/ros/test_execution.sh               (stale calibration/config + limit violations)
+#   5. scripts/safety/test_arm_guard.sh            (any bad motor command, at the last line: arm_guard)
 #
 # Stops at the first failing stage and reports which one failed. Never sets
 # CRACKVISION_ARM_REAL and never touches real hardware (see docs/integration/SAFETY_CASE.md).
@@ -29,12 +30,14 @@ declare -a LABELS=(
     "invalid_depth"
     "unreachable_path"
     "stale_calibration_and_limits"
+    "motor_command_guard"
 )
 declare -a SCRIPTS=(
     "scripts/perc/test_safety_empty_mask.sh"
     "scripts/perc/test_safety_invalid_depth.sh"
     "scripts/ros/test_safety_unreachable.sh"
     "scripts/ros/test_execution.sh"
+    "scripts/safety/test_arm_guard.sh"
 )
 declare -a RESULTS=()
 

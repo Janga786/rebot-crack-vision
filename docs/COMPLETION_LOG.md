@@ -1833,3 +1833,35 @@ ISSUES:
 NEXT CARD: GEOM-09 (full first-order uncertainty budget) or GEOM-05/07 (real wrist-camera/tool
 calibration), unchanged from GEOM-08.8.
 ```
+
+## ARM-GUARD — Last-line motor-command filter (operator-directed, outside claude-auto, 2026-10-21)
+
+```
+TASK: ARM-GUARD (no plan card; requested directly by the operator: "guarantee the IK won't break the arm")
+STATUS: COMPLETE (workstation-only; hardware items handed off in TODO.md)
+CHANGES:
+  - packages/arm_guard/ — new stdlib-only package: core.py (pure rules R1-R7), runtime.py (joint mapping,
+    feedback freshness, fault latch + hold), patch.py (in-place allowlist patch of motorbridge Controller/Motor),
+    config.py (TOML + approval hash), kinematics.py (URDF FK for keep-out), autoload.py + arm_guard_boot.py
+    (fail-closed interpreter-start hook), __main__.py (check/approve/install-hook/hook-status/events), 155 tests
+    incl. a fake motorbridge with simulated joints.
+  - config/robot/arm_guard.toml + arm_guard.approved.json — the enforced limits, approved at creation.
+  - scripts/safety/test_arm_guard.sh — new; stage 5 "motor_command_guard" of scripts/safety/run_safety_case.sh.
+  - docs/motion/ARM_GUARD.md — design, guarantee and its limits, rules, install, compatibility, verification.
+  - TODO.md — hand-off: CAN watchdog, measured joint limits (MOT-09 E1), startup position check.
+  - ~/rebot_ws (local commit bd9087a, not pushed): rebotarmcontroller/hardware_manager.py imports and installs
+    arm_guard, refusing to start without it; copy in packages/arm_guard/vendor_patches/.
+  - Installed the arm_guard.pth hook in ~/miniconda3/envs/rebot (motorbridge 0.5.6) and envs/lerobot (0.5.5).
+TESTS:
+  - `bash scripts/safety/test_arm_guard.sh` -> config check OK, `155 passed`, hook-status OK in rebot + lerobot.
+  - Replay of all 34 real runs (evidence/operator/controller-tuning-2026-10/runs): 33 accepted with no false
+    refusal; demo_show refused by design (J1 -3.767 rad, beyond the URDF +-2.8).
+  - Mutation check: disabling the position window, step limit, keep-out, stopping-speed bound or vlim lowering
+    each makes tests/test_fuzz.py fail; intact rules pass.
+  - Guard smoke-tested under /usr/bin/python3 3.10 (ROS Humble) via tomli.
+ISSUES:
+  - Not run against the powered arm. Limits are vendor-URDF values; keep-out geometry is nominal.
+  - Remaining bypasses: direct motorbridge C-ABI calls, the Rust ws_gateway/motor_cli tools.
+  - The vendor driver still cannot start for pre-existing reasons (VENDOR_DRIVER.md V-SDK-API, V-PYDEPS).
+NEXT: TODO.md items 1-3 (all need the arm and the operator's per-step OK).
+```
