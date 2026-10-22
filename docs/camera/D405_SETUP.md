@@ -1,10 +1,15 @@
 # D405 camera: setup and running the crack model on it
 
-**Status (2026-10-22):**
-- The software side is installed, and every command below works and is tested offline: with a fake camera, a
-  replayed recording, and the real network on the GPU.
-- The physical D405 has **not** been connected to this workstation yet (`lsusb` shows no `8086:0b5b`).
-- [Section 4](#4-first-connection-cam-01) is the first step once it is plugged in.
+**Status (2026-10-22): connected and working.** The D405 (serial 260522273107, firmware 5.15.1.55) is on a USB 3
+port of this workstation. [D405_FIRST_CONNECTION.md](D405_FIRST_CONNECTION.md) has the full report.
+- **Capture:** 30 fps with no dropped frames at 848×480 and 1280×720.
+- **Video test:** 10 s at 1280×720, recorded losslessly and validated, plus an MP4.
+- **The model on the camera:** `snap` (full pipeline) and `live` (4.7 fps at 848×480, 2.1 fps at 1280×720)
+  both run on the real camera.
+- **Open:** the firmware predates the D405 auto-exposure fixes (§5; updating is the operator's call), and no real
+  crack has been in view yet.
+
+Evidence: `evidence/camera/d405_discovery.json`, `evidence/camera/d405_bringup_2026-10-22.json`.
 
 The hardware facts here come from the RealSense D400 datasheet (March 2026), the librealsense releases and
 source, and the Linux 6.8 UVC driver. The sources are listed at the end.
@@ -21,7 +26,7 @@ source, and the Linux 6.8 UVC driver. The sources are listed at the end.
 | Size / mounting | 42×42×23 mm, 58 g. Back: 2× M3×0.5, 20 mm apart (4 mm deep). Bottom: 1/4-20 (5 mm). The arm uses Seeed's stock D405 mount |
 | Imagers | Two global-shutter OV9782 sensors, 18 mm stereo baseline. **Colour comes from the left imager**, the same one depth is referenced to, so colour and depth share nearly one optical centre (`rs.align` still runs, for exact pixels) |
 | Projector | **None.** Depth is passive stereo: it needs surface texture and light. Concrete has texture; shadows from the arm hurt |
-| Field of view | 84° × 58° (92° diagonal), depth and colour. Retailer pages say 87°; the datasheet says 84° |
+| Field of view | 84° × 58° (92° diagonal) per the datasheet; retailer pages say 87°. This unit's colour intrinsics give fx = 436 px at 848×480 (about 88° horizontal) |
 | Range | Ideal **7–50 cm**. Minimum Z is **10 cm at 1280×720** and 7 cm at 848×480. Z accuracy ±2% and RMS noise ≤ 1% within 0.5 m |
 | Modes (USB 3) | 1280×720 at 5/15/30 fps; 848×480 and below up to 90 fps; colour and depth on the same grid |
 | Depth units | 0.0001 m (0.1 mm) per unit by default. The tools read `get_depth_scale()` and never assume it |
@@ -105,7 +110,7 @@ udev rule is missing or another program holds the camera. Close `realsense-viewe
 |---|---|---|
 | `./env.sh python scripts/camera.py snap` | Captures a burst of 10 frames after warm-up and keeps the **sharpest** (variance of the Laplacian; the arm may still be settling). Stores it as its own case and runs the accepted single-case pipeline: `prepare_inputs` → nnU-Net (the validated batch path, TTA on) → skeleton → crack paths → renders. About 15 s | `data/camera/<case>/snap.json` (the frame, its intrinsics, burst sharpness, results). Images: `data/overlays/<case>_overlay.png`, `data/comparisons/<case>_comparison.png`, `data/skeletons/<case>_skeleton_overlay.png`, `data/paths/<case>_paths_overlay.png`; the paths JSON in `data/paths/` |
 | `./env.sh python scripts/camera.py live` | Keeps the network in memory (`crackvision.live_predictor`) and runs it on every frame. Then open **http://127.0.0.1:8090**. The mask is overlaid in red, with model time, crack area and distance on top. The **snapshot** button saves the current frame to `data/camera/live_<UTC>/` and returns the `snap --image` command for the full pipeline on it | Browser view. This env's OpenCV is headless, so the browser is the display |
-| `./env.sh python scripts/camera.py record --frames 60` | A lossless RGB-D recording, validated. Replays bit-exactly with `--replay DIR` | `data/recordings/<session>/` |
+| `./env.sh python scripts/camera.py record --seconds 10 --video` | Captures at the camera's full rate into memory first, so nothing slow runs in the capture loop: 30.0 fps, no dropped frames. Then writes a lossless RGB-D recording on 8 threads and validates it, plus `video.mp4` (H.264, colour beside colourised depth). `--frames N` instead of `--seconds`; `--no-frames` writes the video only; `--no-depth` gives a colour-only video. RAM is checked first. Replays bit-exactly with `--replay DIR` | `data/recordings/<session>/` (+ `video.mp4`) |
 
 **Options:**
 - `--hd` (1280×720) for more pixels on thin cracks. At that resolution the minimum distance is 10 cm.
@@ -113,23 +118,24 @@ udev rule is missing or another program holds the camera. Close `realsense-viewe
 - `--tta` (`live`: mirroring as in the batch path, about 8× slower).
 - `--replay DIR` (any command, no camera); `--image PNG` (`snap` on a saved frame).
 
-**Speed on the RTX 3090:**
-- Live without TTA: 0.14 s at 512², about 0.20 s at 848×480 (about 4–5 fps), 0.40 s at 1280×720.
-- Snapshot: about 15 s, mostly nnU-Net start-up.
+**Speed** (real camera, RTX 3090):
+- Live without TTA: 215 ms per frame at 848×480 (4.7 fps); 420 ms at 1280×720 (2.1 fps).
+- Snapshot: 15–19 s including capture, mostly nnU-Net start-up.
+- Recording: 30.0 fps capture. Writing takes about 2 s per second of 1280×720 recording, after capture.
 
 **Live versus batch.** With TTA, the in-memory network gives the batch path's mask exactly: 100% of pixels on the
 sample crack, and a test checks this. Without TTA it agreed on 99.8% of pixels there.
 
-**Scale.** `snap` takes the median depth over the crack pixels, divides by the focal length, and reports
-**millimetres per pixel**. Crack path lengths are therefore also given in mm. Nominal values (84° HFOV;
-`snap` reports the measured ones from the device intrinsics):
+**Scale.** `snap` takes the median depth over the crack pixels and divides it by the focal length to report
+**millimetres per pixel**, so crack path lengths are also given in mm. Below 50 crack pixels with depth, it uses
+the whole frame instead. Beyond 50 cm it flags the scale as rough. Values from this unit's intrinsics:
 
-| Distance | 848×480 | 1280×720 |
+| Distance | 848×480 (fx 436) | 1280×720 (fx 654) |
 |---|---|---|
-| 10 cm | 0.21 mm/px | 0.14 mm/px |
-| 20 cm | 0.42 mm/px | 0.28 mm/px |
-| 30 cm | 0.64 mm/px | 0.42 mm/px |
-| 40 cm | 0.85 mm/px | 0.56 mm/px |
+| 10 cm | 0.23 mm/px | 0.15 mm/px |
+| 20 cm | 0.46 mm/px | 0.31 mm/px |
+| 30 cm | 0.69 mm/px | 0.46 mm/px |
+| 40 cm | 0.92 mm/px | 0.61 mm/px |
 
 ## 7. Getting good crack images
 
@@ -156,6 +162,8 @@ sample crack, and a test checks this. Without TTA it agreed on 99.8% of pixels t
 | `Frame didn't arrive within 5000` / D405Error mentioning USB | Bandwidth or cable | Shorter or better cable; a port on another controller (`lsusb -t`) |
 | Dark or overexposed colour, frozen auto-exposure | Old firmware (< 5.17.0.9), or USB 2 | §5; USB 3 |
 | `live` page is blank | Wrong host or port, or the network is still loading (about 5 s) | Use the URL it prints; `--port` |
+| validate_recording: dropped hardware frames | Something slow ran between frames. The first `check` on 2026-10-22 wrote PNGs in the capture loop and got 172 gaps in 30 frames | Fixed: recordings capture into memory first. Also make sure no other program streams from the camera |
+| "Device or resource busy" / `live` or `snap` fails while another runs | One process at a time owns the D405 | Stop the other one (`live` holds the camera until Ctrl-C) |
 
 ## 9. Not covered yet
 

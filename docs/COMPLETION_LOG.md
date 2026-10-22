@@ -1935,3 +1935,33 @@ ISSUES:
     and joint-state capture records are not part of this.
 NEXT: TODO.md section C: cable (USB-A to USB 3.0 Micro-B), plug in, `scripts/camera.py check`, file CAM-01.
 ```
+
+## CAMERA-BRINGUP — The real D405 connected, recorded and running the crack model (operator-directed, 2026-10-22)
+
+```
+TASK: CAMERA-BRINGUP (operator: "the camera is now plugged in, make it fully ready to go and test it by recording
+      a video; then set up the computer vision pipeline from the camera and test that we can run it live")
+STATUS: COMPLETE (positive crack detection on real imagery still pending: no crack in view)
+DEVICE: RealSense D405 serial 260522273107, firmware 5.15.1.55, USB 3.2 (5000M, root hub, no hub), udev rule
+        applied (root:plugdev 0660), pyrealsense2 2.58.4, kernel 6.8 stock uvcvideo.
+RESULTS:
+  - Capture: 30.3 fps (848x480) / 30.2 fps (1280x720) aligned, 0 hardware frame gaps, 91-94% valid depth.
+  - check: validate_recording PASS; verdict WARN (firmware < 5.17.0.9 only). evidence/camera/d405_discovery.json.
+  - Video test: record --hd --seconds 10 --video -> 300 frames, 30.0 fps, lossless PASS + video.mp4 (H.264
+    2560x720 colour | depth, 10.0 s).
+  - snap on the camera: full pipeline 14.8 s, 0 crack paths in the lab scene (correct negative).
+  - live on the camera: 4.7 fps at 848x480 (model 215 ms), 2.1 fps at 1280x720; stream/stats/snapshot endpoints.
+FIXES (found on the real camera):
+  - The first check failed validate_recording with 172 hardware frame gaps: PNGs were written inside the capture
+    loop (~230 ms/frame). Recordings now capture into memory at full rate (RAM-checked), then write.
+  - RecordingWriter: optional compress_level (lossless at every level) and write_frames(workers) (threaded PNG
+    encoding, byte-identical output): 300 HD frames 55.4 s -> 21.5 s.
+  - record: --seconds, --video (ffmpeg H.264; colour beside turbo-colourised depth), --no-frames, --no-depth.
+  - Firmware status falls back to the newest D405 firmware (5.17.0.10) when pyrealsense2 recommends none.
+  - snap measures distance over crack pixels only when >= 50 have depth; flags distances beyond 50 cm.
+DOCS/EVIDENCE: docs/camera/D405_FIRST_CONNECTION.md (CAM-01's report), D405_SETUP.md status + measured numbers,
+  evidence/camera/d405_bringup_2026-10-22.json + a video frame and a live-view frame (JPEG), TODO.md section C.
+TESTS: camera/recording tests incl. 6 new (video, no-frames, colormap, memory guard, distance rule, parallel writer
+  parity); full suite run before commit.
+NEXT: point the wrist at a real crack (live, then snap); firmware decision; CAM-04 sessions.
+```

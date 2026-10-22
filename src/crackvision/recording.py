@@ -14,6 +14,7 @@ and no camera attached.
 from __future__ import annotations
 
 import json
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterator
@@ -58,13 +59,17 @@ class CaptureFrame:
             )
 
 
-def _write_depth_png(arr: np.ndarray, path: Path) -> None:
-    """Write a uint16 depth array as a lossless 16-bit grayscale PNG."""
+def _png_kwargs(compress_level: int | None) -> dict[str, int]:
+    return {} if compress_level is None else {"compress_level": int(compress_level)}
+
+
+def _write_depth_png(arr: np.ndarray, path: Path, compress_level: int | None = None) -> None:
+    """Write a uint16 depth array as a lossless 16-bit grayscale PNG (any compress_level is lossless)."""
     if arr.dtype != np.uint16:
         raise ValueError(f"expected uint16 array, got {arr.dtype}")
     img = Image.new("I;16", (arr.shape[1], arr.shape[0]))
     img.frombytes(arr.tobytes())
-    img.save(path)
+    img.save(path, **_png_kwargs(compress_level))
 
 
 def _read_depth_png(path: Path) -> np.ndarray:
@@ -103,7 +108,10 @@ class RecordingWriter:
         depth_scale_m_per_unit: float,
         extrinsics_depth_to_color: dict[str, list[float]],
         aligned_to: str | None = "color",
+        compress_level: int | None = None,
     ) -> None:
+        """`compress_level` (PNG zlib level 0-9, None = PIL's default 6) trades file size for write speed;
+        every level is lossless."""
         _require_keys(device, REQUIRED_DEVICE_KEYS, "device")
         _require_keys(color, REQUIRED_STREAM_KEYS, "color config")
         _require_keys(depth, REQUIRED_STREAM_KEYS, "depth config")
@@ -119,6 +127,7 @@ class RecordingWriter:
         self._depth_scale_m_per_unit = float(depth_scale_m_per_unit)
         self._extrinsics = dict(extrinsics_depth_to_color)
         self._aligned_to = aligned_to
+        self._compress_level = compress_level
 
         self._color_dir = self.root / "color"
         self._depth_dir = self.root / "depth"
@@ -134,7 +143,29 @@ class RecordingWriter:
         declared stream configs (the frame invariant, docs/INTERFACES.md #0.5 — no resize/crop)."""
         if self._closed:
             raise RuntimeError("RecordingWriter is closed")
+        self._check_shape(frame)
+        paths = self._paths(self._frame_count)
+        self._write_pngs(frame, *paths[:2])
+        sidecar_path = self._write_sidecar(frame, *paths)
+        self._frame_count += 1
+        return sidecar_path
 
+    def write_frames(self, frames: list[CaptureFrame], workers: int = 1) -> list[Path]:
+        """Append many frames with the PNG encoding on `workers` threads (zlib releases the GIL). Files, order
+        and sidecars are identical to calling write_frame on each; every shape is checked before any write."""
+        if self._closed:
+            raise RuntimeError("RecordingWriter is closed")
+        frames = list(frames)
+        for frame in frames:
+            self._check_shape(frame)
+        jobs = [(frame, *self._paths(self._frame_count + i)) for i, frame in enumerate(frames)]
+        with ThreadPoolExecutor(max_workers=max(1, int(workers))) as pool:
+            list(pool.map(lambda job: self._write_pngs(*job[:3]), jobs))
+        sidecars = [self._write_sidecar(*job) for job in jobs]
+        self._frame_count += len(frames)
+        return sidecars
+
+    def _check_shape(self, frame: CaptureFrame) -> None:
         expected_color_shape = (self._color["height"], self._color["width"])
         if frame.color_rgb.shape[:2] != expected_color_shape:
             raise ValueError(
@@ -146,14 +177,16 @@ class RecordingWriter:
                 f"depth frame shape {frame.depth_u16.shape} != session depth config {expected_depth_shape}"
             )
 
-        stem = f"{self._frame_count:06d}"
-        color_path = self._color_dir / f"{stem}_color.png"
-        depth_path = self._depth_dir / f"{stem}_depth.png"
-        sidecar_path = self._frames_dir / f"{stem}.json"
+    def _paths(self, index: int) -> tuple[Path, Path, Path]:
+        stem = f"{index:06d}"
+        return (self._color_dir / f"{stem}_color.png", self._depth_dir / f"{stem}_depth.png",
+                self._frames_dir / f"{stem}.json")
 
-        Image.fromarray(frame.color_rgb, mode="RGB").save(color_path)
-        _write_depth_png(frame.depth_u16, depth_path)
+    def _write_pngs(self, frame: CaptureFrame, color_path: Path, depth_path: Path) -> None:
+        Image.fromarray(frame.color_rgb, mode="RGB").save(color_path, **_png_kwargs(self._compress_level))
+        _write_depth_png(frame.depth_u16, depth_path, self._compress_level)
 
+    def _write_sidecar(self, frame: CaptureFrame, color_path: Path, depth_path: Path, sidecar_path: Path) -> Path:
         sidecar = {
             "schema_version": SCHEMA_VERSION,
             "frame_index": frame.frame_index,
@@ -171,8 +204,6 @@ class RecordingWriter:
             },
         }
         sidecar_path.write_text(json.dumps(sidecar, indent=2) + "\n", encoding="utf-8")
-
-        self._frame_count += 1
         return sidecar_path
 
     def close(self) -> Path:

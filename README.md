@@ -22,9 +22,11 @@
 >   last-line filter in front of `motorbridge`, with a startup position check. A trajectory runner on the operator's
 >   controller is rehearsed and ready for the first powered run: [`FIRST_GUARDED_RUN.md`](docs/motion/FIRST_GUARDED_RUN.md).
 >   Remaining steps (CAN watchdog, measured joint limits) are in [`TODO.md`](TODO.md).
-> - **Camera (2026-10-22):** the physical D405 pipeline is set up and tested offline: `scripts/camera.py check`
->   (first connection + evidence), `snap` (capture -> full crack pipeline -> overlays, with mm scale from depth) and
->   `live` (the model on every frame in a browser). Setup, cable and firmware: [`docs/camera/D405_SETUP.md`](docs/camera/D405_SETUP.md).
+> - **Camera (2026-10-22): the real D405 is connected and running the model.** `scripts/camera.py check` (first
+>   connection + evidence), `record --video` (30 fps, lossless + MP4), `snap` (capture -> full crack pipeline ->
+>   overlays, mm scale from depth) and `live` (the model on every frame in a browser, 4.7 fps). Setup:
+>   [`docs/camera/D405_SETUP.md`](docs/camera/D405_SETUP.md); first-connection report:
+>   [`docs/camera/D405_FIRST_CONNECTION.md`](docs/camera/D405_FIRST_CONNECTION.md).
 
 This repository builds the Phase-1 perception pipeline that turns an RGB image of a concrete/masonry
 surface into a binary crack mask and a one-pixel crack skeleton, using publicly released weights

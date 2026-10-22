@@ -155,40 +155,39 @@ only refuses to enable a joint that reads *outside* its range. A reading that is
 
 ---
 
-## C. Camera (D405) pipeline — software done 2026-10-22, the camera itself is next
+## C. Camera (D405) pipeline — connected and working 2026-10-22
 
-Done (workstation only; no camera was attached):
-- `scripts/camera.py`:
-  - `check`: CAM-01 discovery, firmware compared with the SDK's recommendation, USB 3 required, a validated
-    30-frame recording, writing `evidence/camera/d405_discovery.json`;
-  - `snap`: burst capture, sharpest frame, then the accepted single-case pipeline, overlays and mm scale from
-    depth;
-  - `live`: the network in memory, MJPEG on http://127.0.0.1:8090;
-  - `record`: lossless and validated.
-- `crackvision.d405_live`: the missing live `CaptureFrame` source, so live sessions work with
-  `RecordingWriter`, `validate_recording` and replay.
-- `crackvision.live_predictor`: identical to the batch path with TTA; a test enforces it.
-- [`docs/camera/D405_SETUP.md`](docs/camera/D405_SETUP.md): researched facts, cable, port, firmware,
-  troubleshooting.
-- 20 tests, two of them on the real GPU and network.
+Done:
+- **Software (2026-10-22 morning):** `scripts/camera.py` with `check`, `record`, `snap` and `live`; the live
+  `CaptureFrame` source (`crackvision.d405_live`); the in-memory network (`crackvision.live_predictor`, identical to
+  the batch path with TTA); [`docs/camera/D405_SETUP.md`](docs/camera/D405_SETUP.md).
+- **The real camera (2026-10-22, after the operator plugged it in):**
+  - D405 serial 260522273107 on USB 3.2.
+  - Capture at 30 fps with no dropped frames.
+  - `check`: validator PASS, verdict WARN for the firmware only.
+  - Video test: 10 s at 1280×720, lossless and validated, plus an MP4.
+  - `snap` and `live` (4.7 fps / 2.1 fps HD) run the model on the camera.
+  - Full report: [`docs/camera/D405_FIRST_CONNECTION.md`](docs/camera/D405_FIRST_CONNECTION.md); evidence in
+    `evidence/camera/`.
+  - Fixed along the way: recordings dropped frames because PNGs were written inside the capture loop. They now
+    capture to memory first and write on 8 threads.
 
-Next, in order (each needs the physical camera):
-1. **Cable.** The D405 has a USB 3 **Micro-B** socket, not USB-C. The camera-only kit (DigiKey 99ACXD) needs a
-   USB-A to USB 3.0 Micro-B cable, ideally screw-locking and ≤ 2 m.
-2. **First connection.** Rear USB 3 port, no hub, camera end first. Then
-   `./env.sh python scripts/camera.py check`.
-   File the result:
+Next:
+1. **A positive test on real cracks.** Point the wrist at a cracked surface (or a printed crack photo) at
+   10–40 cm. Watch `./env.sh python scripts/camera.py live` (http://127.0.0.1:8090), then run `snap`. Light the
+   surface: the D405 has no projector. Stop the arm before `snap`.
+2. **Firmware.** The camera runs 5.15.1.55, which predates 5.17.0.9 (the D405 auto-exposure fixes). Updating to
+   5.17.0.10 is the operator's decision (D405_SETUP.md §5), never a tool's. Colour looked fine in room light.
+3. **File CAM-01 in the orchestrator:**
    - `claude-auto evidence add CAM-01 evidence/camera/d405_discovery.json`
    - `claude-auto hw declare d405_connected`
 
-   CAM-01's doc `docs/camera/D405_FIRST_CONNECTION.md` is then written from that evidence.
-3. **Firmware.** If `check` warns that it is below 5.17.0.9, updating to 5.17.0.10 is the operator's decision
-   (D405_SETUP.md §5). Never let a tool do it.
-4. `snap` over a real crack; `live` to aim the wrist. Mind the cable slack on J4–J6.
-5. CAM-04: `record` at two or more distances in 10–40 cm. Then the PERC-05 dataset and the PERC-06/08 zero-shot
-   fitness decision.
-6. Later: GEOM-04.1 (swap OpenCV so `calibrateHandEye` exists), then hand-eye calibration. Then captures tied
-   to joint states (`capture_record`, INTERFACES §9) so cracks land in robot coordinates.
+   The doc it wants (`docs/camera/D405_FIRST_CONNECTION.md`) exists.
+4. CAM-04: `record` at two or more distances in 10–40 cm over a test surface. Then the PERC-05 dataset and the
+   PERC-06/08 zero-shot fitness decision.
+5. On the arm: route the cable with slack at J4–J6.
+6. Later: GEOM-04.1 (an OpenCV build with `calibrateHandEye`), then hand-eye calibration, then captures tied to
+   joint states (INTERFACES §9) so cracks land in robot coordinates.
 
 ## Also open (smaller, or someone else's)
 

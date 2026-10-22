@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import time
 
 import numpy as np
@@ -217,3 +218,21 @@ def test_no_pyrealsense2_import_required(monkeypatch):
 
     importlib.reload(recording_module)
     assert "pyrealsense2" not in recording_module.__dict__
+
+
+def test_write_frames_parallel_matches_write_frame(tmp_path):
+    """write_frames (threaded PNG encoding) gives byte-identical files and sidecars to write_frame."""
+    frames = [_make_frame(i, seed=i) for i in range(7)]
+    serial, parallel = tmp_path / "serial", tmp_path / "parallel"
+    with _writer(serial) as w:
+        for f in frames:
+            w.write_frame(f)
+    with _writer(parallel) as w:
+        w.write_frames(frames[:3], workers=4)
+        w.write_frames(frames[3:], workers=4)
+    for sub in ("color", "depth", "frames"):
+        names = sorted(p.name for p in (serial / sub).iterdir())
+        assert names == sorted(p.name for p in (parallel / sub).iterdir())
+        for name in names:
+            assert (serial / sub / name).read_bytes() == (parallel / sub / name).read_bytes()
+    assert json.loads((parallel / "session.json").read_text())["frame_count"] == 7

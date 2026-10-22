@@ -255,3 +255,60 @@ def test_snap_end_to_end_on_a_replayed_recording(tmp_project, tmp_path):
     res = json.loads((tmp_project.root / "data/camera/e2e/snap.json").read_text())["result"]
     assert res["crack_pixels"] > 0 and res["crack_paths"] >= 1 and res["mm_per_px"] > 0
     assert {"overlay", "comparison", "paths_overlay", "skeleton_overlay"} <= set(res["files"])
+
+
+# ---- recording at full rate, video, memory guard, distance rule (added after the first real-camera run) --------
+
+def test_record_seconds_with_video_and_no_frames(tmp_project, fake_camera):
+    assert _run(tmp_project, "record", "--seconds", "0.5", "--warmup", "0", "--video", "--session", "v1") == 0
+    rec = tmp_project.root / "data/recordings/v1"
+    assert len(list((rec / "color").glob("*.png"))) == 15                     # 0.5 s x 30 fps
+    assert (rec / "video.mp4").stat().st_size > 1000
+    assert _run(tmp_project, "record", "--frames", "6", "--warmup", "0", "--video", "--no-frames",
+                "--no-depth", "--session", "v2") == 0
+    rec2 = tmp_project.root / "data/recordings/v2"
+    assert (rec2 / "video.mp4").is_file() and not (rec2 / "color").exists()
+    assert _run(tmp_project, "record", "--no-frames", "--session", "v3") == 2  # --no-frames needs --video
+
+
+def test_video_frames_and_size(tmp_path):
+    import shutil
+    import subprocess
+    if not shutil.which("ffprobe"):
+        pytest.skip("ffprobe not installed")
+    frames = [CaptureFrame(i, rc.synthetic_color_frame(64, 48, i), np.full((48, 64), 2000, np.uint16), i / 30,
+                           "h", i / 30, "h", i, i, 0) for i in range(12)]
+    assert cp.measured_fps(frames) == pytest.approx(30.0)
+    out = cp.write_video(frames, tmp_path / "v.mp4", 30.0, depth_scale_m=1e-4)
+    probe = subprocess.run(["ffprobe", "-v", "error", "-count_frames", "-show_entries", "stream=width,height,nb_read_frames",
+                            "-of", "csv=p=0", str(out)], capture_output=True, text=True).stdout.strip()
+    assert probe == "128,48,12"                                                # colour | depth side by side
+
+
+def test_depth_colormap_marks_missing_depth_black():
+    d = np.array([[0, 700, 5000]], np.uint16)                                  # none, 7 cm, 50 cm
+    rgb = cp.depth_colormap(d, 1e-4)
+    assert tuple(rgb[0, 0]) == (0, 0, 0) and tuple(rgb[0, 1]) != tuple(rgb[0, 2])
+
+
+def test_memory_guard(monkeypatch):
+    monkeypatch.setattr(cp, "_mem_available_bytes", lambda: 4 * 10**9)
+    assert cp.check_memory(100, 1280, 720) == ""
+    assert "RAM" in cp.check_memory(1000, 1280, 720)
+
+
+def test_distance_uses_crack_pixels_only_when_there_are_enough(tmp_project):
+    case = "dist"
+    mask = np.zeros((48, 64), np.uint8)
+    mask[0, 0] = 1                                                             # one stray pixel
+    (tmp_project.root / "data/predictions").mkdir(parents=True, exist_ok=True)
+    Image.fromarray(mask).save(tmp_project.root / f"data/predictions/{case}.png")
+    depth = np.full((48, 64), 3000, np.uint16)
+    depth[0, 0] = 9000
+    frame = CaptureFrame(0, rc.synthetic_color_frame(64, 48, 0), depth, 0.0, "h", 0.0, "h", 1, 1, 0)
+    info = {"depth_scale_m_per_unit": 1e-4, "color_intrinsics": {"fx": 100.0, "fy": 100.0}}
+    res = cp.summarize_case(tmp_project, case, frame, info)
+    assert res["distance_from"] == "whole frame" and res["distance_m"] == pytest.approx(0.3)
+    depth[:] = 9000
+    res = cp.summarize_case(tmp_project, case, frame, info)
+    assert "distance_note" in res                                              # 0.9 m: beyond the D405's range

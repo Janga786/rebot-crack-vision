@@ -1,0 +1,136 @@
+{
+  "schema": "crackvision.d405_bringup/1",
+  "date": "2026-10-22",
+  "operator_go": "operator plugged the D405 in and asked: make it fully ready, test it by recording a video, then run the CV pipeline live on the camera",
+  "device": {
+    "name": "RealSense D405",
+    "serial": "260522273107",
+    "firmware": "5.15.1.55",
+    "recommended_firmware": "unknown",
+    "product_line": "D400",
+    "product_id": "0B5B",
+    "usb_type": "3.2"
+  },
+  "usb": {
+    "lsusb_tree": "Bus 02 Port 4, uvcvideo, 5000M, directly on the xHCI root hub (no hub)",
+    "usb_type": "3.2"
+  },
+  "udev": "/etc/udev/rules.d/99-crackvision-d405.rules applied: /dev/bus/usb node root:plugdev 0660",
+  "sdk": {
+    "pyrealsense2": "2.58.4",
+    "ros_librealsense2": "2.57.7-1jammy.20260324.115117"
+  },
+  "capture_rate": {
+    "848x480_aligned": {
+      "fps": 30.3,
+      "hw_frame_gaps_in_90": 0,
+      "valid_depth_fraction": 0.94
+    },
+    "1280x720_aligned": {
+      "fps": 30.2,
+      "hw_frame_gaps_in_90": 0,
+      "valid_depth_fraction": 0.91
+    },
+    "auto_exposure_us": 28243,
+    "gain": 0,
+    "timestamp_domain": "global_time"
+  },
+  "cam01_check": {
+    "verdict": "WARN",
+    "warnings": [
+      "firmware 5.15.1.55 predates 5.17.0.9, which fixed D405 auto-exposure (dark/frozen colour); updating to 5.17.0.10 is recommended, as an operator decision (docs/camera/D405_SETUP.md \u00a75)"
+    ],
+    "validation": "PASS",
+    "recording": "data/recordings/cam01_20261022T174624Z",
+    "measured_fps": 29.99
+  },
+  "video_test": {
+    "command": "scripts/camera.py record --hd --seconds 10 --video",
+    "recording": "data/recordings/video_test_hd2",
+    "frames": 300,
+    "measured_fps": 30.0,
+    "validate_recording": "PASS",
+    "video": {
+      "codec": "h264",
+      "size": "2560x720 (colour | colourised depth)",
+      "duration_s": 10.0,
+      "sha256": "8503f6020fb350288f55f56711a25ef313e322b3036f568722542fb37f384532"
+    },
+    "write_seconds": {
+      "serial_png_level1": 55.4,
+      "8_threads_png_level1": 21.5
+    },
+    "first_attempt_note": "the first check wrote PNGs inside the capture loop: 30 frames took 7 s and the validator failed on 172 hardware frame gaps; fixed by capturing to memory first"
+  },
+  "intrinsics": {
+    "848x480": {
+      "fx": 436.2304382324219,
+      "fy": 435.7750244140625,
+      "ppx": 418.736083984375,
+      "ppy": 248.59432983398438,
+      "model": "distortion.inverse_brown_conrady",
+      "coeffs": [
+        -0.05390405282378197,
+        0.05609230697154999,
+        0.0004913255106657743,
+        0.0002767232072073966,
+        -0.017763759940862656
+      ],
+      "width": 848,
+      "height": 480
+    },
+    "1280x720": {
+      "fx": 654.3456420898438,
+      "fy": 653.6625366210938,
+      "ppx": 632.1041259765625,
+      "ppy": 372.8914794921875,
+      "model": "distortion.inverse_brown_conrady",
+      "coeffs": [
+        -0.05390405282378197,
+        0.05609230697154999,
+        0.0004913255106657743,
+        0.0002767232072073966,
+        -0.017763759940862656
+      ],
+      "width": 1280,
+      "height": 720
+    }
+  },
+  "model_on_camera": {
+    "snap": {
+      "case": "d405_first_snap",
+      "pipeline_s": 14.8,
+      "result": {
+        "crack_pixels": 1,
+        "crack_paths": 0,
+        "distance_m": 4.1735
+      },
+      "scene": "lab room, no cracks in view (correct negative)"
+    },
+    "live_848x480": {
+      "model_ms": 215,
+      "fps": 4.7,
+      "frames": 400,
+      "endpoints": [
+        "/",
+        "/stream",
+        "/stats",
+        "/snapshot"
+      ]
+    },
+    "live_1280x720": {
+      "model_ms": 421,
+      "fps": 2.1,
+      "frames": 60
+    },
+    "live_snapshot_then_full_pipeline": "data/camera/live_20261022T174914Z -> case d405_live_snapshot: 0 paths, 7 px"
+  },
+  "not_yet": [
+    "a positive crack detection on the real camera (no crack was in view)",
+    "firmware update to 5.17.0.10 (operator decision)"
+  ],
+  "images": {
+    "d405_video_frame_2026-10-22.jpg": "5fc01924d72620ee7f171df572fc237a31aa1c72508d3128e8a163da32dfdea8",
+    "d405_live_view_2026-10-22.jpg": "bb09a9c61e3b044c6a8e37661deea1a6ec45827b4d0249e8a610938d519f41ae"
+  }
+}

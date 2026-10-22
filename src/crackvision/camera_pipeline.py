@@ -48,8 +48,8 @@ from PIL import Image
 
 from crackvision import naming
 from crackvision.config import Config, ConfigError, add_common_args, load_config
-from crackvision.d405_live import (HD, MIN_GOOD_FIRMWARE, USB_HINT, D405Error, LiveD405Source, firmware_tuple,
-                                   list_devices, supported_profiles, usb_is_3)
+from crackvision.d405_live import (HD, LATEST_D405_FIRMWARE, MIN_GOOD_FIRMWARE, USB_HINT, D405Error, LiveD405Source,
+                                   firmware_tuple, list_devices, supported_profiles, usb_is_3)
 from crackvision.logging_setup import EXIT_OK, EXIT_PRECONDITION, EXIT_RUNTIME, EXIT_USAGE, RunSummary, setup_logging, utc_stamp
 from crackvision.recording import CaptureFrame, RecordingWriter, ReplaySource, _write_depth_png
 
@@ -57,6 +57,8 @@ TOOL = "camera_pipeline"
 REPO_ROOT = Path(__file__).resolve().parents[2]
 EVIDENCE_SCHEMA = "crackvision.d405_discovery/1"
 SNAP_SCHEMA = "crackvision.camera_snap/1"
+MIN_CRACK_DEPTH_PX = 50        # fewer crack pixels with depth than this: measure the distance over the whole frame
+D405_MAX_GOOD_Z_M = 0.5        # the D405's ideal range is 7-50 cm
 CHECK_FRAMES = 30
 DEFAULT_PORT = 8090
 
@@ -143,19 +145,104 @@ def open_camera(cfg: Config, args: argparse.Namespace, logger: logging.Logger, l
     return LiveD405Source(width, height, fps, warmup=warmup, serial=args.serial, logger=logger)
 
 
-def record_session(cam, out_dir: Path, n: int, interval_s: float = 0.0) -> Path:
-    info = cam.session_info
+RECORD_PNG_LEVEL = 1   # lossless at every level; 1 writes several times faster than PIL's default 6
+RECORD_WRITE_WORKERS = 8   # PNG encoding threads when writing a captured recording
+
+
+def _mem_available_bytes() -> int | None:
+    try:
+        for line in Path("/proc/meminfo").read_text().splitlines():
+            if line.startswith("MemAvailable:"):
+                return int(line.split()[1]) * 1024
+    except OSError:
+        pass
+    return None
+
+
+def check_memory(n: int, width: int, height: int) -> str:
+    """'' if n frames fit comfortably in RAM (half of what is available), else why not."""
+    need = n * width * height * 5            # RGB8 + Z16 per frame
+    avail = _mem_available_bytes()
+    if avail is not None and need > avail // 2:
+        return (f"{n} frames at {width}x{height} need {need / 1e9:.1f} GB of RAM, more than half of the "
+                f"{avail / 1e9:.1f} GB available: record fewer frames")
+    return ""
+
+
+def capture_frames(cam, n: int) -> tuple[list[CaptureFrame], float]:
+    """Read n frames into memory at the camera's full rate (nothing slow inside the loop: writing PNGs between
+    frames drops hardware frames, which validate_recording rightly fails). Returns (frames, wall seconds)."""
+    t0 = time.monotonic()
+    frames = list(cam.frames(n))
+    return frames, time.monotonic() - t0
+
+
+def write_recording(info: dict[str, Any], frames: list[CaptureFrame], out_dir: Path,
+                    compress_level: int | None = RECORD_PNG_LEVEL) -> Path:
     device = {k: info["device"].get(k, "unknown") for k in ("serial", "firmware", "usb_type")} | info["device"]
     with RecordingWriter(out_dir, session=out_dir.name, device=device, color=info["color"], depth=info["depth"],
                          color_intrinsics=info["color_intrinsics"],
                          depth_scale_m_per_unit=info["depth_scale_m_per_unit"],
                          extrinsics_depth_to_color=info["extrinsics_depth_to_color"],
-                         aligned_to=info.get("aligned_to", "color")) as writer:
-        for frame in cam.frames(n):
-            writer.write_frame(frame)
-            if interval_s > 0:
-                time.sleep(interval_s)
+                         aligned_to=info.get("aligned_to", "color"), compress_level=compress_level) as writer:
+        writer.write_frames(frames, workers=RECORD_WRITE_WORKERS)
     return out_dir / "session.json"
+
+
+def record_session(cam, out_dir: Path, n: int) -> Path:
+    frames, _ = capture_frames(cam, n)
+    return write_recording(cam.session_info, frames, out_dir)
+
+
+def measured_fps(frames: list[CaptureFrame], fallback: float = 30.0) -> float:
+    if len(frames) < 2:
+        return fallback
+    span = frames[-1].color_timestamp - frames[0].color_timestamp
+    return (len(frames) - 1) / span if span > 0 else fallback
+
+
+def depth_colormap(depth_u16: np.ndarray, scale_m: float, near_m: float = 0.07, far_m: float = 0.5) -> np.ndarray:
+    """Depth as RGB (turbo, near = red ... far = blue, over the D405's 7-50 cm sweet spot); no depth = black."""
+    import cv2
+    z = depth_u16.astype(np.float32) * float(scale_m)
+    t = np.clip((far_m - z) / (far_m - near_m), 0.0, 1.0)
+    rgb = cv2.applyColorMap((t * 255).astype(np.uint8), cv2.COLORMAP_TURBO)[:, :, ::-1]
+    rgb[depth_u16 == 0] = 0
+    return rgb
+
+
+def write_video(frames: list[CaptureFrame], path: Path, fps: float, depth_scale_m: float | None = None) -> Path:
+    """H.264 MP4 (ffmpeg; OpenCV's mp4v if ffmpeg is missing): colour, plus colourised depth beside it when a
+    depth scale is given. For watching; the lossless recording stays the data."""
+    if not frames:
+        raise ValueError("no frames to encode")
+    h, w = frames[0].color_rgb.shape[:2]
+    with_depth = depth_scale_m is not None
+    W = 2 * w if with_depth else w
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    def canvas(f: CaptureFrame) -> np.ndarray:
+        return np.hstack([f.color_rgb, depth_colormap(f.depth_u16, depth_scale_m)]) if with_depth else f.color_rgb
+
+    ffmpeg = shutil.which("ffmpeg")
+    if ffmpeg:
+        cmd = [ffmpeg, "-loglevel", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{h}",
+               "-r", f"{fps:.3f}", "-i", "-", "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
+               "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(path)]
+        proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+        assert proc.stdin is not None
+        for f in frames:
+            proc.stdin.write(np.ascontiguousarray(canvas(f)).tobytes())
+        proc.stdin.close()
+        if proc.wait() != 0:
+            raise RuntimeError(f"ffmpeg failed (exit {proc.returncode}) writing {path}")
+        return path
+    import cv2
+    vw = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*"mp4v"), fps, (W, h))
+    for f in frames:
+        vw.write(np.ascontiguousarray(canvas(f)[:, :, ::-1]))
+    vw.release()
+    return path
 
 
 def validate(recording_dir: Path) -> dict[str, Any]:
@@ -214,6 +301,9 @@ def cmd_check(cfg: Config, args: argparse.Namespace, logger: logging.Logger) -> 
     fw, rec = firmware_tuple(dev.get("firmware", "")), firmware_tuple(dev.get("recommended_firmware", ""))
     if fw and rec:
         fw_status = "up_to_date" if fw == rec else "older_than_recommended" if fw < rec else "newer_than_recommended"
+    elif fw:   # pyrealsense2 >= 2.58.2 bundles no firmware, so it recommends none: compare with the newest D405 FW
+        fw_status = ("latest_d405" if fw == LATEST_D405_FIRMWARE else "older_than_latest_d405" if fw < LATEST_D405_FIRMWARE
+                     else "newer_than_latest_known")
     else:
         fw_status = "unknown"
     if fw and fw < MIN_GOOD_FIRMWARE:
@@ -230,13 +320,13 @@ def cmd_check(cfg: Config, args: argparse.Namespace, logger: logging.Logger) -> 
     try:
         with LiveD405Source(width, height, fps, warmup=warmup, serial=dev.get("serial"), logger=logger) as cam:
             info = cam.session_info
-            t0 = time.monotonic()
-            record_session(cam, rec_dir, args.frames)
-            capture_s = time.monotonic() - t0
+            frames, capture_s = capture_frames(cam, args.frames)
+        write_recording(info, frames, rec_dir)
+        fps_measured = measured_fps(frames)
     except D405Error as exc:
         print(f"FAIL capture: {exc}")
         problems.append(f"capture failed: {exc}")
-        info, capture_s = {}, 0.0
+        info, capture_s, fps_measured = {}, 0.0, 0.0
     validation = validate(rec_dir) if (rec_dir / "session.json").is_file() else {"status": "FAIL", "checks": []}
     if validation["status"] == "FAIL":
         problems.append("validate_recording: " + "; ".join(f"{c['name']}: {c['value']}" for c in validation["checks"]
@@ -260,7 +350,7 @@ def cmd_check(cfg: Config, args: argparse.Namespace, logger: logging.Logger) -> 
         "all_devices": devices,
         "supported_profiles": profiles,
         "capture": {"width": width, "height": height, "fps": fps, "warmup_frames": warmup, "frames": args.frames,
-                    "seconds": round(capture_s, 2),
+                    "seconds": round(capture_s, 2), "measured_fps": round(fps_measured, 2),
                     "depth_scale_m_per_unit": scale,
                     "color_intrinsics": info.get("color_intrinsics"),
                     "extrinsics_depth_to_color": info.get("extrinsics_depth_to_color")},
@@ -272,9 +362,9 @@ def cmd_check(cfg: Config, args: argparse.Namespace, logger: logging.Logger) -> 
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
 
-    print(f"{verdict}  D405 serial {dev.get('serial')}  firmware {dev.get('firmware')} ({fw_status}, SDK recommends "
-          f"{dev.get('recommended_firmware')})  USB {dev.get('usb_type')}  pyrealsense2 {sdk}")
-    print(f"      {args.frames} frames at {width}x{height}@{fps} in {capture_s:.1f} s -> {_rel(rec_dir, cfg.root)}; "
+    print(f"{verdict}  D405 serial {dev.get('serial')}  firmware {dev.get('firmware')} ({fw_status})  "
+          f"USB {dev.get('usb_type')}  pyrealsense2 {sdk}")
+    print(f"      {args.frames} frames at {width}x{height}@{fps} in {capture_s:.1f} s ({fps_measured:.1f} fps measured) -> {_rel(rec_dir, cfg.root)}; "
           f"validate_recording: {validation['status']}; depth scale {scale}")
     for c in validation["checks"]:
         if c["status"] != "PASS":
@@ -295,18 +385,41 @@ def cmd_record(cfg: Config, args: argparse.Namespace, logger: logging.Logger) ->
     if rec_dir.exists():
         print(f"recording {rec_dir} already exists; pick another --session")
         return EXIT_USAGE
+    if args.no_frames and not args.video:
+        print("--no-frames only makes sense with --video")
+        return EXIT_USAGE
+    width, height, fps, _ = _stream_args(cfg, args)
+    n = int(round(args.seconds * fps)) if args.seconds else args.frames
+    if not args.replay and (why := check_memory(n, width, height)):
+        print(f"FAIL {why}")
+        return EXIT_USAGE
     try:
         with open_camera(cfg, args, logger) as cam:
-            record_session(cam, rec_dir, args.frames, args.interval)
+            info = cam.session_info
+            print(f"recording {n} frames ({n / fps:.1f} s at {fps} fps) ...", flush=True)
+            frames, wall_s = capture_frames(cam, n)
     except D405Error as exc:
         print(f"FAIL {exc}")
         return EXIT_PRECONDITION
-    v = validate(rec_dir)
-    print(f"{v['status']}  {args.frames} frames -> {_rel(rec_dir, cfg.root)}")
-    for c in v["checks"]:
-        if c["status"] != "PASS":
-            print(f"      {c['status']} {c['name']}: {c['value']}" + (f"  ({c['hint']})" if c.get("hint") else ""))
-    return EXIT_RUNTIME if v["status"] == "FAIL" else EXIT_OK
+    fps_m = measured_fps(frames, fps)
+    code = EXIT_OK
+    rec_dir.mkdir(parents=True, exist_ok=True)
+    if not args.no_frames:
+        t0 = time.monotonic()
+        write_recording(info, frames, rec_dir)
+        v = validate(rec_dir)
+        print(f"{v['status']}  {len(frames)} frames in {wall_s:.1f} s ({fps_m:.1f} fps measured), written in "
+              f"{time.monotonic() - t0:.1f} s -> {_rel(rec_dir, cfg.root)}")
+        for c in v["checks"]:
+            if c["status"] != "PASS":
+                print(f"      {c['status']} {c['name']}: {c['value']}" + (f"  ({c['hint']})" if c.get("hint") else ""))
+        code = EXIT_RUNTIME if v["status"] == "FAIL" else EXIT_OK
+    if args.video:
+        out = rec_dir / "video.mp4"
+        write_video(frames, out, fps_m, None if args.no_depth else info.get("depth_scale_m_per_unit"))
+        print(f"      video: {_rel(out, cfg.root)} ({len(frames)} frames, {fps_m:.1f} fps, "
+              f"{'colour' if args.no_depth else 'colour | depth'}, {out.stat().st_size / 1e6:.1f} MB)")
+    return code
 
 
 # ---- snap --------------------------------------------------------------------------------------------------
@@ -335,10 +448,12 @@ def summarize_case(cfg: Config, case_id: str, frame: CaptureFrame, info: dict[st
     intr = info.get("color_intrinsics") or {}
     depth = frame.depth_u16.astype(np.float64) * scale if scale else None
     if depth is not None and (depth > 0).any():
-        sel = (depth > 0) & mask if mask is not None and (mask & (depth > 0)).any() else depth > 0
-        z = float(np.median(depth[sel]))
+        on_crack = mask is not None and int((mask & (depth > 0)).sum()) >= MIN_CRACK_DEPTH_PX
+        z = float(np.median(depth[(depth > 0) & mask] if on_crack else depth[depth > 0]))
         out["distance_m"] = round(z, 4)
-        out["distance_from"] = "crack pixels" if mask is not None and (mask & (depth > 0)).any() else "whole frame"
+        out["distance_from"] = "crack pixels" if on_crack else "whole frame"
+        if z > D405_MAX_GOOD_Z_M:
+            out["distance_note"] = f"beyond the D405's {100 * D405_MAX_GOOD_Z_M:.0f} cm working range: scale is rough"
         out["valid_depth_fraction"] = round(float((depth > 0).mean()), 4)
         if intr.get("fx"):
             out["mm_per_px"] = round(1000.0 * z / ((intr["fx"] + intr["fy"]) / 2), 4)
@@ -416,6 +531,8 @@ def cmd_snap(cfg: Config, args: argparse.Namespace, logger: logging.Logger) -> i
         line = f"      cracks: {res.get('crack_paths', 0)} path(s), {res.get('crack_pixels', 0)} px ({100 * res.get('crack_fraction', 0):.2f} %)"
         if "distance_m" in res:
             line += f"; distance {100 * res['distance_m']:.1f} cm ({res['distance_from']})"
+            if "distance_note" in res:
+                line += f" [{res['distance_note']}]"
         if "mm_per_px" in res:
             line += f", {res['mm_per_px']:.3f} mm/px"
         if res.get("path_lengths_mm"):
@@ -588,7 +705,10 @@ def build_parser() -> argparse.ArgumentParser:
     r = sub.add_parser("record", help="lossless RGB-D recording (data/recordings/<session>/), validated")
     stream_opts(r)
     r.add_argument("--frames", type=int, default=60)
-    r.add_argument("--interval", type=float, default=0.0, help="seconds between saved frames")
+    r.add_argument("--seconds", type=float, default=None, help="record this long instead of --frames")
+    r.add_argument("--video", action="store_true", help="also write video.mp4 (H.264: colour | colourised depth)")
+    r.add_argument("--no-depth", action="store_true", help="video: colour only")
+    r.add_argument("--no-frames", action="store_true", help="with --video: skip the lossless PNG frames")
     r.add_argument("--session", default=None)
 
     s = sub.add_parser("snap", help="capture, keep the sharpest frame, run the full crack pipeline")

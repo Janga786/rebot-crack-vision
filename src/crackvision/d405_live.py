@@ -41,6 +41,7 @@ USB_HINT = ("The D405 has a USB 3 Micro-B socket: use a USB-A to USB 3.0 Micro-B
             "end first, then push the host end in quickly and firmly (a slow insertion can enumerate as USB 2).")
 NO_DEVICE_HINT = ("No RealSense device found. " + USB_HINT + " Then `lsusb -d 8086:0b5b`: if it is listed but this "
                   "still fails, the udev rule is missing (docs/host/DEVICE_ACCESS.md) or another process holds it.")
+LATEST_D405_FIRMWARE = (5, 17, 0, 10)   # newest firmware listing the D405 (Jul 2025; 5.17.3.x is not for it)
 MIN_GOOD_FIRMWARE = (5, 17, 0, 9)   # D405 auto-exposure fixes (dark colour, AE region); 5.17.0.10 is the newest D405 FW
 
 
