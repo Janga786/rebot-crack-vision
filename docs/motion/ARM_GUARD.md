@@ -7,8 +7,10 @@ reaches the CAN bus. A command that breaks a rule is never sent: the guard **hol
 
 Built 2026-10-21. Status: workstation-only. Verified offline against a fake bus, the real `motorbridge` classes
 (no bus opened), every real run logged on the arm, and full rehearsals of the operator's controller
-(`~/rebot_setup/demo_move.py`) running trajectories through it; **not yet run on the powered arm**. To run the
-first trajectory on the arm, follow [FIRST_GUARDED_RUN.md](FIRST_GUARDED_RUN.md). The open items are in
+(`~/rebot_setup/demo_move.py`) running trajectories through it. **First run on the powered arm 2026-10-22:** the
+smoke trajectory completed with no guard fault, tracking within 0.023 rad
+([evidence](../../evidence/operator/first-guarded-run-2026-10-22/README.md)). One fix came out of it: enable-time
+register reads are now retried. To run a trajectory, follow [FIRST_GUARDED_RUN.md](FIRST_GUARDED_RUN.md). The open items are in
 [`TODO.md`](../../TODO.md).
 
 ## What it guarantees, and what it doesn't

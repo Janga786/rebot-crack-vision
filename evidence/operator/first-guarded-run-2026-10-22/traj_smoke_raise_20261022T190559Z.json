@@ -1,0 +1,176 @@
+{
+  "script": "demo_move.py",
+  "version": "2026-10-21.1",
+  "choreo": "trajectory",
+  "slow": 2.0,
+  "speed": 1.0,
+  "trajectory": {
+    "schema": "crackvision.joint_trajectory/1",
+    "created_utc": "2026-01-01T00:00:00Z",
+    "producer": "MOT-05.2 fixture",
+    "purpose": "test",
+    "planning_frame": "base_link",
+    "joint_names": [
+      "joint1",
+      "joint2",
+      "joint3",
+      "joint4",
+      "joint5",
+      "joint6"
+    ],
+    "notes": "Pose P = [0.1, -0.6, -0.9, 0.1, 0.1, 0.1]: well inside b601_dm_limits.yaml on every joint and far from the \u00a711.6 margin band near joint2/joint3's upper=0.0. Chosen so MOT-05.5 can reuse the same home->P pose on the mock stack.",
+    "limits_file": {
+      "path": "config/robot/b601_dm_limits.yaml",
+      "sha256": null
+    },
+    "end_effector_config_sha256": null,
+    "scene_config_sha256": null,
+    "source": {
+      "paths3d": null
+    },
+    "path": "/home/boosterk1/rebot_setup/trajectories/smoke_raise.json",
+    "sha256": "5deef2166d1864f441e545ca986535d8e78178983d2c0aa77fd4c1a52253f663",
+    "n_points": 3
+  },
+  "plan_cap": {
+    "4340P": 0.6,
+    "4310": 1.2
+  },
+  "vel_abort": {
+    "4340P": 1.0,
+    "4310": 1.6
+  },
+  "operator_go": "go (operator in chat, 2026-10-22; J1 forward confirmed: yes)",
+  "gains": {
+    "j1": [
+      100.0,
+      4.0
+    ],
+    "j2": [
+      100.0,
+      1.0
+    ],
+    "j3": [
+      80.0,
+      1.0
+    ],
+    "j4": [
+      40.0,
+      1.0
+    ],
+    "j5": [
+      40.0,
+      1.0
+    ],
+    "j6": [
+      40.0,
+      1.0
+    ],
+    "j7": [
+      40.0,
+      0.5
+    ]
+  },
+  "gravity_scale": {
+    "j1": 1.0,
+    "j2": 0.6,
+    "j3": 2.5,
+    "j4": 2.5,
+    "j5": 1.0,
+    "j6": 1.0,
+    "j7": 0.0
+  },
+  "friction": {
+    "j1": 1.0,
+    "j2": 1.0,
+    "j3": 2.0,
+    "j4": 0.5,
+    "j5": 0.3,
+    "j6": 0.1,
+    "j7": 0.0
+  },
+  "simulated": false,
+  "start": {
+    "j1": 6.276607513427734,
+    "j2": 0.00171661376953125,
+    "j3": -0.00514984130859375,
+    "j4": -0.00286102294921875,
+    "j5": 0.039483070373535156,
+    "j6": -0.049019813537597656,
+    "j7": -0.00171661376953125
+  },
+  "j1_offset": 6.276607513427734,
+  "guard_preflight": {
+    "problems": [],
+    "warnings": [],
+    "offsets": {
+      "j1": 6.283185307179586,
+      "j2": 0.0,
+      "j3": 0.0,
+      "j4": 0.0,
+      "j5": 0.0,
+      "j6": 0.0,
+      "j7": 0.0
+    },
+    "n_ticks": 3451,
+    "min_keepout_m": 0.04074105378771012
+  },
+  "planned_peak_rad_s": {
+    "j1": 0.029999999999999884,
+    "j2": 0.17999999999999994,
+    "j3": 0.2699999999999999,
+    "j4": 0.029999999999999992,
+    "j5": 0.029999999999999992,
+    "j6": 0.029999999999999992,
+    "j7": 0.0
+  },
+  "outcome": "aborted",
+  "trigger": {
+    "id": "guard_enable",
+    "detail": "j3 enable refused by arm_guard: j3: enable refused, register read failed (get_register_u32 failed: register 10 not received within 200ms)"
+  },
+  "stats": {
+    "n_cmd": 0,
+    "max_err": {
+      "j1": 0.0,
+      "j2": 0.0,
+      "j3": 0.0,
+      "j4": 0.0,
+      "j5": 0.0,
+      "j6": 0.0,
+      "j7": 0.0
+    },
+    "max_gap_s": 0.0,
+    "parked": false
+  },
+  "csv": "/home/boosterk1/rebot_setup/runs/traj_smoke_raise_20261022T190559Z.csv",
+  "all_disabled_confirmed": true,
+  "guard": {
+    "simulated": false,
+    "config_sha256": "fbf08261c8df7e7e2e681fcad4cb2c4e95f5e4ae205fc76ee514ef8c94f5288b",
+    "latched_at_end": "",
+    "events": [
+      {
+        "t_wall": 1792695959.9237182,
+        "kind": "bus",
+        "msg": "opened /dev/ttyACM0",
+        "pid": 3568399
+      },
+      {
+        "t_wall": 1792695961.8409321,
+        "kind": "startup",
+        "msg": "startup check passed; whole-turn offsets {'j1': 1}",
+        "pid": 3568399,
+        "readings": {
+          "j1": 6.276607513427734,
+          "j2": 0.00171661376953125,
+          "j3": -0.00514984130859375,
+          "j4": -0.00286102294921875,
+          "j5": 0.039483070373535156,
+          "j6": -0.049019813537597656,
+          "j7": -0.00171661376953125
+        }
+      }
+    ]
+  }
+}

@@ -1,8 +1,13 @@
 # First guarded trajectory run — operator runbook
 
-**Status (2026-10-21):** everything below has been rehearsed offline: a simulation using the real guard config,
-the operator's real controller and the real trajectory files. **Nothing has run on the powered arm yet.** Every
-step at the arm is the operator's own action.
+**Status: done 2026-10-22.** `smoke_raise.json --slow 2` ran on the powered arm and completed: 6 s up, 6 s back,
+every joint within 0.023 rad of its command, no guard fault
+([evidence](../../evidence/operator/first-guarded-run-2026-10-22/README.md)). Before it, two things stopped the
+run safely at the fold:
+- J1 had lost its turn count over a 24 V cycle. The operator confirmed it faced forward and J1 was re-referenced.
+- A dropped register reply refused J3's enable. Fixed: the guard now retries those reads.
+
+Each step at the arm was taken on the operator's go.
 
 ## What runs
 

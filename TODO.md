@@ -32,7 +32,14 @@ initiative. Workstation code, tests and docs are fine to do first.
 
 ---
 
-## 0. The first guarded trajectory run (operator, at the arm)
+## 0. The first guarded trajectory run — DONE 2026-10-22
+
+`smoke_raise.json --slow 2` completed on the powered arm: tracking ≤ 0.023 rad, no guard fault
+([evidence](evidence/operator/first-guarded-run-2026-10-22/README.md)). Next: the same at full speed, then
+`first_guarded_run.json`. Each run still needs the operator's go. What follows is the original plan, kept for
+reference.
+
+### Original plan
 
 Follow [`docs/motion/FIRST_GUARDED_RUN.md`](docs/motion/FIRST_GUARDED_RUN.md):
 1. Review and re-approve the guard config under the operator's own name.

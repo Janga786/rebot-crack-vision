@@ -1986,3 +1986,24 @@ CHANGES:
 TESTS: live sync/async tests (a slow stub model must not slow the view); full suite 593 passed, 1 skipped; GPU
   parity tests pass.
 ```
+
+## FIRST-GUARDED-RUN — A trajectory on the physical arm, simulation first (operator-directed, 2026-10-22)
+
+```
+TASK: FIRST-GUARDED-RUN (operator: "run a trajectory on the physical robot arm ... first show me in simulation,
+      then the physical robot"; each step on the operator's go)
+STATUS: COMPLETE
+SIMULATION: guarded rehearsal of smoke_raise.json --slow 2 (fakebus + the real arm_guard config) completed;
+  new tools/render_arm_run.py rendered it in MuJoCo on the repo URDF (~/rebot_setup/renders/*_SIM.mp4).
+PHYSICAL (evidence/operator/first-guarded-run-2026-10-22/):
+  - Read-only check refused: J1 read +6.2766 (one whole turn off after a 24 V cycle). Operator confirmed J1
+    forward; re-referenced (--j1-here-is-zero); the guard unwrapped J1 itself.
+  - Attempt 1 aborted at the fold: arm_guard refused J3's enable after one CTRL_MODE register reply did not
+    arrive within 200 ms; J1/J2 disabled (confirmed), nothing moved. Fix 5d8f4cc: enable-time register reads
+    retried up to 3 times (2 new tests; guard suite PASS; runner tests 18 OK).
+  - Attempt 2 completed: up 6 s, back 6.2 s, all 7 motors disabled (confirmed). Reached J2 -0.608 / J3 -0.889
+    (targets -0.6 / -0.9); max |ref-pos| 0.023 rad; max torque J3 10.7 Nm (abort 22); no guard fault,
+    adjustment or latch.
+DOCS: ARM_GUARD.md / FIRST_GUARDED_RUN.md status, TODO.md item 0 done, README.
+NEXT: the same trajectory at full speed, then first_guarded_run.json (each on the operator's go); TODO items 1-2.
+```
