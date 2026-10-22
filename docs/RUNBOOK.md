@@ -103,6 +103,15 @@ and `docs/MACHINE_STATE.md` for the target machine's own inventory.
     (`devices_found`, `d405_present`, `stream_profiles`, `depth_scale`) — that is the expected,
     hardware-optional state this project has run in throughout Phase 1.
 
+13. **Connect the D405 and run the model on it** ([`docs/camera/D405_SETUP.md`](camera/D405_SETUP.md): which
+    cable — the D405 has a USB 3 **Micro-B** socket — which port, firmware, troubleshooting):
+    ```bash
+    ./env.sh python scripts/camera.py check     # first connection: device, firmware, USB 3, validated 30-frame
+                                                # recording -> evidence/camera/d405_discovery.json
+    ./env.sh python scripts/camera.py snap      # capture, keep the sharpest frame, full crack pipeline (~15 s)
+    ./env.sh python scripts/camera.py live      # the model on every frame: open http://127.0.0.1:8090
+    ```
+
 ---
 
 ## Troubleshooting

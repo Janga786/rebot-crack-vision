@@ -1,6 +1,6 @@
-# TODO — where the arm-safety work stands and what comes next
+# TODO — where the arm-safety and camera work stand and what comes next
 
-**Read this first if you are picking up the "make IK/arm motion safe" work.** Last updated 2026-10-21 (evening).
+**Read this first if you are picking up the arm-safety work (items 0–3) or the D405 camera pipeline (C).** Last updated 2026-10-22.
 
 ## Where we are
 
@@ -154,6 +154,41 @@ only refuses to enable a joint that reads *outside* its range. A reading that is
 - Tests: wrong-but-in-range readings refused; the fold accepted; the confirmation path logged.
 
 ---
+
+## C. Camera (D405) pipeline — software done 2026-10-22, the camera itself is next
+
+Done (workstation only; no camera was attached):
+- `scripts/camera.py`:
+  - `check`: CAM-01 discovery, firmware compared with the SDK's recommendation, USB 3 required, a validated
+    30-frame recording, writing `evidence/camera/d405_discovery.json`;
+  - `snap`: burst capture, sharpest frame, then the accepted single-case pipeline, overlays and mm scale from
+    depth;
+  - `live`: the network in memory, MJPEG on http://127.0.0.1:8090;
+  - `record`: lossless and validated.
+- `crackvision.d405_live`: the missing live `CaptureFrame` source, so live sessions work with
+  `RecordingWriter`, `validate_recording` and replay.
+- `crackvision.live_predictor`: identical to the batch path with TTA; a test enforces it.
+- [`docs/camera/D405_SETUP.md`](docs/camera/D405_SETUP.md): researched facts, cable, port, firmware,
+  troubleshooting.
+- 20 tests, two of them on the real GPU and network.
+
+Next, in order (each needs the physical camera):
+1. **Cable.** The D405 has a USB 3 **Micro-B** socket, not USB-C. The camera-only kit (DigiKey 99ACXD) needs a
+   USB-A to USB 3.0 Micro-B cable, ideally screw-locking and ≤ 2 m.
+2. **First connection.** Rear USB 3 port, no hub, camera end first. Then
+   `./env.sh python scripts/camera.py check`.
+   File the result:
+   - `claude-auto evidence add CAM-01 evidence/camera/d405_discovery.json`
+   - `claude-auto hw declare d405_connected`
+
+   CAM-01's doc `docs/camera/D405_FIRST_CONNECTION.md` is then written from that evidence.
+3. **Firmware.** If `check` warns that it is below 5.17.0.9, updating to 5.17.0.10 is the operator's decision
+   (D405_SETUP.md §5). Never let a tool do it.
+4. `snap` over a real crack; `live` to aim the wrist. Mind the cable slack on J4–J6.
+5. CAM-04: `record` at two or more distances in 10–40 cm. Then the PERC-05 dataset and the PERC-06/08 zero-shot
+   fitness decision.
+6. Later: GEOM-04.1 (swap OpenCV so `calibrateHandEye` exists), then hand-eye calibration. Then captures tied
+   to joint states (`capture_record`, INTERFACES §9) so cracks land in robot coordinates.
 
 ## Also open (smaller, or someone else's)
 

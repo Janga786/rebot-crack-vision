@@ -1900,3 +1900,38 @@ ISSUES:
     rad/s at 2x (2026-10-18..21) above the 2.5 abort. Re-enabling it is an operator decision (FIRST_GUARDED_RUN.md §5).
 NEXT: the operator's first guarded run (FIRST_GUARDED_RUN.md), then TODO.md items 1-2.
 ```
+
+## CAMERA-PIPELINE — The physical D405 pipeline, set up for running the crack model (operator-directed, outside claude-auto, 2026-10-22)
+
+```
+TASK: CAMERA-PIPELINE (no plan card; operator: "fully set up the physical camera pipeline so we can run the
+      computer vision model on it"; camera = DigiKey 99ACXD, RealSense D405 camera only)
+STATUS: COMPLETE offline (no D405 attached to the workstation yet: lsusb shows no 8086:0b5b)
+FINDINGS:
+  - Research (D400 datasheet Mar 2026, librealsense releases, Linux 6.8 uvc_driver.c): the D405 has a USB 3
+    Micro-B socket (not USB-C); 84x58 deg FOV; min Z 10 cm at 1280x720, 7 cm at 848x480; passive stereo (no
+    projector); colour from the left imager; newest D405 firmware 5.17.0.10 (5.17.0.9 fixed auto-exposure); the
+    stock 6.8 uvcvideo lists the D405, so no DKMS patch; pyrealsense2 2.58.4 (installed) is fine.
+  - Gap 1: no live source yielded crackvision.recording CaptureFrames, so CAM-01's "30-frame capture validated by
+    validate_recording.py" had no producer. Gap 2: nothing went camera -> model in one step.
+  - validate_recording's timestamp thresholds are in seconds; librealsense reports ms: the live source converts.
+CHANGES:
+  - src/crackvision/d405_live.py: LiveD405Source (aligned CaptureFrames, session_info for RecordingWriter incl.
+    usb_type, recommended firmware, product line), list_devices, supported_profiles.
+  - src/crackvision/live_predictor.py: the OpenCrack nnU-Net in memory (same model folder/fold/checkpoint/trainer
+    shim/step as crackvision.inference); identical masks to the batch path with TTA.
+  - src/crackvision/camera_pipeline.py + scripts/camera.py: check (CAM-01 evidence
+    evidence/camera/d405_discovery.json; USB 2 = FAIL; firmware compared, never flashed), record, snap (burst ->
+    sharpest frame -> operator_segment_paths --stage both + visualize; distance and mm/px from depth, path lengths
+    in mm), live (MJPEG on http://127.0.0.1:8090, snapshot endpoint).
+  - docs/camera/D405_SETUP.md (new), RUNBOOK.md step 13, README.md, TODO.md section C.
+TESTS:
+  - tests/test_d405_live.py (7) + tests/test_camera_pipeline.py (13, two gpu+model: live vs batch parity, snap end
+    to end on a replayed recording) -> 20 passed; full suite 585 passed, 2 skipped.
+  - Manual: snap on the sample crack image (4577 crack px, identical to the batch path); snap on a replayed
+    recording (20.0 cm, 0.278 mm/px); live on a replay (about 4.3 fps at 848x480, stream + snapshot endpoints).
+ISSUES:
+  - Nothing has run against a real D405 yet. Hand-eye calibration (GEOM-04.x, blocked on GEOM-04.1's OpenCV swap)
+    and joint-state capture records are not part of this.
+NEXT: TODO.md section C: cable (USB-A to USB 3.0 Micro-B), plug in, `scripts/camera.py check`, file CAM-01.
+```
