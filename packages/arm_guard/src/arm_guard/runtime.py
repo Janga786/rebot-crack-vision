@@ -33,6 +33,8 @@ LOCK_DIR = Path(os.environ.get("ARM_GUARD_LOCK_DIR", "/tmp/arm_guard_locks"))
 EVENT_LOG = Path(os.environ.get("ARM_GUARD_EVENT_LOG", Path.home() / ".local/state/arm_guard/events.jsonl"))
 HEARTBEAT_TIMEOUT_MS = 10
 ENABLE_REG_TIMEOUT_MS = 200
+ENABLE_REG_ATTEMPTS = 3      # the USB2CAN link occasionally drops one register reply (2026-10-17, 2026-10-22):
+                             # one good round trip proves the link; a dead link fails every attempt
 STARTUP_POLLS, STARTUP_POLL_S = 100, 0.002     # up to 0.2 s for each motor's feedback frame at the startup check
 RESYNC_DEBOUNCE_S = 1.0                         # enable_all checks every motor in turn: one startup check for all
 
@@ -344,6 +346,17 @@ class Guard:
             self._adj_logged[joint] = now
             self._event("adjusted", msg)
 
+    def _read_register(self, read, motor, rid: int):
+        """A register read at enable time, retried: a single missed reply is not a dead link."""
+        for attempt in range(1, ENABLE_REG_ATTEMPTS + 1):
+            try:
+                return read(motor, rid, ENABLE_REG_TIMEOUT_MS)
+            except Exception as exc:  # noqa: BLE001 — motorbridge raises CallError on a timeout
+                if attempt == ENABLE_REG_ATTEMPTS:
+                    raise
+                self._event("retry", f"{getattr(motor, '_arm_guard').cfg.name}: register {rid} read failed "
+                                     f"({exc}); retry {attempt}/{ENABLE_REG_ATTEMPTS - 1}")
+
     def check_enable(self, motor) -> None:
         """Before enable(): known joint, no latch, live link, MIT mapping verified, sane mode, state within limits."""
         self._require_cfg()
@@ -353,9 +366,9 @@ class Guard:
                 raise GuardRefused(f"{jr.cfg.name}: enable refused, guard latched: {self.latched}")
             self._startup(jr.bus)
             try:
-                mode = int(self.raw.get_register_u32(motor, RID_CTRL_MODE, ENABLE_REG_TIMEOUT_MS))
+                mode = int(self._read_register(self.raw.get_register_u32, motor, RID_CTRL_MODE))
                 if not jr.mapping_verified:
-                    got = tuple(float(self.raw.get_register_f32(motor, rid, ENABLE_REG_TIMEOUT_MS))
+                    got = tuple(float(self._read_register(self.raw.get_register_f32, motor, rid))
                                 for rid in (RID_PMAX, RID_VMAX, RID_TMAX))
                     want = self.cfg.models[jr.cfg.model]
                     if any(abs(a - b) > 1e-3 * max(1.0, abs(b)) for a, b in zip(got, want)):

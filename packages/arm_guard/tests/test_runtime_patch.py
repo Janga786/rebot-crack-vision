@@ -100,6 +100,24 @@ def test_enable_refused_when_link_dead(rig):
         rig.m["j3"].enable()
 
 
+def test_enable_survives_one_dropped_register_reply(rig):
+    """2026-10-22, first powered run: J3's CTRL_MODE reply went missing once and the guard refused to enable."""
+    rig.m["j3"].reg_failures = 1
+    rig.m["j3"].enable()
+    assert rig.m["j3"].status == ST_ENABLED
+    assert any(e["kind"] == "retry" and "j3" in e["msg"] for e in rig.guard.events)
+    rig.m["j4"].reg_failures = 2                         # two misses in a row: the third attempt answers
+    rig.m["j4"].enable()
+    assert rig.m["j4"].status == ST_ENABLED
+
+
+def test_enable_refused_when_every_attempt_fails(rig):
+    rig.m["j5"].reg_failures = 3
+    with pytest.raises(GuardRefused, match="register read failed"):
+        rig.m["j5"].enable()
+    assert rig.m["j5"].status != ST_ENABLED
+
+
 def test_enable_refused_in_velocity_mode(rig):
     rig.m["j4"].regs[10] = int(Mode.VEL)
     with pytest.raises(GuardRefused, match="mode"):

@@ -23,6 +23,7 @@ def make_classes():
             self.target = None
             self.frozen = False      # feedback stops changing
             self.heartbeat_ok = True
+            self.reg_failures = 0    # the next N register reads time out (a dropped reply on the link)
             self.no_feedback = False
             self.zeroed = 0
             self.stored = 0
@@ -109,13 +110,19 @@ def make_classes():
         def write_register_u32(self, rid, value):
             self.regs[rid] = int(value)
 
+        def _reg_ok(self):
+            if self.reg_failures > 0:
+                self.reg_failures -= 1
+                return False
+            return self.heartbeat_ok
+
         def get_register_f32(self, rid, timeout_ms=1000):
-            if not self.heartbeat_ok:
+            if not self._reg_ok():
                 raise CallError("timeout")
             return float(self.regs[rid])
 
         def get_register_u32(self, rid, timeout_ms=1000):
-            if not self.heartbeat_ok:
+            if not self._reg_ok():
                 raise CallError("timeout")
             return int(self.regs[rid])
 
