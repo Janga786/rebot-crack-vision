@@ -80,6 +80,11 @@ def test_limits_inside_mit_mapping(cfg_copy):
     ('link = "link4"', 'link = "nolink"', "not in URDF"),
     ("max_step = 0.15", "max_step = -0.15", "must be > 0"),
     ("stale_feedback_s = 0.25", "stale_feedback_s = nan", "finite"),
+    ("j5 = [-0.40, 0.40]\n", "", "every joint needs a startup window"),
+    ("j3 = [-0.40, 0.05]", "j3 = [-0.40, 0.20]", "must lie within"),
+    ("j1 = [-0.40, 0.40]", "j1 = [-2.0, 2.0]", "narrower than"),
+    ('turn_ambiguous = ["j1"]', 'turn_ambiguous = ["j9"]', "unknown joints"),
+    ("rest_tolerance_rad = 0.50", "rest_tolerance_rad = -0.5", "must be >= 0"),
 ])
 def test_invalid_values_refused(cfg_copy, old, new, match):
     _edit(cfg_copy, old, new)

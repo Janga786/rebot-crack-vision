@@ -50,14 +50,14 @@ def _fb(rng, j, rest_tol):
 
 
 def _assert_rules(cfg, j, cmd_in, fb, out):
-    lo, hi = core.target_window(j, fb.pos, cfg.rest_tolerance_rad, cfg.rest_slack_rad)
+    lo, hi = core.target_window(j, fb.pos, j.rest_tolerance_rad, cfg.rest_slack_rad)
     for x in (out.pos, out.vel, out.kp, out.kd, out.tau, out.vlim, out.ratio):
         assert math.isfinite(x)
     if out.mode == "vel":
         assert cfg.allow_velocity_mode
         return
     assert lo <= out.pos <= hi
-    assert j.lower - cfg.rest_tolerance_rad <= out.pos <= j.upper + cfg.rest_tolerance_rad
+    assert j.lower - j.rest_tolerance_rad <= out.pos <= j.upper + j.rest_tolerance_rad
     assert abs(out.pos - fb.pos) <= j.max_step + 1e-12
     if out.mode == "mit":
         assert 0.0 <= out.kp <= j.kp_max and 0.0 <= out.kd <= j.kd_max and abs(out.tau) <= j.tau_ff_max
@@ -83,7 +83,7 @@ def test_accepted_commands_satisfy_every_rule(cfg, seed):
     accepted = 0
     for _ in range(N_COMMANDS):
         j = rng.choice(joints)
-        fb = _fb(rng, j, cfg.rest_tolerance_rad)
+        fb = _fb(rng, j, j.rest_tolerance_rad)
         c = _cmd(rng, j, fb.pos)
         v = core.check_command(j, c, fb, cfg)
         assert v.ok == (not v.reasons)
@@ -155,7 +155,7 @@ def test_closed_loop_hostile_planner_never_breaks_limits(cfg, seed):
         rig.step(dt)
         for name, m in rig.m.items():
             j = cfg.joints[name]
-            assert j.lower - cfg.rest_tolerance_rad - 1e-9 <= m.pos <= j.upper + cfg.rest_tolerance_rad + 1e-9, \
+            assert j.lower - j.rest_tolerance_rad - 1e-9 <= m.pos <= j.upper + j.rest_tolerance_rad + 1e-9, \
                 (step, name, m.pos)
             assert abs(m.vel) <= max(j.vel_cap, j.max_step / 0.02) + 1e-9
         q = {cfg.joints[n].urdf_joint: m.pos for n, m in rig.m.items() if cfg.joints[n].arm}
@@ -184,7 +184,7 @@ def test_closed_loop_pos_vel_hostile(cfg, seed):
         rig.step(0.002)
         for name, m in rig.m.items():
             j = cfg.joints[name]
-            assert j.lower - cfg.rest_tolerance_rad - 1e-9 <= m.pos <= j.upper + cfg.rest_tolerance_rad + 1e-9
+            assert j.lower - j.rest_tolerance_rad - 1e-9 <= m.pos <= j.upper + j.rest_tolerance_rad + 1e-9
             assert abs(m.vel) <= j.vel_cap + 1e-9, (step, name, m.vel)
         q = {cfg.joints[n].urdf_joint: m.pos for n, m in rig.m.items() if cfg.joints[n].arm}
         assert min(core.pose_margins(cfg, q).values()) >= -KEEPOUT_SLACK_M

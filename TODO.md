@@ -1,6 +1,6 @@
 # TODO — where the arm-safety work stands and what comes next
 
-**Read this first if you are picking up the "make IK/arm motion safe" work.** Last updated 2026-10-21.
+**Read this first if you are picking up the "make IK/arm motion safe" work.** Last updated 2026-10-21 (evening).
 
 ## Where we are
 
@@ -16,12 +16,33 @@
     `packages/arm_guard/vendor_patches/`);
   - 155 tests (`bash scripts/safety/test_arm_guard.sh`, also stage 5 of `scripts/safety/run_safety_case.sh`):
     closed-loop fuzz against a hostile planner, a replay of all 34 real runs, mutation-checked.
+- Done (2026-10-21 evening, workstation-only), on the operator's "get it 100% ready to run a trajectory on the arm":
+  - the startup check (item 3 below, mostly), J1 whole-turn unwrapping, J2 droop tolerance, a session allowance
+    past a limit that cannot ratchet, the offline pre-flight (`arm_guard.preflight`); 201 tests;
+  - the operator's controller made guard-aware and able to run trajectory files: `~/rebot_setup/demo_move.py`
+    2026-10-21.1, `run-trajectory.sh`, `trajectories/`, `test_guarded_runs.py`. Rehearsed in simulation with the
+    real guard config: both trajectories complete with zero guard faults;
+  - the config re-approved for offline testing only, marked *operator review pending*.
 - **Not yet true:** the guard has never run against the powered arm, and its limits are the vendor URDF's, not
   measured ones.
 
-The three items below are next, in this order. **All three need the physical arm, so every powered or bus step
-needs the operator's explicit OK for that step.** Don't run the arm, open the bus, or write motor registers on your
-own initiative. Workstation code, tests and docs are fine to do first.
+**Next is the operator's first guarded run** (item 0). Items 1 and 2 follow. **Every powered or bus step needs the
+operator's explicit OK for that step.** Don't run the arm, open the bus, or write motor registers on your own
+initiative. Workstation code, tests and docs are fine to do first.
+
+---
+
+## 0. The first guarded trajectory run (operator, at the arm)
+
+Follow [`docs/motion/FIRST_GUARDED_RUN.md`](docs/motion/FIRST_GUARDED_RUN.md):
+1. Review and re-approve the guard config under the operator's own name.
+2. Run the read-only `--check`.
+3. Run `./run-trajectory.sh trajectories/smoke_raise.json 2`.
+4. Then full speed, then `first_guarded_run.json`.
+
+After it, look at the run's summary (`guard` events, max tracking error, `max_gap_s`) and the guard's event log.
+Then update ARM_GUARD.md's status line ("not yet run on the powered arm") with what actually happened. If the guard
+tripped, the CSV shows what it saw.
 
 ---
 
@@ -86,7 +107,25 @@ Ask the operator. If they choose (b), record the decision as an ADR-016 amendmen
 5. While the arm is there: measure the table plane and the specimen (MOT-10 / MOT-10.4) and replace the nominal
    keep-out numbers in `[keepout]` with measured ones.
 
-## 3. Startup position check (encoder plausibility before the first enable)
+## 3. Startup position check — mostly DONE (2026-10-21)
+
+Built: `[startup]` in `arm_guard.toml`, `core.startup_check`, `Guard._startup`.
+- Before a session's first enable (every motor on the bus disabled), every joint must read inside its window
+  around the fold (±0.4 rad; J2 −0.4…+0.5; J7 −0.6…+0.1). The windows cover every start logged 2026-10-14…21.
+- J1 is unwrapped by whole turns: it read +6.335, +6.278 and +6.272 facing forward after power cycles on
+  2026-10-18; every other forward reading was within 0.08 of 0. The guard then checks J1 with that offset.
+- J1 is refused if its range would leave the MIT position mapping (two turns off).
+- Tests: `tests/test_startup.py`.
+
+Still open:
+- `arm_guard.confirm_start_pose("reason")`: starting from another known pose by explicit operator confirmation
+  (e.g. the show demo's "folded, facing the audience" start). Not built. Today the operator turns the base to
+  forward.
+- With the arm: power-cycle with J1 at +1.0 rad and at −3.0 rad. That confirms the reading is off by exactly
+  whole turns (2π), which the data supports but no controlled test has shown. Also check whether any other joint
+  can come back a turn off (none has).
+
+The original analysis follows.
 
 **Why.** The guard compares every command with the *measured* position, so a wrong reading defeats it. The
 reading can be wrong after a power cycle with a joint turned. CONTROLLER_TUNING §12 says: "Multi-turn position
@@ -124,8 +163,19 @@ only refuses to enable a joint that reads *outside* its range. A reading that is
   hook installed in whatever interpreter ends up running the driver.
 - **Remaining guard bypasses** (by design, documented): direct C-ABI calls and the Rust tools
   `ws_gateway`/`motor_cli`. Closing them means moving the checks into motorbridge's Rust `send_raw`.
-- **The "show" demo** (J1 at −3.76 rad) is refused by the guard. If the operator wants it back, add
-  `beyond_urdf_reason` to `[joints.j1]` with the cable-harness caveat, then re-approve. Don't do it silently.
+- **The "show" demo** (`basic-demo.sh`) is refused by the guard's pre-flight before anything moves, for two
+  reasons. J1 at −3.76 rad is beyond the URDF; and at 2×, J5 measured up to 2.62 rad/s (2026-10-18…21), above the
+  guard's 2.5 rad/s abort. To bring it back:
+  - add `lower = -3.9` and a `beyond_urdf_reason` to `[joints.j1]` (with the cable-harness caveat);
+  - raise the 4310 `vel_cap`/`vel_abort` (about 2.6/3.2), or run the show at 1.5× at most;
+  - re-approve.
+
+  This is the operator's decision. Don't do it silently.
+- **`~/rebot_setup` is not under version control.** The runner (`demo_move.py`, `run-trajectory.sh`,
+  `trajectories/`) lives there. The pre-guard versions are in `~/rebot_setup/backup_pre_guard_2026-10-21/`.
+- **Guard overhead** is about 0.55 ms per 7-motor cycle, almost all of it the keep-out FK run on every arm-joint
+  command. That is fine at 200 Hz. If the vendor SDK's 500 Hz loop ever runs under the guard, compute the FK once
+  per cycle instead.
 - **The claude-auto orchestrator** (`claude-auto status`) is paused (`operator_stop`). This work was done outside it,
   so no plan card records it. If it should be tracked there, add a card that points at this file.
 
@@ -133,6 +183,7 @@ only refuses to enable a joint that reads *outside* its range. A reading that is
 
 ```
 bash scripts/safety/test_arm_guard.sh                                  # everything, offline
+cd ~/rebot_setup && ./run-trajectory.sh --rehearse trajectories/smoke_raise.json   # full run in simulation
 cd packages/arm_guard/src && ../../../env.sh python -m arm_guard check  # enforced limits + approval
 cd packages/arm_guard/src && ../../../env.sh python -m arm_guard hook-status
 cd packages/arm_guard/src && ../../../env.sh python -m arm_guard events # fault/reset/config-write log

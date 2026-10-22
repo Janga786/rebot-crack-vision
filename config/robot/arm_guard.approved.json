@@ -1,7 +1,7 @@
 {
-  "config_sha256": "3528f507abdc5a22ddd7d7aab6911fcbe77bbe059029cfdaa17c2e518495df2f",
+  "config_sha256": "fbf08261c8df7e7e2e681fcad4cb2c4e95f5e4ae205fc76ee514ef8c94f5288b",
   "urdf_sha256": "697012de95acb99bda4a257d327c955a174a5b528dbefd2e9a9aafc1851e5c5b",
-  "approved_by": "Janga786 (initial approval at creation, 2026-10-21)",
-  "approved_at": "2026-10-21T23:46:50+00:00",
-  "note": "vendor-URDF joint ranges (not measured, see TODO.md); keep-out values nominal (MOT-10)"
+  "approved_by": "not yet reviewed by the operator (approved for offline testing, 2026-10-21)",
+  "approved_at": "2026-10-22T04:52:33+00:00",
+  "note": "2026-10-21: startup check + J1 whole-turn unwrap + J2 droop tolerance 0.50 (TODO.md item 3), for the first guarded trajectory run; re-approve under your own name after reviewing 'python -m arm_guard check'"
 }

@@ -4,7 +4,7 @@ import pytest
 
 from arm_guard import GuardConfigError, GuardFault, GuardRefused, runtime
 from arm_guard.core import ST_ENABLED
-from arm_guard.patch import MOTOR_GUARDED, MOTOR_PASSTHROUGH
+from arm_guard.patch import MOTOR_GUARDED, MOTOR_LIVENESS_READS, MOTOR_PASSTHROUGH
 from conftest import make_rig
 from motorbridge import CallError
 from motorbridge.models import Mode
@@ -22,7 +22,9 @@ def test_every_public_motor_method_is_classified(rig):
         if name.startswith("_") or not callable(getattr(rig.Motor, name)):
             continue
         fn = getattr(rig.Motor, name)
-        if name in MOTOR_PASSTHROUGH:
+        if name in MOTOR_LIVENESS_READS:     # pass-through, only noting that the link answered
+            assert getattr(fn, "__wrapped__", None) and not getattr(fn, "_arm_guard_refuser", False), name
+        elif name in MOTOR_PASSTHROUGH:
             assert not getattr(fn, "__wrapped__", None), name
         else:
             assert name in MOTOR_GUARDED or getattr(fn, "_arm_guard_refuser", False), name

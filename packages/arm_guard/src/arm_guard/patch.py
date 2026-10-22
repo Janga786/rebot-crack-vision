@@ -22,6 +22,7 @@ MOTOR_PASSTHROUGH = {
     "close", "get_state", "request_feedback", "disable", "clear_error",
     "get_register_f32", "get_register_u32", "damiao_get_param_f32", "damiao_get_param_u32",
 }
+MOTOR_LIVENESS_READS = {"get_register_f32", "get_register_u32", "damiao_get_param_f32", "damiao_get_param_u32"}
 MOTOR_SENDS = {"send_mit", "send_pos_vel", "send_vel", "send_force_pos"}
 MOTOR_CONFIG_WRITES = {
     "set_zero_position", "store_parameters", "set_can_timeout_ms",
@@ -97,14 +98,14 @@ def patch(controller_cls, motor_cls, guard) -> None:
                 raise GuardFault(fault)
         return w
 
-    wrappers = {
-        "send_mit": send_wrapper("send_mit", lambda pos, vel, kp, kd, tau: Command(
-            "mit", pos=_f(pos), vel=_f(vel), kp=_f(kp), kd=_f(kd), tau=_f(tau))),
-        "send_pos_vel": send_wrapper("send_pos_vel", lambda pos, vlim: Command("pos_vel", pos=_f(pos), vlim=_f(vlim))),
-        "send_vel": send_wrapper("send_vel", lambda vel: Command("vel", vel=_f(vel))),
-        "send_force_pos": send_wrapper("send_force_pos", lambda pos, vlim, ratio: Command(
-            "force_pos", pos=_f(pos), vlim=_f(vlim), ratio=_f(ratio))),
+    builders = {
+        "send_mit": lambda pos, vel, kp, kd, tau: Command(
+            "mit", pos=_f(pos), vel=_f(vel), kp=_f(kp), kd=_f(kd), tau=_f(tau)),
+        "send_pos_vel": lambda pos, vlim: Command("pos_vel", pos=_f(pos), vlim=_f(vlim)),
+        "send_vel": lambda vel: Command("vel", vel=_f(vel)),
+        "send_force_pos": lambda pos, vlim, ratio: Command("force_pos", pos=_f(pos), vlim=_f(vlim), ratio=_f(ratio)),
     }
+    wrappers = {n: send_wrapper(n, b) for n, b in builders.items() if n in orig}   # a class may lack some
 
     def enable(self):
         guard.check_enable(self)
@@ -114,8 +115,9 @@ def patch(controller_cls, motor_cls, guard) -> None:
         guard.check_mode(self, mode)
         return orig["ensure_mode"](self, mode, timeout_ms)
 
-    wrappers["enable"] = functools.wraps(orig["enable"])(enable)
-    wrappers["ensure_mode"] = functools.wraps(orig["ensure_mode"])(ensure_mode)
+    for n, fn in (("enable", enable), ("ensure_mode", ensure_mode)):
+        if n in orig:
+            wrappers[n] = functools.wraps(orig[n])(fn)
 
     def config_wrapper(name):
         @functools.wraps(orig[name])
@@ -130,7 +132,18 @@ def patch(controller_cls, motor_cls, guard) -> None:
         if n in orig:
             wrappers[n] = config_wrapper(n)
 
+    def liveness_read(name):
+        @functools.wraps(orig[name])
+        def w(self, *a, **k):
+            out = orig[name](self, *a, **k)      # pass-through: never refused; a failure raises as before
+            guard.note_link_alive(self)
+            return out
+        return w
+
     for n in orig:
+        if n in MOTOR_LIVENESS_READS:
+            setattr(motor_cls, n, liveness_read(n))
+            continue
         if n in MOTOR_PASSTHROUGH:
             continue
         setattr(motor_cls, n, wrappers.get(n) or _refuser(n))

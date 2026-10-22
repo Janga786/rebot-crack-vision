@@ -5,9 +5,12 @@ The runtime (runtime.py) feeds these functions and acts on their verdicts.
 
 Rules (each is an invariant the tests assert for arbitrary input):
   R1  every number in a command is finite.
-  R2  a position target lies inside [lower, upper]; if the joint already rests slightly outside (by at most
-      rest_tolerance, e.g. J2 at +0.02 in the fold) the target may hold there (+ rest_slack for sensor noise) or
-      move inward, never further out.
+  R2  a position target lies inside [lower, upper]; if the joint already rests slightly outside (by at most its
+      rest_tolerance, e.g. J2 at +0.02 in the fold, or drooped to +0.4 below it after a power cut) the target may
+      hold there (+ rest_slack for sensor noise) or move inward, never further out. Within a session the runtime
+      keeps that allowance and shrinks it with the accepted targets (never with the measured position, which may
+      lead the reference into the range): no ratcheting outward, no return into a deep droop once lifted, but a
+      joint may always go back to its fold rest reading (<= the global rest_tolerance past the limit).
   R3  |target - measured position| <= max_step (bounds the MIT spring torque kp * error and catches IK branch
       flips / wrist flips that teleport a joint).
   R4  speed (MIT vel, VEL-mode vel, POS_VEL/FORCE_POS vlim) <= min(vel_cap, max(min_vlim, sqrt(2 * accel_stop *
@@ -19,6 +22,9 @@ Rules (each is an invariant the tests assert for arbitrary input):
       existing violation worse.
   R7  measured state: status ENABLED/DISABLED (no fault code), finite, position within limits + rest_tolerance,
       |velocity| <= vel_abort, |torque| <= torque_abort, feedback fresher than stale_feedback_s.
+  S1  startup (before a session's first enable): every joint reads inside its startup window, i.e. the arm is in
+      its fold and the encoders agree; a turn-ambiguous joint (J1) is unwrapped by whole turns into its window and
+      every later check uses that offset (raw = physical + offset).
 
 Only two adjustments are ever made, both toward "slower/softer": lowering vlim (R4) and kd (R5). A position
 target is never moved: a target that breaks a rule is refused, and the runtime then holds the arm.
@@ -30,6 +36,7 @@ import math
 from dataclasses import dataclass, replace
 
 ST_DISABLED, ST_ENABLED = 0x0, 0x1
+EPS_RAD = 1e-9            # float rounding at an exact limit (a min-jerk ending on 0.0 can give +1e-16)
 STATUS_NAMES = {0x0: "DISABLED", 0x1: "ENABLED", 0x8: "OVER_VOLTAGE", 0x9: "UNDER_VOLTAGE", 0xA: "OVER_CURRENT",
                 0xB: "MOS_OVER_TEMP", 0xC: "ROTOR_OVER_TEMP", 0xD: "LOST_COMM", 0xE: "OVERLOAD"}
 
@@ -75,6 +82,19 @@ def target_window(j, q_meas: float, rest_tol: float, slack: float = 0.0) -> tupl
     return lo, hi
 
 
+def initial_allowance(j, q_meas: float, cfg) -> tuple:
+    """R2 allowance at a joint's first command of a session: (lo, hi, lo_floor, hi_floor). The floors are how far
+    it never shrinks: the fold rest band (global rest_tolerance) if the joint started out there, else the limit."""
+    lo, hi = target_window(j, q_meas, j.rest_tolerance_rad, cfg.rest_slack_rad)
+    return lo, hi, max(lo, j.lower - cfg.rest_tolerance_rad), min(hi, j.upper + cfg.rest_tolerance_rad)
+
+
+def shrink_allowance(allow: tuple, target: float, cfg) -> tuple:
+    """After an accepted target: the allowance past a limit follows the target inward and never grows back."""
+    lo, hi, lof, hif = allow
+    return (min(lof, max(lo, target - cfg.rest_slack_rad)), max(hif, min(hi, target + cfg.rest_slack_rad)), lof, hif)
+
+
 def stop_speed(j, q: float, direction: float, lo: float, hi: float, floor: float = 0.0) -> float:
     """R4: highest speed from q toward `direction` that can still stop (at accel_stop) before the window edge.
     `floor` (e.g. 0.05 rad/s, stopping distance < 1 mm) keeps rounding/noise near the edge from tripping it."""
@@ -96,7 +116,7 @@ def check_state(j, fb: Feedback, cfg) -> list:
         return [f"{j.name}: non-finite feedback"]
     if fb.status not in (ST_DISABLED, ST_ENABLED):
         r.append(f"{j.name}: motor status {STATUS_NAMES.get(fb.status, hex(fb.status))}")
-    tol = cfg.rest_tolerance_rad
+    tol = j.rest_tolerance_rad
     if not (j.lower - tol <= fb.pos <= j.upper + tol):
         r.append(f"{j.name}: measured position {fb.pos:+.4f} outside [{j.lower}, {j.upper}] (+/-{tol})")
     if abs(fb.vel) > j.vel_abort:
@@ -108,8 +128,10 @@ def check_state(j, fb: Feedback, cfg) -> list:
     return r
 
 
-def check_command(j, cmd: Command, fb: Feedback, cfg) -> Verdict:
-    """R1-R5 for one joint. R6 (whole-pose keep-out) is checked separately by check_pose."""
+def check_command(j, cmd: Command, fb: Feedback, cfg, window: tuple = None) -> Verdict:
+    """R1-R5 for one joint. R6 (whole-pose keep-out) is checked separately by check_pose. `window` = the runtime's
+    session allowance (lo, hi); without it the window is computed from the measured position alone. Either way it
+    never reaches beyond the joint's rest_tolerance past its limits."""
     reasons, adj = [], []
     if fb is None or not _finite(fb.pos):
         return Verdict(False, cmd, (f"{j.name}: no usable measured position",))
@@ -117,7 +139,10 @@ def check_command(j, cmd: Command, fb: Feedback, cfg) -> Verdict:
         return Verdict(False, cmd, (f"{j.name}: unknown mode {cmd.mode!r}",))
     if not _finite(cmd.pos, cmd.vel, cmd.kp, cmd.kd, cmd.tau, cmd.vlim, cmd.ratio):
         return Verdict(False, cmd, (f"{j.name}: non-finite command {cmd}",))
-    lo, hi = target_window(j, fb.pos, cfg.rest_tolerance_rad, cfg.rest_slack_rad)
+    if window is None:
+        lo, hi = target_window(j, fb.pos, j.rest_tolerance_rad, cfg.rest_slack_rad)
+    else:
+        lo, hi = max(window[0], j.lower - j.rest_tolerance_rad), min(window[1], j.upper + j.rest_tolerance_rad)
     out = cmd
 
     if cmd.mode == "vel":
@@ -128,7 +153,7 @@ def check_command(j, cmd: Command, fb: Feedback, cfg) -> Verdict:
             reasons.append(f"{j.name}: vel {cmd.vel:+.3f} > {lim:.3f} rad/s (cap/stopping distance)")
         return Verdict(not reasons, out, tuple(reasons))
 
-    if not (lo <= cmd.pos <= hi):
+    if not (lo - EPS_RAD <= cmd.pos <= hi + EPS_RAD):
         reasons.append(f"{j.name}: target {cmd.pos:+.4f} outside [{lo:+.4f}, {hi:+.4f}]")
     if abs(cmd.pos - fb.pos) > j.max_step + 1e-12:
         reasons.append(f"{j.name}: target {cmd.pos:+.4f} is {abs(cmd.pos - fb.pos):.3f} rad from measured "
@@ -160,6 +185,37 @@ def check_command(j, cmd: Command, fb: Feedback, cfg) -> Verdict:
     if reasons:
         return Verdict(False, cmd, tuple(reasons), tuple(adj))
     return Verdict(True, out, (), tuple(adj))
+
+
+def startup_check(cfg, raw_pos: dict) -> tuple:
+    """S1. raw_pos: joint name -> position as the motor reports it (None = no reading), for every joint on the bus.
+    Returns (offsets, problems): offsets[name] is the whole-turn offset (raw = physical + offset; 0 unless the joint
+    is turn-ambiguous), problems lists every joint without a reading or outside its startup window."""
+    offsets, problems = {}, []
+    for name, r in raw_pos.items():
+        j = cfg.joints[name]
+        if not j.startup_window:
+            offsets[name] = 0.0
+            continue
+        lo, hi = j.startup_window
+        if r is None or not _finite(r):
+            problems.append(f"{name}: no position reading")
+            continue
+        off = 0.0
+        if j.turn_ambiguous:
+            off = 2.0 * math.pi * round((r - (lo + hi) / 2.0) / (2.0 * math.pi))
+        q = r - off
+        turns = f" ({q:+.3f} plus {round(off / (2 * math.pi))} whole turns)" if off else ""
+        if not lo <= q <= hi:
+            problems.append(f"{name}: reads {r:+.3f}{turns}, outside its startup window [{lo:+.2f}, {hi:+.2f}]")
+            continue
+        pmax = cfg.models[j.model][0]
+        if max(abs(j.lower - j.rest_tolerance_rad + off), abs(j.upper + j.rest_tolerance_rad + off)) >= pmax:
+            problems.append(f"{name}: reads {r:+.3f}{turns}: its range would leave the {j.model} MIT position "
+                            f"mapping (+/-{pmax}); power-cycle the arm")
+            continue
+        offsets[name] = off
+    return offsets, problems
 
 
 def _dist_point_segment(p, a, b) -> float:

@@ -20,12 +20,16 @@ KNOWN_PYTHONS = [Path.home() / "miniconda3/envs" / e / "bin/python" for e in ("r
 
 def _summary(cfg) -> None:
     print(f"config  {cfg.path}\n  sha256 {cfg.sha256}\nurdf    {cfg.urdf_path}\n  sha256 {cfg.urdf_sha256}")
-    print(f"{'joint':6} {'id':>4} {'model':6} {'lower':>7} {'upper':>7} {'vcap':>5} {'step':>5} {'kp_max':>6} "
-          f"{'tau_ff':>6} {'tq_abort':>8}")
+    print(f"{'joint':6} {'id':>4} {'model':6} {'lower':>7} {'upper':>7} {'rest':>5} {'vcap':>5} {'step':>5} "
+          f"{'kp_max':>6} {'tau_ff':>6} {'tq_abort':>8}  startup window")
     for j in cfg.joints.values():
-        print(f"{j.name:6} {j.motor_id:>#4x} {j.model:6} {j.lower:>7.3f} {j.upper:>7.3f} {j.vel_cap:>5.2f} "
-              f"{j.max_step:>5.2f} {j.kp_max:>6.1f} {j.tau_ff_max:>6.1f} {j.torque_abort:>8.1f}"
+        win = f"[{j.startup_window[0]:+.2f}, {j.startup_window[1]:+.2f}]" if j.startup_window else "-"
+        print(f"{j.name:6} {j.motor_id:>#4x} {j.model:6} {j.lower:>7.3f} {j.upper:>7.3f} {j.rest_tolerance_rad:>5.2f} "
+              f"{j.vel_cap:>5.2f} {j.max_step:>5.2f} {j.kp_max:>6.1f} {j.tau_ff_max:>6.1f} {j.torque_abort:>8.1f}  "
+              f"{win}{' whole turns unwrapped' if j.turn_ambiguous else ''}"
               + (f"  BEYOND URDF: {j.beyond_urdf_reason}" if j.beyond_urdf_reason else ""))
+    if not cfg.startup_required:
+        print("startup check: OFF (no [startup] section)")
     rest = {j.urdf_joint: 0.0 for j in cfg.arm_joints}
     worst = min(core.pose_margins(cfg, rest).items(), key=lambda kv: kv[1])
     print(f"keep-out at the fold (all zero): tightest {worst[0]} {worst[1] * 1000:+.1f} mm")

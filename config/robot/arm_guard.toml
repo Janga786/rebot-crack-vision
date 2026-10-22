@@ -64,6 +64,8 @@ feedback_id = 0x12
 model = "4340P"
 lower = -3.14
 upper = 0.0
+rest_tolerance_rad = 0.50      # unpowered, J2 droops below the fold: read +0.395 at a start on 2026-10-18 (demo_move
+                               # J2_DROOP_MAX 0.45); from there it may only hold or be lifted back toward 0
 vel_cap = 1.2
 vel_abort = 1.5
 accel_stop = 4.0
@@ -169,6 +171,25 @@ tau_ff_max = 2.5
 torque_abort = 6.5
 hold_kp = 40.0
 hold_kd = 0.5
+
+# Startup check (TODO.md item 3, ABB SafeMove-style "synchronisation"): before a session's first enable (every motor
+# on the bus disabled), every joint must read inside its window (rad, URDF frame) = the arm sits in its fold and
+# the encoders agree with it. The windows are wide enough for every start logged on 2026-10-14..21 (J3 -0.347,
+# J6 -0.259, J4 +0.18, J2 drooped +0.395) and catch a joint that reads a whole turn off or was re-zeroed elsewhere.
+# J1 forgets its turn count over a power cycle (read +6.335/+6.278/+6.272 facing forward on 2026-10-18, otherwise
+# within 0.08 of 0): its reading is unwrapped by whole turns into the window and the guard checks J1 with that
+# offset for the rest of the session (raw = physical + 2*pi*k).
+[startup]
+turn_ambiguous = ["j1"]
+
+[startup.window]
+j1 = [-0.40, 0.40]
+j2 = [-0.40, 0.50]
+j3 = [-0.40, 0.05]
+j4 = [-0.40, 0.40]
+j5 = [-0.40, 0.40]
+j6 = [-0.40, 0.40]
+j7 = [-0.60, 0.10]
 
 # Keep-out (metres, base_link frame; z = 0 is the mounting plane). Coarse proxies, not a mesh check: the planner
 # (MoveIt, mesh collision) and the offline validator stay the precise layer; these catch gross errors.

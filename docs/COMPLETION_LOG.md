@@ -1865,3 +1865,38 @@ ISSUES:
   - The vendor driver still cannot start for pre-existing reasons (VENDOR_DRIVER.md V-SDK-API, V-PYDEPS).
 NEXT: TODO.md items 1-3 (all need the arm and the operator's per-step OK).
 ```
+
+## ARM-GUARD-RUN — Ready for the first guarded trajectory on the arm (operator-directed, outside claude-auto, 2026-10-21)
+
+```
+TASK: ARM-GUARD-RUN (no plan card; operator: "get it 100% ready to go so that I can run a trajectory on physical
+      hardware")
+STATUS: COMPLETE offline (rehearsed in simulation with the real guard config; the powered run is the operator's)
+CHANGES:
+  - packages/arm_guard: startup check S1 (TODO.md item 3): [startup] windows around the fold, J1 unwrapped by whole
+    turns (read +6.33 facing forward after 2026-10-18 power cycles), refused if its range would leave the MIT
+    mapping; per-joint rest_tolerance (J2 0.50: drooped +0.395 at a 2026-10-18 start); R2 allowance kept per session
+    and shrunk by accepted targets with a fold-rest floor (fixes measured-leads-reference refusals, no outward
+    ratchet); EPS_RAD at exact limits (the rehearsal's +1e-16 fold-return refusal); caller register reads count
+    as liveness (no second heartbeat stream); preflight.py (offline mirror of the runtime for a planned command
+    stream); patch tolerates classes missing a send method. 155 -> 201 tests; 6 new mutants all killed.
+  - config/robot/arm_guard.toml: [startup] + j2 rest_tolerance_rad; re-approved for offline testing, marked
+    "operator review pending" (the operator re-approves under their own name: FIRST_GUARDED_RUN.md step 1).
+  - docs/motion/FIRST_GUARDED_RUN.md (new runbook), ARM_GUARD.md, README.md, SAFETY_CASE.md, TODO.md updated.
+  - ~/rebot_setup (operator workspace, not in git; pre-change copies in backup_pre_guard_2026-10-21/):
+    demo_move.py 2026-10-21.1 (guard required for real runs, guard pre-flight before enabling, guard-fault hold +
+    operator stop/off, --trajectory for crackvision.joint_trajectory/1, --guard-sim/--sim-auto-go rehearsals),
+    run-trajectory.sh (run / --check / --rehearse), make_trajectory.py, trajectories/{smoke_raise,
+    first_guarded_run}.json, test_guarded_runs.py (18 tests).
+TESTS:
+  - bash scripts/safety/test_arm_guard.sh -> PASS (201 passed, hook OK in rebot + lerobot).
+  - ~/rebot_setup: unittest test_guarded_runs test_demo_move -> 39 tests OK (the 21 existing ones unchanged).
+  - Rehearsals: both trajectories x slow 1/2/3 complete with zero guard faults (pre-flight: up to 15 385 command
+    cycles accepted, keep-out margin >= 41 mm); crackvision.trajectory_check schema/C-LIMITS/C-MARGIN pass on both.
+  - Guard overhead 0.55 ms per 7-motor cycle (5 ms budget at 200 Hz).
+ISSUES:
+  - Not run against the powered arm. Limits still vendor-URDF; keep-out nominal; TIMEOUT 0.
+  - basic-demo.sh (show) is now refused by the guard pre-flight: J1 -3.76 beyond the URDF, and J5 measured 2.62
+    rad/s at 2x (2026-10-18..21) above the 2.5 abort. Re-enabling it is an operator decision (FIRST_GUARDED_RUN.md §5).
+NEXT: the operator's first guarded run (FIRST_GUARDED_RUN.md), then TODO.md items 1-2.
+```

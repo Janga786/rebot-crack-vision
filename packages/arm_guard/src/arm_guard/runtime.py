@@ -18,7 +18,7 @@ import sys
 import threading
 import time
 from collections import deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from . import core
@@ -33,6 +33,8 @@ LOCK_DIR = Path(os.environ.get("ARM_GUARD_LOCK_DIR", "/tmp/arm_guard_locks"))
 EVENT_LOG = Path(os.environ.get("ARM_GUARD_EVENT_LOG", Path.home() / ".local/state/arm_guard/events.jsonl"))
 HEARTBEAT_TIMEOUT_MS = 10
 ENABLE_REG_TIMEOUT_MS = 200
+STARTUP_POLLS, STARTUP_POLL_S = 100, 0.002     # up to 0.2 s for each motor's feedback frame at the startup check
+RESYNC_DEBOUNCE_S = 1.0                         # enable_all checks every motor in turn: one startup check for all
 
 
 @dataclass
@@ -48,6 +50,8 @@ class JointRT:
     cmd_pos: float = math.nan
     cmd_t: float = -math.inf
     mapping_verified: bool = False      # PMAX/VMAX/TMAX read back and match the model
+    offset: float = 0.0                 # whole turns found by the startup check: raw = physical + offset
+    allowance: tuple = None             # R2 (lo, hi, lo_floor, hi_floor) for this session; shrinks with targets
 
 
 @dataclass
@@ -55,14 +59,16 @@ class Bus:
     channel: str
     lock_fd: int = -1
     joints: dict = field(default_factory=dict)   # name -> JointRT
+    synced_t: float = -math.inf                  # last passed startup check (S1)
 
 
 class Guard:
-    def __init__(self, cfg=None, config_error: str = "", raw=None, clock=time.monotonic) -> None:
+    def __init__(self, cfg=None, config_error: str = "", raw=None, clock=time.monotonic, sleep=time.sleep) -> None:
         self.cfg = cfg
         self.config_error = config_error
         self.raw = raw
         self.clock = clock
+        self.sleep = sleep
         self.lock = threading.RLock()
         self.buses: dict = {}
         self.latched = ""
@@ -98,6 +104,8 @@ class Guard:
                 "config_error": self.config_error,
                 "latched": self.latched,
                 "buses": {c: sorted(b.joints) for c, b in self.buses.items()},
+                "turn_offsets": {c: {n: o.offset for n, o in b.joints.items() if o.offset}
+                                 for c, b in self.buses.items()},
                 "recent_events": list(self.events)[-10:],
             }
 
@@ -192,9 +200,65 @@ class Guard:
                 jr.fb_changed_t = now
             except Exception:
                 pass
-        fb = Feedback(float(st.pos), float(st.vel), float(st.torq), int(st.status_code), now - jr.fb_changed_t)
+        fb = Feedback(float(st.pos) - jr.offset, float(st.vel), float(st.torq), int(st.status_code),
+                      now - jr.fb_changed_t)
         jr.last_fb = fb
         return fb
+
+    def note_link_alive(self, motor) -> None:
+        """A caller's register read succeeded: the same proof of a live link as the guard's own heartbeat (so a
+        caller that already sends heartbeats does not get a second set from the guard)."""
+        jr = getattr(motor, "_arm_guard", None)
+        if jr is not None:
+            with self.lock:
+                jr.fb_changed_t = self.clock()
+
+    # ---- the startup check (S1) --------------------------------------------------------------------------
+
+    def _state_now(self, jr: JointRT):
+        try:
+            self.raw.request_feedback(jr.motor)
+        except Exception:
+            pass
+        for _ in range(STARTUP_POLLS):
+            st = self.raw.get_state(jr.motor)
+            if st is not None:
+                return st
+            self.sleep(STARTUP_POLL_S)
+        return None
+
+    def _startup(self, bus: Bus) -> None:
+        """Before a session's first enable (every motor on the bus disabled, or never checked): every joint must
+        read inside its startup window. Sets each joint's whole-turn offset for the session."""
+        if not self.cfg.startup_required:
+            return
+        states = {name: self._state_now(o) for name, o in bus.joints.items()}
+        all_disabled = all(st is not None and int(st.status_code) == core.ST_DISABLED for st in states.values())
+        now = self.clock()
+        if bus.synced_t > -math.inf and (not all_disabled or now - bus.synced_t < RESYNC_DEBOUNCE_S):
+            return                     # a session is under way: keep its offsets
+        raw_pos = {name: (None if st is None else float(st.pos)) for name, st in states.items()}
+        offsets, problems = core.startup_check(self.cfg, raw_pos)
+        if problems:
+            msg = ("startup check failed, nothing enabled: " + "; ".join(problems) + ". Put the arm in its fold "
+                   "(J1 facing forward) by hand; if it IS folded, an encoder or motor zero is off: stop and check")
+            self._event("refused", msg, readings=raw_pos)
+            raise GuardRefused(msg)
+        for name, o in bus.joints.items():
+            o.offset, o.allowance = offsets[name], None
+        bus.synced_t = now
+        turns = {n: round(off / (2 * math.pi)) for n, off in offsets.items() if off}
+        self._event("startup", "startup check passed" + (f"; whole-turn offsets {turns}" if turns else ""),
+                    readings=raw_pos)
+
+    def _window(self, jr: JointRT, fb: Feedback) -> tuple:
+        if jr.allowance is None:
+            jr.allowance = core.initial_allowance(jr.cfg, fb.pos, self.cfg)
+        return jr.allowance[:2]
+
+    @staticmethod
+    def _to_raw(jr: JointRT, c: Command) -> Command:
+        return c if c.mode == "vel" or not jr.offset else replace(c, pos=c.pos + jr.offset)
 
     # ---- the fault latch ---------------------------------------------------------------------------------
 
@@ -216,13 +280,14 @@ class Guard:
         if q is None or not math.isfinite(q):
             return None
         ratio = min(max(cmd.ratio, 0.0), self.cfg.force_pos_ratio_max) if math.isfinite(cmd.ratio) else 0.0
-        return core.hold_command(jr.cfg, cmd.mode, q, cmd.tau, ratio, self.cfg.hold_vlim)
+        return self._to_raw(jr, core.hold_command(jr.cfg, cmd.mode, q, cmd.tau, ratio, self.cfg.hold_vlim))
 
     # ---- operations --------------------------------------------------------------------------------------
 
     def filter(self, motor, cmd: Command):
         """Return (command_to_send, fault_message). fault_message != "" means the caller must send the (hold)
-        command and then raise GuardFault. Raises GuardRefused/GuardConfigError when nothing may be sent."""
+        command and then raise GuardFault. Raises GuardRefused/GuardConfigError when nothing may be sent.
+        Commands arrive and leave in raw motor coordinates; every check runs on physical ones (raw - offset)."""
         self._require_cfg()
         jr = self._jr(motor)
         with self.lock:
@@ -242,15 +307,18 @@ class Guard:
                     if missing:
                         raise GuardRefused(f"{jr.cfg.name}: arm joints {missing} not registered on {jr.bus.channel}; "
                                            f"the keep-out check needs the whole arm")
-                v = core.check_command(jr.cfg, cmd, fb, self.cfg)
+                phys = cmd if cmd.mode == "vel" else replace(cmd, pos=cmd.pos - jr.offset)
+                v = core.check_command(jr.cfg, phys, fb, self.cfg, window=self._window(jr, fb))
                 reasons = list(v.reasons)
                 if v.ok and jr.cfg.arm:
-                    reasons = self._pose_reasons(jr, cmd.pos, now)
+                    reasons = self._pose_reasons(jr, phys.pos, now)
                 if not reasons:
                     for a in v.adjustments:
                         self._note_adjustment(jr.cfg.name, a)
                     jr.cmd_pos, jr.cmd_t = v.cmd.pos, now
-                    return v.cmd, ""
+                    if cmd.mode != "vel":
+                        jr.allowance = core.shrink_allowance(jr.allowance, v.cmd.pos, self.cfg)
+                    return self._to_raw(jr, v.cmd), ""
             self._trip(jr, reasons)
             hold = self._hold_for(jr, cmd)
             if hold is None:
@@ -283,6 +351,7 @@ class Guard:
         with self.lock:
             if self.latched:
                 raise GuardRefused(f"{jr.cfg.name}: enable refused, guard latched: {self.latched}")
+            self._startup(jr.bus)
             try:
                 mode = int(self.raw.get_register_u32(motor, RID_CTRL_MODE, ENABLE_REG_TIMEOUT_MS))
                 if not jr.mapping_verified:
