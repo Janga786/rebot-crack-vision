@@ -35,8 +35,18 @@ initiative. Workstation code, tests and docs are fine to do first.
 ## 0. The first guarded trajectory run — DONE 2026-10-22
 
 `smoke_raise.json --slow 2` completed on the powered arm: tracking ≤ 0.023 rad, no guard fault
-([evidence](evidence/operator/first-guarded-run-2026-10-22/README.md)). Next: the same at full speed, then
-`first_guarded_run.json`. Each run still needs the operator's go. What follows is the original plan, kept for
+([evidence](evidence/operator/first-guarded-run-2026-10-22/README.md)).
+
+The operator saw a wobble: J2/J3 rang at 3.3 Hz with kd 1. An A/B run with J2/J3 kd 4 cut it by 61 % / 48 %.
+
+Next, each on the operator's go:
+1. **Decide** whether kd 4 becomes the J2/J3 default (`first_move_j1.TUNED`, `tuned_gains.yaml`,
+   CONTROLLER_TUNING). Today it is `demo_move.py --gains j2=100/4,j3=80/4`.
+2. Run the same trajectory at its own speed.
+3. Run `first_guarded_run.json`.
+4. Give sparse-waypoint trajectories a smoother interpolation: velocity kinks at the middle point.
+
+Summary of the whole session: [docs/SESSION_2026-10-21_22.md](docs/SESSION_2026-10-21_22.md). What follows is the original plan, kept for
 reference.
 
 ### Original plan

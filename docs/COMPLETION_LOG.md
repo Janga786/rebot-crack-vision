@@ -2007,3 +2007,19 @@ PHYSICAL (evidence/operator/first-guarded-run-2026-10-22/):
 DOCS: ARM_GUARD.md / FIRST_GUARDED_RUN.md status, TODO.md item 0 done, README.
 NEXT: the same trajectory at full speed, then first_guarded_run.json (each on the operator's go); TODO items 1-2.
 ```
+
+## WOBBLE-KD + RUNNER SNAPSHOT — damping fix A/B on the arm; the operator runner put under version control (2026-10-22)
+
+```
+TASK: operator-directed ("did you see how it wobbled?"; "update the github with what we got done")
+STATUS: COMPLETE
+WOBBLE: the 200 Hz log of the first guarded run shows J2/J3 ringing at 3.3 Hz through the move (kp 100/80, kd 1:
+  damping ratio ~0.1; re-excited by gearbox stick-slip, worse at the slowed speed; also present, smaller, in the
+  2x show demos). fakebus cannot reproduce it (10x smaller), so tested on the arm: demo_move --gains (new, per run)
+  with J2/J3 kd 4, same trajectory and speed -> velocity ripple -61% (J2) / -48% (J3), 2-5 Hz energy -73% / -52%,
+  no guard fault, all motors disabled. Adopting kd 4 as the default is pending the operator's decision.
+RUNNER: ~/rebot_setup is not under git. Unmodified snapshot with SHA256SUMS in
+  evidence/operator/rebot_setup_runner_2026-10-22/ (demo_move.py 2026-10-22.1, run-trajectory.sh, first_move_j1.py,
+  gravity.py, fakebus.py, tests, trajectories, tuned_gains.yaml, j1_reference.json).
+DOCS: docs/SESSION_2026-10-21_22.md (the two days in one page), TODO.md item 0, README.
+```

@@ -19,8 +19,10 @@
 > - Still nominal until measured: camera extrinsic, tool tip, workcell, and joint limits (vendor URDF values).
 >   Pending: D405 hand-eye calibration and gated commissioning (MOT-05 / MOT-09).
 > - **First guarded trajectory on the physical arm (2026-10-22):** shown in simulation first, then run on the
->   operator's go. It completed with tracking within 0.023 rad and no guard fault
->   ([evidence](evidence/operator/first-guarded-run-2026-10-22/README.md)).
+>   operator's go. It completed with tracking within 0.023 rad and no guard fault. A visible 3.3 Hz shoulder/elbow
+>   wobble was traced to low damping, and kd 4 cut it about in half
+>   ([evidence](evidence/operator/first-guarded-run-2026-10-22/README.md),
+>   [session summary](docs/SESSION_2026-10-21_22.md)).
 > - **Arm safety (2026-10-21):** every motor command now passes [`arm_guard`](docs/motion/ARM_GUARD.md), a
 >   last-line filter in front of `motorbridge`, with a startup position check. A trajectory runner on the operator's
 >   controller is rehearsed and ready for the first powered run: [`FIRST_GUARDED_RUN.md`](docs/motion/FIRST_GUARDED_RUN.md).
