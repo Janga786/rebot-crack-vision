@@ -10,10 +10,14 @@
 > - The end-of-arm model is in [ADR-014](docs/adr/014-end-effector-frames-and-task-phases.md): a wrist D405
 >   on Seeed's stock mount, a `tool_tip` distinct from the grasp-centre `gripper_tcp`, and separate
 >   view and trace phases.
-> - Everything robot-side is simulation/mock only. The camera extrinsic, tool tip and workcell are
->   nominal priors until measured.
-> - Physical steps wait for the operator: D405 and arm adapter connection, calibration, and powered
->   commissioning.
+> - **Physical arm (2026-10-14 / 10-17): first powered runs.** All 7 motors over CAN at 200 Hz in MIT mode,
+>   gravity and friction feed-forward identified on hardware (elbow gravity load measured at 6.6 N·m vs
+>   2.7 N·m in the URDF), and loaded-joint hold error cut from 0.04–0.05 rad to ≤ 0.005 rad over 41 logged
+>   runs. A 52 s seven-joint demo tracked every joint within 0.025 rad. Write-up and raw logs:
+>   [`docs/motion/CONTROLLER_TUNING.md`](docs/motion/CONTROLLER_TUNING.md). These were operator-attended
+>   runs, not commissioning.
+> - Still nominal until measured: camera extrinsic, tool tip, workcell, and joint limits (vendor URDF values).
+>   Pending: D405 hand-eye calibration and gated commissioning (MOT-05 / MOT-09).
 > - **Arm safety (2026-10-21):** every motor command now passes [`arm_guard`](docs/motion/ARM_GUARD.md), a
 >   last-line filter in front of `motorbridge`. Next steps (CAN watchdog, measured joint limits, startup position
 >   check) are in [`TODO.md`](TODO.md).
@@ -148,6 +152,9 @@ run_test.sh             the one-command orchestrator (see Commands, above)
   `fetch_model.py` runs).
 
 ## Attribution
+
+Fort Lewis College senior-design project (Robotic Arm Bridge Repair Team: Jangara Bliss and Derrick),
+advised by Dr. Yiyan Li.
 
 - **OpenCrack nnU-Net** — `fadeevla/opencrack-nnunet`, CC-BY-4.0.
 - **nnU-Net v2** — Isensee, F. et al., *nnU-Net: a self-configuring method for deep learning-based
