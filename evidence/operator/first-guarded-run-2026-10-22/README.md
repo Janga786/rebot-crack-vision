@@ -42,3 +42,25 @@ in front of every motor command.
 - arm_guard events during the run: bus opened, startup check passed (whole-turn offset J1 = 1). There were no
   faults, no adjustments and no latch.
 - `measured_pose_at_top.jpg` is the measured pose at maximum elbow bend, rendered on the URDF.
+
+## The wobble (operator: "it wasn't a smooth trajectory, it kind of wobbled")
+
+The log confirms it: **J2 and J3 oscillated at about 3.3 Hz all the way through the move**, up and down. The
+measured velocity rippled around the commanded one by 0.065 / 0.070 rad/s RMS against a peak commanded 0.18 /
+0.27 rad/s, and the motor torque oscillated with it (`wobble_j2_j3_velocity_torque.png`). The wrist (J4–J6) shows
+a smaller ripple at about 7 Hz.
+
+- **Cause (most likely):** an underdamped servo plus stick-slip friction.
+  - The 2026-10-17 gains give J2 kp 100 / kd 1 and J3 kp 80 / kd 1. With the arm's inertia about those axes
+    (~0.25 kg·m²), that is a natural frequency of √(kp/I) ≈ 20 rad/s ≈ 3.2 Hz, matching the log, at a damping
+    ratio near 0.1.
+  - The gearbox's stick-slip friction keeps re-exciting it, and slow motion makes stick-slip worse. The same
+    3.3 Hz ripple is in the show-demo runs at 2× (2026-10-17 / 10-21), but at 0.026–0.037 rad/s, well under half.
+- **Why the tuning missed it:** the kd sweeps (CONTROLLER_TUNING §8) were single-joint 0.1 rad moves near the fold,
+  and oscillation was scored only during holds.
+- **The simulator cannot show it.** fakebus gives a 10× smaller ripple at the same gains (its friction model is too
+  idealised), so the fix has to be tested on the arm.
+- **Proposed fix, to A/B on the arm:** J2/J3 kd 1 → 4. J1 already runs kd 4; the vendor default is 10; arm_guard
+  allows ≤ 5. Then run at the file's own speed rather than slowed down. `demo_move.py --gains j2=100/4,j3=80/4`
+  (added 2026-10-22, this run only, recorded in the summary) makes the A/B possible without touching the tuned
+  defaults.
