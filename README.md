@@ -153,8 +153,7 @@ run_test.sh             the one-command orchestrator (see Commands, above)
 
 ## Attribution
 
-Fort Lewis College senior-design project (Robotic Arm Bridge Repair Team: Jangara Bliss and Derrick),
-advised by Dr. Yiyan Li.
+Fort Lewis College senior-design project (Robotic Arm Bridge Repair Team), advised by Dr. Yiyan Li.
 
 - **OpenCrack nnU-Net** — `fadeevla/opencrack-nnunet`, CC-BY-4.0.
 - **nnU-Net v2** — Isensee, F. et al., *nnU-Net: a self-configuring method for deep learning-based
