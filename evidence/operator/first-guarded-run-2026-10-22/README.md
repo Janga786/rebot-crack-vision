@@ -64,3 +64,27 @@ a smaller ripple at about 7 Hz.
   allows ≤ 5. Then run at the file's own speed rather than slowed down. `demo_move.py --gains j2=100/4,j3=80/4`
   (added 2026-10-22, this run only, recorded in the summary) makes the A/B possible without touching the tuned
   defaults.
+
+## A/B: J2/J3 kd 1 → 4 (attempt 3, `…192035Z.*`)
+
+The same trajectory, speed and everything else, with `--gains j2=100/4,j3=80/4`, on the operator's gos. It
+completed: all 7 motors disabled (confirmed); arm_guard recorded no fault, adjustment or latch.
+
+| | kd 1 (attempt 2) | kd 4 (attempt 3) | Change |
+|---|---|---|---|
+| J2 velocity ripple (RMS) | 0.062 rad/s | **0.024** rad/s | −61 % |
+| J3 velocity ripple (RMS) | 0.067 rad/s | **0.035** rad/s | −48 % |
+| J2 / J3 ripple energy, 2–5 Hz | 0.0150 / 0.0098 | 0.0041 / 0.0047 | −73 % / −52 % |
+| J2 / J3 max tracking error | 0.017 / 0.023 rad | 0.010 / 0.021 rad | |
+| J2 / J3 torque ripple (std) | 0.30 / 0.42 Nm | 0.13 / 0.33 Nm | |
+
+`kd1_vs_kd4_velocity.png` plots both against the commanded velocity. More damping removes most of the 3.3 Hz
+ringing.
+
+What remains:
+- J3 keeps some jitter: higher-frequency, noise-like, still friction.
+- The commanded J3 velocity has a small dip at the middle waypoint. `smoke_raise.json` has only 3 points, and the
+  monotone cubic through them is continuous in velocity, not in acceleration.
+
+Next candidates: make kd 4 the J2/J3 default (an operator decision; CONTROLLER_TUNING and `tuned_gains.yaml`), try
+the file's own speed, and possibly a smoother interpolation for sparse waypoints.
