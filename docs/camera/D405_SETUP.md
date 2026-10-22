@@ -4,8 +4,9 @@
 port of this workstation. [D405_FIRST_CONNECTION.md](D405_FIRST_CONNECTION.md) has the full report.
 - **Capture:** 30 fps with no dropped frames at 848×480 and 1280×720.
 - **Video test:** 10 s at 1280×720, recorded losslessly and validated, plus an MP4.
-- **The model on the camera:** `snap` (full pipeline) and `live` (4.7 fps at 848×480, 2.1 fps at 1280×720)
-  both run on the real camera.
+- **The model on the camera:** `snap` (full pipeline) and `live` both run on the real camera. `live` shows the
+  video at 30 fps with the crack mask on top. The model runs 17 times a second at 848×480 and 8 at 1280×720, so the
+  mask trails the video by about 100–165 ms.
 - **Open:** the firmware predates the D405 auto-exposure fixes (§5; updating is the operator's call), and no real
   crack has been in view yet.
 
@@ -109,7 +110,7 @@ udev rule is missing or another program holds the camera. Close `realsense-viewe
 | Command | What happens | Output |
 |---|---|---|
 | `./env.sh python scripts/camera.py snap` | Captures a burst of 10 frames after warm-up and keeps the **sharpest** (variance of the Laplacian; the arm may still be settling). Stores it as its own case and runs the accepted single-case pipeline: `prepare_inputs` → nnU-Net (the validated batch path, TTA on) → skeleton → crack paths → renders. About 15 s | `data/camera/<case>/snap.json` (the frame, its intrinsics, burst sharpness, results). Images: `data/overlays/<case>_overlay.png`, `data/comparisons/<case>_comparison.png`, `data/skeletons/<case>_skeleton_overlay.png`, `data/paths/<case>_paths_overlay.png`; the paths JSON in `data/paths/` |
-| `./env.sh python scripts/camera.py live` | Keeps the network in memory (`crackvision.live_predictor`) and runs it on every frame. Then open **http://127.0.0.1:8090**. The mask is overlaid in red, with model time, crack area and distance on top. The **snapshot** button saves the current frame to `data/camera/live_<UTC>/` and returns the `snap --image` command for the full pipeline on it | Browser view. This env's OpenCV is headless, so the browser is the display |
+| `./env.sh python scripts/camera.py live` | Keeps the network in memory (`crackvision.live_predictor`): the video runs at 30 fps and the model works on the newest frame in its own thread (`--sync` waits for the model on every frame instead). Then open **http://127.0.0.1:8090**. The mask is overlaid in red, with model time, crack area and distance on top. The **snapshot** button saves the current frame to `data/camera/live_<UTC>/` and returns the `snap --image` command for the full pipeline on it | Browser view. This env's OpenCV is headless, so the browser is the display |
 | `./env.sh python scripts/camera.py record --seconds 10 --video` | Captures at the camera's full rate into memory first, so nothing slow runs in the capture loop: 30.0 fps, no dropped frames. Then writes a lossless RGB-D recording on 8 threads and validates it, plus `video.mp4` (H.264, colour beside colourised depth). `--frames N` instead of `--seconds`; `--no-frames` writes the video only; `--no-depth` gives a colour-only video. RAM is checked first. Replays bit-exactly with `--replay DIR` | `data/recordings/<session>/` (+ `video.mp4`) |
 
 **Options:**
@@ -119,7 +120,17 @@ udev rule is missing or another program holds the camera. Close `realsense-viewe
 - `--replay DIR` (any command, no camera); `--image PNG` (`snap` on a saved frame).
 
 **Speed** (real camera, RTX 3090):
-- Live without TTA: 215 ms per frame at 848×480 (4.7 fps); 420 ms at 1280×720 (2.1 fps).
+- **Live (without TTA):** the view runs at the camera's 30 fps. The model runs on the newest frame in its own
+  thread: 57 ms at 848×480 (17 passes a second; the mask trails the video by about 100 ms) and 120 ms at 1280×720
+  (8 a second, about 165 ms behind). `--sync` instead shows only frames the model has finished: the mask is then
+  exactly on its frame, but the whole view lags by a model pass.
+  - The model is about 3.8× faster than stock nnU-Net's in-process predictor (204 → 54 ms at 848×480), with no
+    change in output: identical masks on 100% of pixels over 10 real frames, 99.9998% at 1280×720. Two changes do
+    it: the sliding-window tiles go through the network as one batch, and the single fold's weights load once
+    instead of on every frame.
+  - What remains is the camera itself. A frame is 17–30 ms old on arrival (28 ms auto-exposure in room light, one
+    33 ms frame period), plus about 10 ms to encode and stream. More light shortens the exposure; `--fps 60` halves
+    the frame period at 848×480.
 - Snapshot: 15–19 s including capture, mostly nnU-Net start-up.
 - Recording: 30.0 fps capture. Writing takes about 2 s per second of 1280×720 recording, after capture.
 

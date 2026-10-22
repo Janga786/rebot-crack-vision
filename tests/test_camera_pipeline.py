@@ -186,8 +186,7 @@ def test_live_server_endpoints(tmp_project):
         server.shutdown()
 
 
-def test_live_loop_runs_frames_through_the_model(tmp_project, tmp_path, monkeypatch, capsys):
-    rec = _recording(tmp_path / "rec")
+def _stub_predictor(monkeypatch, delay_s: float = 0.0):
     seen = []
 
     class StubPredictor:
@@ -196,13 +195,31 @@ def test_live_loop_runs_frames_through_the_model(tmp_project, tmp_path, monkeypa
 
         def predict(self, rgb):
             seen.append(rgb.shape)
+            time.sleep(delay_s)
             return np.zeros(rgb.shape[:2], np.uint8)
 
     import crackvision.live_predictor as lp
     monkeypatch.setattr(lp, "LivePredictor", StubPredictor)
-    assert _run(tmp_project, "live", "--replay", str(rec), "--port", str(_free_port()), "--max-frames", "9") == 0
+    return seen
+
+
+def test_live_sync_runs_every_frame_through_the_model(tmp_project, tmp_path, monkeypatch, capsys):
+    rec = _recording(tmp_path / "rec")
+    seen = _stub_predictor(monkeypatch)
+    assert _run(tmp_project, "live", "--replay", str(rec), "--port", str(_free_port()), "--max-frames", "9",
+                "--sync") == 0
     assert len(seen) == 9 and seen[0] == (240, 320, 3)                   # replay loops past its 6 frames
     assert "stopped after 9 frames" in capsys.readouterr().out
+
+
+def test_live_default_shows_every_frame_while_a_slow_model_lags(tmp_project, tmp_path, monkeypatch, capsys):
+    """The view keeps the camera's rate; a slow model only updates the overlay less often."""
+    rec = _recording(tmp_path / "rec")
+    seen = _stub_predictor(monkeypatch, delay_s=0.1)                   # 100 ms model, 30 fps replay
+    assert _run(tmp_project, "live", "--replay", str(rec), "--port", str(_free_port()), "--max-frames", "30") == 0
+    out = capsys.readouterr().out
+    assert "stopped after 30 frames" in out
+    assert 2 <= len(seen) < 30                                           # the model ran on a subset of frames
 
 
 # ---- the real network (GPU + downloaded checkpoint) ---------------------------------------------------------

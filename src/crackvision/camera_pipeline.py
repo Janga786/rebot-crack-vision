@@ -623,7 +623,30 @@ def _make_handler(state: _LiveState, cfg: Config, info: dict[str, Any]):
     return Handler
 
 
+def _hud(cv2, rgb: np.ndarray, text: str) -> bytes | None:
+    bgr = np.ascontiguousarray(rgb[:, :, ::-1])
+    cv2.rectangle(bgr, (0, 0), (bgr.shape[1], 34), (0, 0, 0), -1)
+    cv2.putText(bgr, text, (10, 23), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1, cv2.LINE_AA)
+    ok, jpeg = cv2.imencode(".jpg", bgr, [int(cv2.IMWRITE_JPEG_QUALITY), 85])
+    return jpeg.tobytes() if ok else None
+
+
+def _distance_text(frame: CaptureFrame, info: dict[str, Any]) -> str:
+    scale = info.get("depth_scale_m_per_unit")
+    if scale and frame.depth_u16.any():
+        d = frame.depth_u16[frame.depth_u16 > 0]
+        return f"  dist {100 * float(np.median(d)) * scale:.1f} cm"
+    return ""
+
+
+def _ema(prev: float | None, value: float, k: float = 0.1) -> float:
+    return value if prev is None else (1 - k) * prev + k * value
+
+
 def cmd_live(cfg: Config, args: argparse.Namespace, logger: logging.Logger) -> int:
+    """Default: the camera is shown at its own frame rate and the model runs in its own thread on the newest
+    frame; each shown frame carries the newest mask (from a frame up to one model pass older). --sync shows only
+    frames the model has finished (mask always on its own frame, but the view lags by a model pass)."""
     import cv2
     from crackvision.live_predictor import LivePredictor
 
@@ -638,42 +661,91 @@ def cmd_live(cfg: Config, args: argparse.Namespace, logger: logging.Logger) -> i
     except D405Error as exc:
         print(f"FAIL {exc}")
         return EXIT_PRECONDITION
-    server = ThreadingHTTPServer((args.host, args.port), _make_handler(state, cfg, cam.session_info))
+    info = cam.session_info
+    server = ThreadingHTTPServer((args.host, args.port), _make_handler(state, cfg, info))
     threading.Thread(target=server.serve_forever, daemon=True).start()
     print(f"live view: http://{args.host}:{args.port}/   (Ctrl-C to stop; 'snapshot' saves the current frame)",
           flush=True)
-    n, t_start, fps_ema = 0, time.monotonic(), None
+
+    model = {"frame": None, "mask": None, "ms": 0.0, "fps": None, "runs": 0}   # the newest finished prediction
+    newest: dict[str, Any] = {"frame": None, "seq": 0}
+    lock, stop = threading.Lock(), threading.Event()
+
+    def run_model(frame: CaptureFrame) -> None:
+        t0 = time.monotonic()
+        mask = predictor.predict(frame.color_rgb)
+        dt = time.monotonic() - t0
+        with lock:
+            model.update(frame=frame, mask=mask, ms=1000 * dt, fps=_ema(model["fps"], 1.0 / max(dt, 1e-3)),
+                         runs=model["runs"] + 1)
+        with state.lock:                                  # the snapshot pair: a frame and its own mask
+            state.frame, state.mask = frame, mask
+
+    def model_loop() -> None:
+        seen = -1
+        while not stop.is_set():
+            with lock:
+                frame, seq = newest["frame"], newest["seq"]
+            if frame is None or seq == seen:
+                time.sleep(0.002)
+                continue
+            seen = seq
+            try:
+                run_model(frame)
+            except Exception as exc:  # noqa: BLE001 — keep the view alive; report once per failure
+                logger.error("model failed on a frame: %s: %s", type(exc).__name__, exc)
+                time.sleep(0.5)
+
+    worker = None if args.sync else threading.Thread(target=model_loop, daemon=True)
+    if worker:
+        worker.start()
+    replay_period = 1.0 / float(info.get("color", {}).get("fps", 30)) if getattr(args, "replay", None) else 0.0
+    n, t_start, video_fps, t_prev = 0, time.monotonic(), None, None
     try:
         for frame in cam.frames(args.max_frames):
-            t0 = time.monotonic()
-            mask = predictor.predict(frame.color_rgb)
-            dt = time.monotonic() - t0
-            img = overlay(frame.color_rgb, mask, color, alpha)
-            frac = float(mask.mean())
-            fps_ema = 1.0 / max(dt, 1e-3) if fps_ema is None else 0.9 * fps_ema + 0.1 / max(dt, 1e-3)
-            hud = f"model {1000 * dt:.0f} ms ({fps_ema:.1f} fps)  crack {100 * frac:.2f}%"
-            if frame.depth_u16.any() and cam.session_info.get("depth_scale_m_per_unit"):
-                d = frame.depth_u16[frame.depth_u16 > 0]
-                if d.size:
-                    hud += f"  dist {100 * float(np.median(d)) * cam.session_info['depth_scale_m_per_unit']:.1f} cm"
-            bgr = np.ascontiguousarray(img[:, :, ::-1])
-            cv2.rectangle(bgr, (0, 0), (bgr.shape[1], 34), (0, 0, 0), -1)
-            cv2.putText(bgr, hud, (10, 23), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1, cv2.LINE_AA)
-            ok, jpeg = cv2.imencode(".jpg", bgr, [int(cv2.IMWRITE_JPEG_QUALITY), 85])
-            with state.lock:
-                state.jpeg, state.frame, state.mask, state.seq = jpeg.tobytes() if ok else state.jpeg, frame, mask, state.seq + 1
-                state.stats = {"frames": n + 1, "model_ms": round(1000 * dt, 1), "fps": round(fps_ema, 2),
-                               "crack_fraction": round(frac, 5), "tta": args.tta}
+            now = time.monotonic()
+            if t_prev is not None:
+                video_fps = _ema(video_fps, 1.0 / max(now - t_prev, 1e-3))
+            t_prev = now
+            if args.sync:
+                run_model(frame)
+            else:
+                with lock:
+                    newest["frame"], newest["seq"] = frame, newest["seq"] + 1
+            with lock:
+                mask, mframe, ms, mfps = model["mask"], model["frame"], model["ms"], model["fps"]
+            if mask is not None and mask.shape == frame.color_rgb.shape[:2]:
+                img = overlay(frame.color_rgb, mask, color, alpha)
+                frac = float(mask.mean())
+                lag = (frame.host_monotonic_ns - mframe.host_monotonic_ns) / 1e6
+                text = (f"video {video_fps or 0:.0f} fps  model {ms:.0f} ms ({mfps or 0:.1f}/s)"
+                        + ("" if args.sync else f"  mask lag {lag:.0f} ms") + f"  crack {100 * frac:.2f}%")
+            else:
+                img, frac, lag = frame.color_rgb, 0.0, None
+                text = "video only: the model is warming up"
+            jpeg = _hud(cv2, img, text + _distance_text(frame, info))
             n += 1
+            with state.lock:
+                state.jpeg = jpeg or state.jpeg
+                state.seq += 1
+                state.stats = {"frames": n, "video_fps": round(video_fps or 0, 2), "model_ms": round(ms, 1) if mask is not None else None,
+                               "model_fps": round(mfps or 0, 2), "model_runs": model["runs"],
+                               "mask_lag_ms": None if lag is None else round(lag, 1), "crack_fraction": round(frac, 5),
+                               "tta": args.tta, "mode": "sync" if args.sync else "async"}
+            if replay_period:                             # a replay plays at its recorded rate
+                time.sleep(max(0.0, replay_period - (time.monotonic() - now)))
     except KeyboardInterrupt:
         pass
     except D405Error as exc:
         print(f"camera stopped: {exc}")
         return EXIT_RUNTIME
     finally:
+        stop.set()
+        if worker:
+            worker.join(timeout=5)
         server.shutdown()
         cam_cm.__exit__(None, None, None)
-    print(f"stopped after {n} frames in {time.monotonic() - t_start:.1f} s")
+    print(f"stopped after {n} frames in {time.monotonic() - t_start:.1f} s ({model['runs']} model passes)")
     return EXIT_OK
 
 
@@ -722,6 +794,8 @@ def build_parser() -> argparse.ArgumentParser:
     lv = sub.add_parser("live", help="model on every frame, MJPEG view in a browser")
     stream_opts(lv)
     lv.add_argument("--tta", action="store_true", help="mirroring TTA (= the batch path; ~8x slower)")
+    lv.add_argument("--sync", action="store_true", help="show only frames the model finished (mask always on its own "
+                                                         "frame; the view then lags by one model pass)")
     lv.add_argument("--host", default="127.0.0.1")
     lv.add_argument("--port", type=int, default=DEFAULT_PORT)
     lv.add_argument("--max-frames", type=int, default=None)

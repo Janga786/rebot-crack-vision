@@ -24,7 +24,7 @@
 >   Remaining steps (CAN watchdog, measured joint limits) are in [`TODO.md`](TODO.md).
 > - **Camera (2026-10-22): the real D405 is connected and running the model.** `scripts/camera.py check` (first
 >   connection + evidence), `record --video` (30 fps, lossless + MP4), `snap` (capture -> full crack pipeline ->
->   overlays, mm scale from depth) and `live` (the model on every frame in a browser, 4.7 fps). Setup:
+>   overlays, mm scale from depth) and `live` (30 fps video in a browser, crack mask from the model 17 times a second). Setup:
 >   [`docs/camera/D405_SETUP.md`](docs/camera/D405_SETUP.md); first-connection report:
 >   [`docs/camera/D405_FIRST_CONNECTION.md`](docs/camera/D405_FIRST_CONNECTION.md).
 

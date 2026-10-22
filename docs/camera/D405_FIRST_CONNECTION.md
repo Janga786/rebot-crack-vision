@@ -47,6 +47,28 @@ on 8 threads, against 55.4 s serially.
 The model's few predicted pixels in the room scene (0.07–0.08% in live view) are specks on the speckled floor,
 about 3 m away. That is far outside the close-up range the model and this camera are for (7–50 cm).
 
+## Same day: the live view's delay (operator: "it is slightly delayed")
+
+| | Before | After |
+|---|---|---|
+| Video in the browser, 848×480 | 4.7 fps: only frames the model had finished | **30 fps**: every camera frame, with the newest mask |
+| Model per frame, 848×480 | 204–215 ms | **54–57 ms** (17 passes a second); the mask trails the video by about 100 ms |
+| Model per frame, 1280×720 | 404–421 ms | **111–120 ms** (8 a second); the mask trails by about 165 ms |
+
+Where the time went:
+- Frames arrived only 17–30 ms old, and no queue built up.
+- The model was about 205 ms per frame. 68 ms of that was nnU-Net reloading the fold's weights on every call;
+  the rest was running its 18 tiles through the network one at a time.
+- The view could only change when the model finished.
+
+The fixes, in `crackvision.live_predictor` and `camera.py live`:
+- load the weights once;
+- batch the tiles (nnU-Net's own tile order, Gaussian weighting and accumulation; identical output on every
+  pixel of 10 real 848×480 frames, and on 99.9998% at 1280×720);
+- run the model in its own thread on the newest frame while the view streams at the camera's rate.
+
+`--sync` keeps the old behaviour.
+
 ## Not yet shown
 
 - **A positive detection on real imagery.** No crack was in view. The next step is to point the wrist at a

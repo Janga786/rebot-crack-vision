@@ -166,7 +166,8 @@ Done:
   - Capture at 30 fps with no dropped frames.
   - `check`: validator PASS, verdict WARN for the firmware only.
   - Video test: 10 s at 1280×720, lossless and validated, plus an MP4.
-  - `snap` and `live` (4.7 fps / 2.1 fps HD) run the model on the camera.
+  - `snap` and `live` run the model on the camera. Live is 30 fps video with the model at 17 passes a second
+    (848×480) or 8 (HD); it was 4.7 fps before the latency fix the same day.
   - Full report: [`docs/camera/D405_FIRST_CONNECTION.md`](docs/camera/D405_FIRST_CONNECTION.md); evidence in
     `evidence/camera/`.
   - Fixed along the way: recordings dropped frames because PNGs were written inside the capture loop. They now

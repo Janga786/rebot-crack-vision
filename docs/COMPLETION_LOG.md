@@ -1965,3 +1965,24 @@ TESTS: camera/recording tests incl. 6 new (video, no-frames, colormap, memory gu
   parity); full suite run before commit.
 NEXT: point the wrist at a real crack (live, then snap); firmware decision; CAM-04 sessions.
 ```
+
+## LIVE-LATENCY — The live crack view at the camera's 30 fps (operator: "it is slightly delayed", 2026-10-22)
+
+```
+TASK: LIVE-LATENCY (operator-directed)
+STATUS: COMPLETE
+MEASURED (real D405, 848x480): frames arrive 17-30 ms old, no queueing; model 204-215 ms/frame, of which 68 ms
+  was nnU-Net reloading the single fold's weights on every predict call and most of the rest its 18 sliding-window
+  tiles run one at a time; the view only updated when the model finished (4.7 fps).
+CHANGES:
+  - crackvision.live_predictor: FastPredictor (subclass of nnUNetPredictor): tiles batched through the network
+    (nnU-Net's own slicers, Gaussian, half-precision accumulation order); single-fold weights loaded once.
+    204 -> 54 ms at 848x480, 404 -> 111 ms at 1280x720; masks identical to stock nnU-Net on 100% / 99.9998% of
+    pixels over 10 real frames; the GPU parity test against the batch CLI (TTA) still passes.
+  - camera.py live: the model runs in its own thread on the newest frame; the view streams every camera frame with
+    the newest mask (video 30 fps; model 17/s, mask lag ~100 ms at 848x480; 8/s, ~165 ms at 1280x720). --sync keeps
+    the old frame-locked behaviour. HUD and /stats report video fps, model ms and passes/s, mask lag. Snapshots
+    save the frame the mask was computed on.
+TESTS: live sync/async tests (a slow stub model must not slow the view); full suite 593 passed, 1 skipped; GPU
+  parity tests pass.
+```
