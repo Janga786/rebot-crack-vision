@@ -1,0 +1,84 @@
+{
+ "schema": "crackvision.joint_trajectory/1",
+ "created_utc": "2026-10-23T05:10:36Z",
+ "producer": "crackvision.crack_trace:scan-plan",
+ "purpose": "test",
+ "planning_frame": "base_link",
+ "joint_names": [
+  "joint1",
+  "joint2",
+  "joint3",
+  "joint4",
+  "joint5",
+  "joint6"
+ ],
+ "notes": "scan pose: the wrist camera 0.25 m from the surface point [0.3, 0.0, 0.0] (normal [0.0, 0.0, 1.0]), held 15.0 s for crack_trace capture; nominal camera mount (CAD prior)",
+ "points": [
+  {
+   "t_s": 0.0,
+   "positions": [
+    -0.022981,
+    -1.282521,
+    -1.135528,
+    1.16193,
+    0.006107,
+    0.022834
+   ]
+  },
+  {
+   "t_s": 15.0,
+   "positions": [
+    -0.022981,
+    -1.282521,
+    -1.135528,
+    1.16193,
+    0.006107,
+    0.022834
+   ]
+  }
+ ],
+ "limits_file": {
+  "path": "config/robot/b601_dm_limits.yaml",
+  "sha256": null
+ },
+ "end_effector_config_sha256": null,
+ "scene_config_sha256": null,
+ "source": {
+  "paths3d": null
+ },
+ "scan": {
+  "schema": "crackvision.crack_scan_pose/1",
+  "target_m": [
+   0.3,
+   0.0,
+   0.0
+  ],
+  "normal": [
+   0.0,
+   0.0,
+   1.0
+  ],
+  "view_m": 0.25,
+  "dwell_s": 15.0,
+  "q_rad": [
+   -0.022981,
+   -1.282521,
+   -1.135528,
+   1.16193,
+   0.006107,
+   0.022834
+  ],
+  "camera_position_m": [
+   0.3,
+   -0.0,
+   0.25
+  ],
+  "optical_axis_base": [
+   0.0001,
+   0.0,
+   -1.0
+  ],
+  "gripper_link_z_m": 0.1578,
+  "wrist_camera_value_status": "nominal"
+ }
+}

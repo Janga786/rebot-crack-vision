@@ -1,6 +1,6 @@
 # TODO — where the arm-safety and camera work stand and what comes next
 
-**Read this first if you are picking up the arm-safety work (items 0–3) or the D405 camera pipeline (C).** Last updated 2026-10-22.
+**Read this first if you are picking up the arm-safety work (items 0–3) or the D405 camera pipeline (C).** Last updated 2026-10-23.
 
 ## Where we are
 
@@ -60,6 +60,23 @@ Follow [`docs/motion/FIRST_GUARDED_RUN.md`](docs/motion/FIRST_GUARDED_RUN.md):
 After it, look at the run's summary (`guard` events, max tracking error, `max_gap_s`) and the guard's event log.
 Then update ARM_GUARD.md's status line ("not yet run on the powered arm") with what actually happened. If the guard
 tripped, the CSV shows what it saw.
+
+---
+
+## 0b. Show trajectories and the camera → crack → trace pipeline — built 2026-10-23 (offline only)
+
+Runbook: [docs/motion/CRACK_TRACE_PIPELINE.md](docs/motion/CRACK_TRACE_PIPELINE.md).
+- `tools/make_fancy_trajectory.py`: 11 shapes (figure8, star, heart, spiral, rose, lissajous, wave, helix, showreel,
+  raster, crack) in `~/rebot_setup/trajectories/fancy/`. All 22 guarded rehearsals (x1, x2) completed.
+- `scripts/crack_pipeline.sh scan-plan | scan | plan | trace | demo` (`crackvision.crack_trace`, `crackvision.arm_ik`,
+  `demo_move.py --state-file`). The offline `demo` passes end to end.
+
+Next, each on the operator's go:
+1. A show trajectory on the arm: `figure8.json` at x2 with `DEMO_EXTRA="--gains j2=100/4,j3=80/4"`.
+2. Check the D405 sits on the wrist as `end_effector.yaml` assumes. Then `scan` over a printed crack, `plan`, look at
+   the preview, and `trace` at x2.
+3. Hand-eye (GEOM-05) and tool (GEOM-07) calibration: until then, the trace may be off by a few cm and hovers about
+   14 cm above a table crack.
 
 ---
 
