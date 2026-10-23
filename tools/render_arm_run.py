@@ -7,7 +7,10 @@ signs were checked against the real arm on 2026-10-10). Kinematic playback in re
 video shows exactly the commanded motion (or, with --column pos, what the joints measured).
 
 Needs an env with `mujoco` and `cv2` (on this workstation the navilaenv venv) plus ffmpeg:
-    MUJOCO_GL=egl <python> tools/render_arm_run.py RUN.csv OUT.mp4 [--column ref|pos] [--title TEXT]
+    MUJOCO_GL=egl <python> tools/render_arm_run.py RUN.csv OUT.mp4 [--column ref|pos] [--title TEXT] [--trail]
+
+--trail draws the gripper tip's path (gripper_link origin) as it goes and adds a third view facing the arm, so a
+drawn figure (tools/make_fancy_trajectory.py) can be seen.
 """
 
 from __future__ import annotations
@@ -61,7 +64,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--fps", type=int, default=30)
     ap.add_argument("--size", default="640x540", help="per view")
     ap.add_argument("--title", default="")
+    ap.add_argument("--trail", action="store_true", help="draw the gripper tip's path; add a view facing the arm")
     args = ap.parse_args(argv)
+    views = VIEWS + ([(0.0, -5.0, 1.15, "facing the arm")] if args.trail else [])
     import cv2
     import mujoco
 
@@ -78,16 +83,18 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     args.out.parent.mkdir(parents=True, exist_ok=True)
     proc = subprocess.Popen([ffmpeg, "-loglevel", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24",
-                             "-s", f"{w * len(VIEWS)}x{h}", "-r", str(args.fps), "-i", "-", "-c:v", "libx264",
+                             "-s", f"{w * len(views)}x{h}", "-r", str(args.fps), "-i", "-", "-c:v", "libx264",
                              "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
                              str(args.out)], stdin=subprocess.PIPE)
     cams = []
-    for az, el, dist, _ in VIEWS:
+    for az, el, dist, label in views:
         cam = mujoco.MjvCamera()
         cam.type = mujoco.mjtCamera.mjCAMERA_FREE
-        cam.lookat[:] = [0.0, 0.0, 0.22]
+        cam.lookat[:] = [0.15, 0.0, 0.32] if label == "facing the arm" else [0.0, 0.0, 0.22]
         cam.azimuth, cam.elevation, cam.distance = az, el, dist
         cams.append(cam)
+    tip_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "gripper_link")
+    trail: list[np.ndarray] = []
     last = q[0]
     n_frames = int(t[-1] * args.fps) + 1
     for k in range(n_frames):
@@ -97,9 +104,16 @@ def main(argv: list[str] | None = None) -> int:
         for adr, v in zip(qadr, last):
             data.qpos[adr] = v
         mujoco.mj_forward(model, data)
+        if args.trail and (not trail or np.linalg.norm(data.xpos[tip_id] - trail[-1]) > 0.002):
+            trail.append(data.xpos[tip_id].copy())
         tiles = []
-        for cam, (_, _, _, label) in zip(cams, VIEWS):
+        for cam, (_, _, _, label) in zip(cams, views):
             renderer.update_scene(data, camera=cam)
+            scn = renderer.scene
+            for p in trail[-(scn.maxgeom - scn.ngeom):]:
+                mujoco.mjv_initGeom(scn.geoms[scn.ngeom], mujoco.mjtGeom.mjGEOM_SPHERE, np.array([0.003, 0, 0]),
+                                    p, np.eye(3).flatten(), np.array([0.85, 0.1, 0.1, 1.0], dtype=np.float32))
+                scn.ngeom += 1
             img = renderer.render().copy()
             cv2.putText(img, label, (10, h - 12), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (60, 60, 60), 1, cv2.LINE_AA)
             tiles.append(img)
