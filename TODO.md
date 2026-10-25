@@ -63,20 +63,31 @@ tripped, the CSV shows what it saw.
 
 ---
 
-## 0b. Show trajectories and the camera → crack → trace pipeline — built 2026-10-23 (offline only)
+## 0b. Show trajectories and the camera → crack → trace pipeline — built 2026-10-23, shown on the arm 2026-10-23/25
 
-Runbook: [docs/motion/CRACK_TRACE_PIPELINE.md](docs/motion/CRACK_TRACE_PIPELINE.md).
-- `tools/make_fancy_trajectory.py`: 11 shapes (figure8, star, heart, spiral, rose, lissajous, wave, helix, showreel,
-  raster, crack) in `~/rebot_setup/trajectories/fancy/`. All 22 guarded rehearsals (x1, x2) completed.
-- `scripts/crack_pipeline.sh scan-plan | scan | plan | trace | demo` (`crackvision.crack_trace`, `crackvision.arm_ik`,
-  `demo_move.py --state-file`). The offline `demo` passes end to end.
+Runbook: [docs/motion/CRACK_TRACE_PIPELINE.md](docs/motion/CRACK_TRACE_PIPELINE.md). Powered runs and the gain analysis:
+[evidence/operator/powered-show-runs-2026-10-23_25](evidence/operator/powered-show-runs-2026-10-23_25/README.md).
+- **Shown on the powered arm, all completed with no guard fault:** figure-8 (x2, x1), heart (x2, three gain settings),
+  showreel (figure-8, star, heart; x2), box (x2). Not yet run: spiral, rose, lissajous, wave, helix, raster, crack.
+- **Crack pipeline** (`scripts/crack_pipeline.sh search-plan | search | scan-plan [--from-search] | scan | plan | trace | demo`):
+  the search sweep (6 camera stops looking down, the crack model at every stop, the crack located in base_link), the
+  centred scan, and the trace; every trajectory is refused unless reachable, jump-free, and clear of the table
+  (gripper 13.5 cm, camera and mount 3 cm over the whole run including the fold moves). The offline `demo` passes end to
+  end. **Never run on the arm:** the D405 was not on USB when it was last tried (2026-10-25).
+- **Runner options added** (`~/rebot_setup/demo_move.py` 2026-10-25.1, snapshots in `evidence/operator/`):
+  `--state-file` (measured pose, for the capture) and `--ff-bias` (per-run feed-forward offset).
 
-Next, each on the operator's go:
-1. A show trajectory on the arm: `figure8.json` at x2 with `DEMO_EXTRA="--gains j2=100/4,j3=80/4"`.
-2. Check the D405 sits on the wrist as `end_effector.yaml` assumes. Then `scan` over a printed crack, `plan`, look at
-   the preview, and `trace` at x2.
-3. Hand-eye (GEOM-05) and tool (GEOM-07) calibration: until then, the trace may be off by a few cm and hovers about
-   14 cm above a table crack.
+Open, each on the operator's go for the arm:
+1. **Gains** (the operator: "not perfect", the oscillation "still wasn't great"). From the logs: kd 5 on J2/J3 cut their
+   3 Hz ripple about 25 %; **J4 (kp 40 / kd 1) has the largest ripple** and a speed-correlated lag, so try J4 kd 3-4.
+   A constant feed-forward bias halved the steady sag (J2 +10.6 -> -2.8 mrad, J3 -10.0 -> -5.3, J4 -5.4 -> -2.4) but not
+   the rms: the approach and return dominate, so fit a pose-dependent gravity correction from these logs.
+   Still needed from the operator: which part oscillates, how fast, and when (the encoders cannot see link flex).
+2. Run the search and the crack pipeline once the D405 is on USB 3: check it sits on the wrist as `end_effector.yaml`
+   assumes, lay a printed crack in the search area (x 0.22-0.40 m, y +-0.2 m), `search`, `scan-plan --from-search`,
+   `scan`, look at the preview, `trace` at x2.
+3. Hand-eye (GEOM-05) and tool (GEOM-07) calibration: until then the trace may be a few cm off and hovers about 14 cm
+   above a table crack.
 
 ---
 

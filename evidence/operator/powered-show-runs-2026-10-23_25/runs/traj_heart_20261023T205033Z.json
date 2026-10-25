@@ -1,0 +1,243 @@
+{
+  "script": "demo_move.py",
+  "version": "2026-10-23.1",
+  "choreo": "trajectory",
+  "slow": 2.0,
+  "speed": 1.0,
+  "trajectory": {
+    "schema": "crackvision.joint_trajectory/1",
+    "created_utc": "2026-10-23T03:01:45Z",
+    "producer": "tools/make_fancy_trajectory.py:heart",
+    "purpose": "test",
+    "planning_frame": "base_link",
+    "joint_names": [
+      "joint1",
+      "joint2",
+      "joint3",
+      "joint4",
+      "joint5",
+      "joint6"
+    ],
+    "notes": "heart: the tool tip (nominal tool_tip = gripper_link origin) draws it in the plane x=0.32 m centred y=0.0 z=0.45 m, pointing +x; size 0.16 m, tool speed <= 0.05 m/s; crackvision.arm_ik DLS IK on the repo URDF; joint peaks <= 70% of the runner caps",
+    "limits_file": {
+      "path": "config/robot/b601_dm_limits.yaml",
+      "sha256": null
+    },
+    "end_effector_config_sha256": null,
+    "scene_config_sha256": null,
+    "source": {
+      "paths3d": null
+    },
+    "shape": {
+      "name": "heart",
+      "x_m": 0.32,
+      "y_m": 0.0,
+      "z_m": 0.45,
+      "size_m": 0.16,
+      "tool_speed_m_s": 0.05
+    },
+    "report": {
+      "n_points": 210,
+      "duration_s": 10.416,
+      "peak_speed_rad_s": [
+        0.344,
+        0.113,
+        0.255,
+        0.173,
+        0.344,
+        0.0
+      ],
+      "peak_speed_fraction_of_cap": [
+        0.573,
+        0.188,
+        0.425,
+        0.144,
+        0.286,
+        0.0
+      ],
+      "slowed_by": 1.0,
+      "min_gripper_z_m": 0.3712,
+      "max_tip_error_mm": 0.072,
+      "joint_ranges": [
+        [
+          -0.503,
+          0.503
+        ],
+        [
+          -0.961,
+          -0.7
+        ],
+        [
+          -1.399,
+          -0.739
+        ],
+        [
+          0.04,
+          0.446
+        ],
+        [
+          -0.503,
+          0.503
+        ],
+        [
+          -0.0,
+          0.0
+        ]
+      ],
+      "notes": []
+    },
+    "path": "/home/boosterk1/rebot_setup/trajectories/fancy/heart.json",
+    "sha256": "649e4b815400c0907bbb4be58587e68b4eedba2aa12c727382593aaeb64c1810",
+    "n_points": 210
+  },
+  "plan_cap": {
+    "4340P": 0.6,
+    "4310": 1.2
+  },
+  "vel_abort": {
+    "4340P": 1.0,
+    "4310": 1.6
+  },
+  "operator_go": "operator go in chat 2026-10-23: heart x2, kd4",
+  "gains": {
+    "j1": [
+      100.0,
+      4.0
+    ],
+    "j2": [
+      100.0,
+      4.0
+    ],
+    "j3": [
+      80.0,
+      4.0
+    ],
+    "j4": [
+      40.0,
+      1.0
+    ],
+    "j5": [
+      40.0,
+      1.0
+    ],
+    "j6": [
+      40.0,
+      1.0
+    ],
+    "j7": [
+      40.0,
+      0.5
+    ]
+  },
+  "gains_override": {
+    "j2": [
+      100.0,
+      4.0
+    ],
+    "j3": [
+      80.0,
+      4.0
+    ]
+  },
+  "gravity_scale": {
+    "j1": 1.0,
+    "j2": 0.6,
+    "j3": 2.5,
+    "j4": 2.5,
+    "j5": 1.0,
+    "j6": 1.0,
+    "j7": 0.0
+  },
+  "friction": {
+    "j1": 1.0,
+    "j2": 1.0,
+    "j3": 2.0,
+    "j4": 0.5,
+    "j5": 0.3,
+    "j6": 0.1,
+    "j7": 0.0
+  },
+  "simulated": false,
+  "start": {
+    "j1": 0.00438690185546875,
+    "j2": 0.06733036041259766,
+    "j3": -0.01277923583984375,
+    "j4": 0.01506805419921875,
+    "j5": 0.031853675842285156,
+    "j6": 0.00019073486328125,
+    "j7": -0.00095367431640625
+  },
+  "j1_offset": 0.00591278076171875,
+  "guard_preflight": {
+    "problems": [],
+    "warnings": [],
+    "offsets": {
+      "j1": 0.0,
+      "j2": 0.0,
+      "j3": 0.0,
+      "j4": 0.0,
+      "j5": 0.0,
+      "j6": 0.0,
+      "j7": 0.0
+    },
+    "n_ticks": 8557,
+    "min_keepout_m": 0.04074105378771009
+  },
+  "planned_peak_rad_s": {
+    "j1": 0.17197816343868622,
+    "j2": 0.19197783614792116,
+    "j3": 0.2699999529834668,
+    "j4": 0.09931013256262593,
+    "j5": 0.1719805025702923,
+    "j6": 1.5049070218860223e-05,
+    "j7": 0.0
+  },
+  "second_go": "second go (operator, chat)",
+  "outcome": "completed",
+  "trigger": null,
+  "stats": {
+    "n_cmd": 11787,
+    "max_err": {
+      "j1": 0.006084515625,
+      "j2": 0.03011712677839029,
+      "j3": 0.024872404859800135,
+      "j4": 0.019464668639940397,
+      "j5": 0.008277554786036756,
+      "j6": 0.00019673486328125,
+      "j7": 0.00095367431640625
+    },
+    "max_gap_s": 0.013930710032582283,
+    "parked": false,
+    "wait_logged": true
+  },
+  "csv": "/home/boosterk1/rebot_setup/runs/traj_heart_20261023T205033Z.csv",
+  "all_disabled_confirmed": true,
+  "guard": {
+    "simulated": false,
+    "config_sha256": "fbf08261c8df7e7e2e681fcad4cb2c4e95f5e4ae205fc76ee514ef8c94f5288b",
+    "latched_at_end": "",
+    "events": [
+      {
+        "t_wall": 1792788633.9252162,
+        "kind": "bus",
+        "msg": "opened /dev/ttyACM0",
+        "pid": 3660476
+      },
+      {
+        "t_wall": 1792788638.671369,
+        "kind": "startup",
+        "msg": "startup check passed",
+        "pid": 3660476,
+        "readings": {
+          "j1": 0.00438690185546875,
+          "j2": 0.06733036041259766,
+          "j3": -0.01277923583984375,
+          "j4": 0.01506805419921875,
+          "j5": 0.031853675842285156,
+          "j6": 0.00019073486328125,
+          "j7": -0.00095367431640625
+        }
+      }
+    ]
+  }
+}
