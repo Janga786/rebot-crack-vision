@@ -139,3 +139,17 @@ def test_star_stops_at_every_point():
     pieces = mod.wall_pieces("star", *mod.DEFAULTS["star"][:4], 0.05)
     _, _, _, spans = time_pieces(pieces)
     assert len(spans) == 5                                     # five edges, each its own profile
+
+
+def test_motion_clearance_refuses_a_camera_that_would_touch_the_table(ik):
+    from crackvision.arm_ik import check_motion_clearance, min_body_z
+    # tool pointing down at 0.13 m: the gripper floor passes, so the camera/mount boxes decide
+    r = ik.solve_global([0.30, 0.0, 0.13], [0, 0, -1.0])
+    q = np.vstack([r.q, r.q])
+    z, _ = min_body_z(ik, r.q)
+    assert z > 0.0
+    with pytest.raises(IKError, match="table"):
+        check_motion_clearance(ik, q, floor_z_m=z + 0.05)       # a stricter floor than the pose allows is refused
+    assert check_motion_clearance(ik, q, floor_z_m=z - 0.005)["min_body_z_m"] >= z - 0.005 - 1e-9
+    zf, _ = min_body_z(ik, np.zeros(6))
+    assert zf > 0.1                                             # the fold is well clear

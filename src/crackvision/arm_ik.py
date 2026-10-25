@@ -190,6 +190,61 @@ class ArmIK:
         return out
 
 
+# -- whole-body clearance ----------------------------------------------------------------------------------------
+
+BODY_FLOOR_Z_M = 0.03        # camera housing / mount / wrist boxes must stay this far above the base plane (table top)
+
+
+def body_boxes(ik: "ArmIK", ee: kinematics.EndEffector | None = None) -> list[tuple[str, np.ndarray, np.ndarray]]:
+    """(name, T_gripper_link_box_centre, box_size) for the collision proxies end_effector.yaml defines on the
+    gripper (camera housing, camera mount), each padded on every side as the config says."""
+    import yaml
+    ee = ee or kinematics.load_end_effector()
+    cfg = yaml.safe_load(kinematics.DEFAULT_END_EFFECTOR.read_text())
+    pad = float(cfg.get("collision_padding_m", 0.0))
+    out = []
+    for c in cfg["collision"]:
+        frame = np.asarray(ee.T_gripper_link_camera_link if c["frame"] == "camera_link" else np.eye(4), dtype=float)
+        T = frame @ kinematics.transform_from_xyz_rpy(c["xyz_m"], c["rpy_rad"])
+        out.append((c["id"], T, np.asarray(c["box_size_m"], dtype=float) + 2 * pad))
+    return out
+
+
+def min_body_z(ik: "ArmIK", q: Sequence[float], boxes=None) -> tuple[float, str]:
+    """Lowest z (base_link) over the corners of the gripper's collision boxes, and which box."""
+    boxes = boxes or body_boxes(ik)
+    corners = np.array([[sx, sy, sz] for sx in (-.5, .5) for sy in (-.5, .5) for sz in (-.5, .5)])
+    best = (math.inf, "")
+    for name, T, size in boxes:
+        Tb = ik.fk_frame(q, T)
+        z = (Tb[:3, :3] @ (corners * size).T).T[:, 2] + Tb[2, 3]
+        if z.min() < best[0]:
+            best = (float(z.min()), name)
+    return best
+
+
+def check_motion_clearance(ik: "ArmIK", q: np.ndarray, *, q_fold: Sequence[float] = (0.0,) * 6,
+                           floor_z_m: float = BODY_FLOOR_Z_M, n_approach: int = 40) -> dict:
+    """The whole run as the runner plays it: min-jerk from the fold to q[0], the trajectory, min-jerk back to the
+    fold. Raises IKError if the camera housing/mount would come within floor_z_m of the table. Returns the
+    lowest body z and the lowest gripper_link z seen."""
+    boxes = body_boxes(ik)
+    fold = np.asarray(q_fold, dtype=float)
+    u = np.linspace(0, 1, n_approach)
+    mj = 10 * u**3 - 15 * u**4 + 6 * u**5
+    path = np.vstack([fold + (q[0] - fold) * mj[:, None], q, q[-1] + (fold - q[-1]) * mj[:, None]])
+    zmin, where, gmin = math.inf, (0, ""), math.inf
+    for i, qq in enumerate(path[:: max(1, len(path) // 600)]):
+        z, name = min_body_z(ik, qq, boxes)
+        if z < zmin:
+            zmin, where = z, (i, name)
+        gmin = min(gmin, float(ik.fk_frame(qq, np.eye(4))[2, 3]))
+    if zmin < floor_z_m:
+        raise IKError(f"the {where[1]} would come within {zmin * 1000:.0f} mm of the table "
+                      f"(minimum {floor_z_m * 1000:.0f} mm): raise the path or the scan distance")
+    return {"min_body_z_m": round(zmin, 4), "lowest_box": where[1], "min_gripper_z_m": round(gmin, 4)}
+
+
 # -- timing ------------------------------------------------------------------------------------------------------
 
 def ramp_profile(length_m: float, speed_m_s: float, ramp_s: float) -> tuple[float, callable]:

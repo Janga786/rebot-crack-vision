@@ -4,6 +4,11 @@ The B601-DM runner (~/rebot_setup/run-trajectory.sh -> demo_move.py, behind arm_
 crackvision.joint_trajectory/1 files: approach from the fold, the file, return to the fold. This module makes the two
 files the crack pipeline needs and the capture in between (scripts/crack_pipeline.sh sequences them):
 
+  search-plan   a small search before the scan: the camera, looking straight down, visits a grid of stops
+                (default 2 x 3, 25 cm up) and rests at each. Writes the sweep trajectory and data/crack_trace/search.json.
+  search-capture  while the sweep runs: at every stop waits for the arm to rest, grabs a frame, runs the crack model,
+                and keeps the stop with the biggest crack that sits inside the image. The crack's centre becomes a
+                3D target (depth + the measured pose) in data/crack_trace/<case>_search/search_result.json.
   scan-plan  the scan pose: the D405 looking straight at the target surface from --view-m away. Writes a
              trajectory that holds that pose for --dwell-s, during which the camera captures.
   capture    run while the scan trajectory holds (demo_move.py --state-file publishes the measured pose): waits
@@ -17,7 +22,9 @@ files the crack pipeline needs and the capture in between (scripts/crack_pipelin
              preview: the planned path drawn back into the camera image over the crack.
   check      (synthetic cases) the planned surface path against tools/synth_scene3d.py's ground truth.
 
-  ./env.sh python -m crackvision.crack_trace scan-plan --out data/crack_trace/scan.json [--target 0.30 0 0]
+  ./env.sh python -m crackvision.crack_trace search-plan
+  ./env.sh python -m crackvision.crack_trace search-capture --case CASE --state-file ~/rebot_setup/runs/arm_state.json
+  ./env.sh python -m crackvision.crack_trace scan-plan --out data/crack_trace/scan.json [--target 0.30 0 0 | --from-search CASE]
   ./env.sh python -m crackvision.crack_trace capture --case CASE --state-file ~/rebot_setup/runs/arm_state.json
   ./env.sh python -m crackvision.crack_trace plan --case CASE [--hover-m 0.05]
 
@@ -43,7 +50,8 @@ import numpy as np
 from PIL import Image, ImageDraw
 
 from crackvision import capture_record, kinematics, naming
-from crackvision.arm_ik import (GRIPPER_FLOOR_Z_M, ArmIK, IKError, Piece, build_trajectory, trajectory_doc)
+from crackvision.arm_ik import (GRIPPER_FLOOR_Z_M, ArmIK, IKError, Piece, build_trajectory, check_motion_clearance,
+                                trajectory_doc)
 from crackvision.config import Config, ConfigError, add_common_args, load_config
 from crackvision.logging_setup import EXIT_OK, EXIT_PRECONDITION, EXIT_RUNTIME, EXIT_USAGE, setup_logging
 
@@ -88,6 +96,18 @@ def scan_pose(target: np.ndarray, normal: np.ndarray, view_m: float, ik: ArmIK |
 
 def cmd_scan_plan(cfg: Config, args: argparse.Namespace, log: logging.Logger) -> int:
     target, normal = np.array(args.target, float), np.array(args.normal, float)
+    if args.from_search:
+        res_path = trace_dir(cfg.root) / f"{args.from_search}_search" / "search_result.json"
+        try:
+            res = json.loads(res_path.read_text())
+        except (OSError, json.JSONDecodeError) as exc:
+            log.error("no search result %s: %s", res_path, exc)
+            return EXIT_PRECONDITION
+        if not res.get("found"):
+            log.error("the search %s found no crack: nothing to scan", args.from_search)
+            return EXIT_PRECONDITION
+        target, normal = np.array(res["target_base_m"], float), np.array(res.get("normal_base", [0, 0, 1.0]), float)
+        print(f"scan target from the search: crack centre at {target.round(3).tolist()} (stop {res['best_stop']})")
     try:
         q, info = scan_pose(target, normal, args.view_m)
     except IKError as exc:
@@ -97,6 +117,11 @@ def cmd_scan_plan(cfg: Config, args: argparse.Namespace, log: logging.Logger) ->
         log.error("scan pose puts gripper_link at z %.3f m, below %.3f m: raise --view-m", info["gripper_link_z_m"],
                   TIP_Z_MIN_M)
         return EXIT_PRECONDITION
+    try:
+        clear = check_motion_clearance(ArmIK(), np.vstack([q, q]))
+    except IKError as exc:
+        log.error("scan pose refused: %s", exc)
+        return EXIT_PRECONDITION
     t = np.array([0.0, args.dwell_s])
     doc = trajectory_doc(t, np.vstack([q, q]), producer="crackvision.crack_trace:scan-plan", purpose="test",
                          notes=(f"scan pose: the wrist camera {args.view_m} m from the surface point "
@@ -104,15 +129,230 @@ def cmd_scan_plan(cfg: Config, args: argparse.Namespace, log: logging.Logger) ->
                                 "for crack_trace capture; nominal camera mount (CAD prior)"),
                          extra={"scan": {"schema": SCAN_SCHEMA, "target_m": target.tolist(), "normal": normal.tolist(),
                                          "view_m": args.view_m, "dwell_s": args.dwell_s,
-                                         "q_rad": q.round(6).tolist(), **info}})
+                                         "q_rad": q.round(6).tolist(), "clearance": clear, **info}})
     out = args.out or trace_dir(cfg.root) / "scan.json"
     if args.dry_run:
         log.info("dry-run: would write %s", out)
         return EXIT_OK
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(doc, indent=1) + "\n")
+    print(f"clearance over the whole run (fold -> scan pose -> fold): camera/mount at least "
+          f"{clear['min_body_z_m'] * 1000:.0f} mm above the table ({clear['lowest_box']}), gripper_link at least "
+          f"{clear['min_gripper_z_m'] * 1000:.0f} mm")
     print(f"scan pose q = {np.round(q, 3).tolist()}  camera at {info['camera_position_m']} looking "
           f"{info['optical_axis_base']}; holds {args.dwell_s} s -> {out}")
+    return EXIT_OK
+
+
+# ---- search ------------------------------------------------------------------------------------------------------
+
+SEARCH_SCHEMA = "crackvision.crack_search/1"
+BORDER_PX = 24                    # a crack closer than this to the image edge may be cut off by the view
+
+
+def plan_search(xs: list[float], ys: list[float], view_m: float, dwell_s: float, *, speed_m_s: float = 0.06,
+                ramp_s: float = 0.8, speed_fraction: float = 0.6, log: logging.Logger | None = None):
+    """Camera stops over the table (looking straight down, view_m up), visited in a serpentine. Stops the arm cannot
+    reach (camera pointing down), or that would put the camera/mount near the table, are dropped. Returns
+    (t, q (N,6), stops [{q, camera_m, t0, t1}])."""
+    from crackvision.arm_ik import peak_speed_fraction, slow_to_fit, time_pieces
+    ik = ArmIK()
+    T_cl, _ = camera_frames(kinematics.load_end_effector())
+    down = np.array([0.0, 0.0, -1.0])
+    cams = []
+    for i, x in enumerate(xs):
+        for y in (ys if i % 2 == 0 else ys[::-1]):
+            cams.append(np.array([x, y, view_m]))
+    stops, q_prev = [], None
+    for c in cams:
+        try:
+            q = ik.solve_global(c, down, T_tip=T_cl).q if q_prev is None else ik.solve(c, q_prev, down, T_tip=T_cl)
+            if q_prev is not None and not (isinstance(q, np.ndarray) or q.ok):
+                raise IKError("no solution")
+            q = q if isinstance(q, np.ndarray) else q.q
+            check_motion_clearance(ik, np.vstack([q, q]))
+        except IKError as exc:
+            if log:
+                log.warning("search stop %s dropped: %s", c.round(3).tolist(), exc)
+            continue
+        stops.append({"camera_m": c, "q": q})
+        q_prev = q
+    if len(stops) < 2:
+        raise IKError(f"only {len(stops)} reachable search stop(s): move the search area closer to the arm")
+    ts, qs = [np.array([0.0])], [stops[0]["q"][None]]
+    t_now = 0.0
+    dt = 0.05
+    stops[0]["t0"] = 0.0
+    n_hold = int(round(dwell_s / dt))
+    ts.append(t_now + dt * np.arange(1, n_hold + 1)); qs.append(np.repeat(stops[0]["q"][None], n_hold, 0))
+    t_now += n_hold * dt
+    stops[0]["t1"] = t_now
+    for a, b in zip(stops[:-1], stops[1:]):
+        pts = a["camera_m"] + (b["camera_m"] - a["camera_m"]) * np.linspace(0, 1, 30)[:, None]
+        pc = Piece(pts, np.tile(down, (30, 1)), speed_m_s, True, "leg")
+        tl, pl, nl, _ = time_pieces([pc], ramp_s=ramp_s)
+        ql = ArmIK.follow(ik, pl, nl, a["q"], max_joint_step_rad=0.15, T_tip=T_cl)
+        tl, _f = slow_to_fit(tl, ql, speed_fraction)
+        check_motion_clearance(ik, ql)
+        b["q"] = ql[-1].copy()          # rest where the leg arrives: the roll about the optical axis is free, so a
+                                        # separately solved stop pose differs by a few hundredths of a rad (a jump)
+        ts.append(t_now + tl[1:]); qs.append(ql[1:])
+        t_now += float(tl[-1])
+        b["t0"] = t_now
+        ts.append(t_now + dt * np.arange(1, n_hold + 1)); qs.append(np.repeat(b["q"][None], n_hold, 0))
+        t_now += n_hold * dt
+        b["t1"] = t_now
+    return np.concatenate(ts), np.vstack(qs), stops
+
+
+def cmd_search_plan(cfg: Config, args: argparse.Namespace, log: logging.Logger) -> int:
+    xs = [float(v) for v in args.xs]
+    ys = [float(v) for v in args.ys]
+    try:
+        t, q, stops = plan_search(xs, ys, args.view_m, args.dwell_s, log=log)
+        clear = check_motion_clearance(ArmIK(), q)
+    except IKError as exc:
+        log.error("search refused: %s", exc)
+        return EXIT_PRECONDITION
+    doc = trajectory_doc(
+        t, q, producer="crackvision.crack_trace:search-plan", purpose="test",
+        notes=(f"search: the wrist camera looks straight down from {args.view_m} m and rests {args.dwell_s} s at each of "
+               f"{len(stops)} stops over the table; crack_trace search-capture runs the crack model at every stop"),
+        extra={"search": {"schema": SEARCH_SCHEMA, "view_m": args.view_m, "dwell_s": args.dwell_s, "clearance": clear,
+                          "stops": [{"index": i, "camera_m": s["camera_m"].round(4).tolist(),
+                                     "q_rad": s["q"].round(6).tolist(), "t0_s": round(s["t0"], 3),
+                                     "t1_s": round(s["t1"], 3)} for i, s in enumerate(stops)]}})
+    out = args.out or trace_dir(cfg.root) / "search.json"
+    if args.dry_run:
+        log.info("dry-run: would write %s", out)
+        return EXIT_OK
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(doc, indent=1) + "\n")
+    print(f"search: {len(stops)} stops, camera {args.view_m} m up, {t[-1]:.0f} s; camera/mount >= "
+          f"{clear['min_body_z_m'] * 1000:.0f} mm above the table over the whole run (incl. approach and return)\n"
+          + "\n".join(f"  stop {i}: camera at {np.round(s['camera_m'], 3).tolist()}" for i, s in enumerate(stops))
+          + f"\n  -> {out}")
+    return EXIT_OK
+
+
+def locate_crack(mask: np.ndarray, depth_u16: np.ndarray, depth_scale: float, intr: dict, T_base_opt: np.ndarray,
+                 *, min_px: int = 150) -> dict | None:
+    """Where the crack in `mask` is, in base_link: its pixel centroid lifted with the surface depth around it
+    (valid depth in a ring 4-14 px outside the mask, median) and the measured pose. None if too small or no depth."""
+    from scipy import ndimage
+    m = mask > 0
+    if m.sum() < min_px:
+        return None
+    ring = ndimage.binary_dilation(m, iterations=14) & ~ndimage.binary_dilation(m, iterations=4)
+    d = depth_u16[ring & (depth_u16 > 0)].astype(float) * depth_scale
+    if len(d) < 50:
+        return None
+    z = float(np.median(d))
+    ys, xs = np.nonzero(m)
+    u, v = xs.mean(), ys.mean()
+    p_opt = np.array([(u - intr["ppx"]) / intr["fx"] * z, (v - intr["ppy"]) / intr["fy"] * z, z, 1.0])
+    p = (T_base_opt @ p_opt)[:3]
+    ext = []
+    for uu, vv in ((xs.min(), ys.min()), (xs.max(), ys.max())):
+        q_ = np.array([(uu - intr["ppx"]) / intr["fx"] * z, (vv - intr["ppy"]) / intr["fy"] * z, z, 1.0])
+        ext.append((T_base_opt @ q_)[:3])
+    h, w = m.shape
+    touches = bool(xs.min() < BORDER_PX or ys.min() < BORDER_PX or xs.max() > w - BORDER_PX or ys.max() > h - BORDER_PX)
+    return {"crack_px": int(m.sum()), "centroid_px": [round(float(u), 1), round(float(v), 1)], "depth_m": round(z, 4),
+            "target_base_m": p.round(4).tolist(), "touches_border": touches,
+            "extent_base_m": round(float(np.linalg.norm(ext[1] - ext[0])), 3)}
+
+
+def _stop_source(args, cam, stop_index: int):
+    """Frames for one stop: the live camera, or (testing) the stop's own rendered recording."""
+    if getattr(args, "replay", None):
+        from crackvision.camera_pipeline import _ReplayCamera
+        return _ReplayCamera(Path(args.replay) / f"stop_{stop_index:02d}").frames(args.burst)
+    return cam.frames(args.burst)
+
+
+def cmd_search_capture(cfg: Config, args: argparse.Namespace, log: logging.Logger) -> int:
+    plan = json.loads(Path(args.search).read_text())["search"]
+    stops = plan["stops"]
+    case = naming.derive_case_id(Path(f"{args.case}.png"))
+    out = trace_dir(cfg.root) / f"{case}_search"
+    if args.dry_run:
+        log.info("dry-run: would search %d stops into %s", len(stops), out)
+        return EXIT_OK
+    from crackvision import camera_pipeline as cp
+    from crackvision.d405_live import D405Error
+    from crackvision.live_predictor import LivePredictor
+    from crackvision.recording import _write_depth_png
+    cam_ctx = cam = None
+    if not args.replay:
+        try:
+            cam_ctx = cp.open_camera(cfg, args, log)
+            cam = cam_ctx.__enter__()
+        except D405Error as exc:
+            log.error("camera: %s", exc)
+            return EXIT_PRECONDITION
+    predictor = LivePredictor(cfg, tta=args.tta)
+    out.mkdir(parents=True, exist_ok=True)
+    ik = ArmIK()
+    _, T_opt = camera_frames(kinematics.load_end_effector())
+    results = []
+    try:
+        for st in stops:
+            q_stop = np.array(st["q_rad"])
+            log.info("stop %d/%d: waiting for the arm", st["index"] + 1, len(stops))
+            try:
+                wait_settled(Path(args.state_file), q_stop, args.timeout_s, tol_rad=0.05, hold_s=0.5, log=None)
+            except TimeoutError as exc:
+                log.error("stop %d skipped: %s", st["index"], exc)
+                if "left the scan pose" in str(exc):
+                    break
+                continue
+            s0 = read_state(Path(args.state_file))
+            frames = list(_stop_source(args, cam, st["index"]))
+            s1 = read_state(Path(args.state_file))
+            if not frames or s0 is None or s1 is None or not settled([s0, s1], q_stop, 0.05, 0.05):
+                log.error("stop %d skipped: the arm moved during the capture", st["index"])
+                continue
+            tail = frames[len(frames) // 2:]
+            f = max(tail, key=lambda fr: sharpness(fr.color_rgb))
+            info = cam.session_info if cam is not None else json.loads((Path(args.replay) / "stop_00" / "session.json").read_text())
+            mask = predictor.predict(f.color_rgb)
+            T = ik.fk_frame(s1["positions_rad"], T_opt)
+            loc = locate_crack(mask, f.depth_u16, float(info["depth_scale_m_per_unit"]), info["color_intrinsics"], T,
+                               min_px=args.min_px)
+            tag = f"stop_{st['index']:02d}"
+            Image.fromarray(f.color_rgb).save(out / f"{tag}_color.png")
+            _write_depth_png(f.depth_u16, out / f"{tag}_depth.png")
+            ov = f.color_rgb.copy()
+            ov[mask > 0] = (255, 0, 0)
+            Image.fromarray(ov).save(out / f"{tag}_overlay.png")
+            r = {"stop": st["index"], "camera_m": st["camera_m"], "state": s1, "crack_px": int(mask.sum()),
+                 "located": loc}
+            results.append(r)
+            print(f"stop {st['index']}: camera {np.round(st['camera_m'], 3).tolist()}: "
+                  + (f"crack {loc['crack_px']} px at {loc['target_base_m']}"
+                     + (" (touches the image edge)" if loc["touches_border"] else "") if loc else
+                     f"no crack ({int(mask.sum())} px)"))
+    finally:
+        if cam_ctx is not None:
+            cam_ctx.__exit__(None, None, None)
+    ok = [r for r in results if r["located"]]
+    best = max(ok, key=lambda r: (not r["located"]["touches_border"], r["located"]["crack_px"]), default=None)
+    res = {"schema": SEARCH_SCHEMA, "case": case, "stops_planned": len(stops), "stops_done": len(results),
+           "found": best is not None, "results": [{k: v for k, v in r.items() if k != "state"} for r in results]}
+    if best:
+        res |= {"best_stop": best["stop"], "target_base_m": best["located"]["target_base_m"],
+                "normal_base": [0.0, 0.0, 1.0], "crack_px": best["located"]["crack_px"],
+                "extent_base_m": best["located"]["extent_base_m"],
+                "touches_border": best["located"]["touches_border"],
+                "note": "target = crack centroid lifted with the surface depth around it and the measured pose; the "
+                        "surface is assumed horizontal (table)"}
+    (out / "search_result.json").write_text(json.dumps(res, indent=2) + "\n")
+    if not best:
+        print(f"search: no crack found at {len(results)}/{len(stops)} stops")
+        return EXIT_PRECONDITION
+    print(f"search: crack found at stop {best['stop']}, centre {res['target_base_m']} (extent {res['extent_base_m']} m); "
+          f"next: scan-plan --from-search {case}")
     return EXIT_OK
 
 
@@ -400,7 +640,8 @@ def plan_trace(doc: dict, *, hover_m: float, approach_m: float, trace_speed: flo
                         "sigma_along_normal_m": round(s["sigma_along_normal_m"], 4)})
     q0 = ik.solve_global(pieces[0].points[0], pieces[0].pointing[0]).q
     t, q, rep = build_trajectory(ik, pieces, q0, speed_fraction=speed_fraction, floor_z_m=TIP_Z_MIN_M - 0.005)
-    return t, q, {"segments": planned, "report": asdict(rep), "hover_floor_3sigma_m": round(3 * sigma, 4)}
+    clear = check_motion_clearance(ik, q)
+    return t, q, {"segments": planned, "report": asdict(rep), "clearance": clear, "hover_floor_3sigma_m": round(3 * sigma, 4)}
 
 
 def project(T_base_opt: np.ndarray, intr: dict, pts: np.ndarray) -> np.ndarray:
@@ -490,7 +731,8 @@ def cmd_plan(cfg: Config, args: argparse.Namespace, log: logging.Logger) -> int:
           + "; ".join(f"{s['length_m'] * 1000:.0f} mm, hover {s['hover_m'] * 100:.1f} cm, tilt {s['tilt_deg']:.0f} deg"
                       for s in plan["segments"])
           + f"), {r['duration_s']:.1f} s, joint peak/cap {max(r['peak_speed_fraction_of_cap']):.2f}, "
-          f"min gripper z {r['min_gripper_z_m']:.3f} m\n  trajectory {out}\n  preview    {prev}")
+          f"min gripper z {r['min_gripper_z_m']:.3f} m, camera/mount >= {plan['clearance']['min_body_z_m'] * 1000:.0f} mm "
+          f"above the table (whole run incl. approach and return)\n  trajectory {out}\n  preview    {prev}")
     if reasons:
         print(f"  NOTE paths3d is not execution-eligible ({', '.join(reasons)}): expect cm-level offsets until the "
               "camera and tool are calibrated (GEOM-05/07)")
@@ -519,47 +761,73 @@ def cmd_check(cfg: Config, args: argparse.Namespace, log: logging.Logger) -> int
 
 # ---- make-replay (offline testing) ------------------------------------------------------------------------------
 
-def cmd_make_replay(cfg: Config, args: argparse.Namespace, log: logging.Logger) -> int:
-    """A D405-format recording of what the camera sees at the scan pose when a photo, printed --print-width-m wide,
-    lies flat on the surface at the scan target (ray/plane intersection; exact aligned depth). Feeds `capture
-    --replay` with a scene that has a real crack in it, so the whole pipeline runs without the arm or the camera."""
-    from crackvision import camera_pipeline as cp
-    from crackvision.recording import CaptureFrame
-    scan = json.loads(Path(args.scan).read_text())["scan"]
-    info = json.loads((Path(args.like) / "session.json").read_text())
-    ci = info["color_intrinsics"]
+def render_view(photo: np.ndarray, q, ci: dict, depth_scale: float, center: np.ndarray, normal: np.ndarray,
+                print_width_m: float, ik: ArmIK | None = None) -> tuple[np.ndarray, np.ndarray, float]:
+    """What the wrist camera sees at joint pose q of a photo printed print_width_m wide lying on the plane through
+    `center` with `normal` (ray/plane intersection; exact aligned depth, the plane everywhere). Returns
+    (rgb, depth_u16, fraction of the view covered by the print)."""
+    ik = ik or ArmIK()
     W, H = int(ci["width"]), int(ci["height"])
-    ik = ArmIK()
     _, T_opt = camera_frames(kinematics.load_end_effector())
-    T = ik.fk_frame(scan["q_rad"], T_opt)
-    target, n = np.array(scan["target_m"]), np.array(scan["normal"]) / np.linalg.norm(scan["normal"])
+    T = ik.fk_frame(q, T_opt)
+    n = normal / np.linalg.norm(normal)
     u, v = np.meshgrid(np.arange(W), np.arange(H))
     rays = np.stack([(u - ci["ppx"]) / ci["fx"], (v - ci["ppy"]) / ci["fy"], np.ones_like(u, float)], -1)
     rays_b = rays @ T[:3, :3].T
-    lam = ((target - T[:3, 3]) @ n) / (rays_b @ n)                 # depth along optical z (ray z component = 1)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        lam = ((center - T[:3, 3]) @ n) / (rays_b @ n)             # depth along optical z (ray z component = 1)
     pts = T[:3, 3] + rays_b * lam[..., None]
-    # photo axes on the surface: x_img along base +y (left), y_img along base -x (toward the base) for a table
     e1 = np.cross(n, [1.0, 0.0, 0.0]) if abs(n[0]) < 0.9 else np.cross(n, [0.0, 1.0, 0.0])
     e1 /= np.linalg.norm(e1)
     e2 = np.cross(n, e1)
-    photo = np.array(Image.open(args.image).convert("RGB"))
     ph, pw = photo.shape[:2]
-    scale = pw / args.print_width_m                                 # photo px per metre
-    a = ((pts - target) @ e1) * scale + pw / 2
-    b = ((pts - target) @ e2) * scale + ph / 2
+    scale = pw / print_width_m
+    a = ((pts - center) @ e1) * scale + pw / 2
+    b = ((pts - center) @ e2) * scale + ph / 2
     inside = (a >= 0) & (a < pw - 1) & (b >= 0) & (b < ph - 1) & (lam > 0)
     rgb = np.full((H, W, 3), 205, np.uint8)
     rgb[inside] = photo[b[inside].astype(int), a[inside].astype(int)]
-    depth = np.where(lam > 0, lam / float(info["depth_scale_m_per_unit"]), 0).round().astype(np.uint16)
-    frames = [CaptureFrame(frame_index=k, color_rgb=rgb, depth_u16=depth, color_timestamp=1000.0 * k / 30,
-                           color_timestamp_domain="system_time", depth_timestamp=1000.0 * k / 30,
-                           depth_timestamp_domain="system_time", color_frame_number=k, depth_frame_number=k,
-                           host_monotonic_ns=time.monotonic_ns(), extra={"rendered_from": str(args.image)})
-             for k in range(args.frames)]
+    depth = np.where(lam > 0, lam / depth_scale, 0).round().astype(np.uint16)
+    return rgb, depth, float(inside.mean())
+
+
+def cmd_make_replay(cfg: Config, args: argparse.Namespace, log: logging.Logger) -> int:
+    """D405-format recordings of what the camera sees when a photo, printed --print-width-m wide, lies flat on the
+    table: at the scan pose (--scan), or at every stop of a search (--search, one stop_NN recording each, the print
+    centred at --print-center). Feeds `capture --replay` / `search-capture --replay`: the whole pipeline runs without
+    the arm or the camera."""
+    from crackvision import camera_pipeline as cp
+    from crackvision.recording import CaptureFrame
+    info = json.loads((Path(args.like) / "session.json").read_text())
+    ci = info["color_intrinsics"]
+    ds = float(info["depth_scale_m_per_unit"])
+    photo = np.array(Image.open(args.image).convert("RGB"))
+    ik = ArmIK()
     info = dict(info, device=dict(info.get("device", {}), serial="rendered", name="crack_trace make-replay"))
-    out = cp.write_recording(info, frames, Path(args.out))
-    print(f"rendered {args.frames} frames ({100 * inside.mean():.0f} % of the view is the print, depth "
-          f"{lam[inside].min():.3f}..{lam[inside].max():.3f} m) -> {out}")
+
+    def write(rgb, depth, out: Path) -> Path:
+        frames = [CaptureFrame(frame_index=k, color_rgb=rgb, depth_u16=depth, color_timestamp=1000.0 * k / 30,
+                               color_timestamp_domain="system_time", depth_timestamp=1000.0 * k / 30,
+                               depth_timestamp_domain="system_time", color_frame_number=k, depth_frame_number=k,
+                               host_monotonic_ns=time.monotonic_ns(), extra={"rendered_from": str(args.image)})
+                  for k in range(args.frames)]
+        return cp.write_recording(info, frames, out)
+
+    if args.search:
+        stops = json.loads(Path(args.search).read_text())["search"]["stops"]
+        center = np.array(args.print_center or [0.30, 0.0, 0.0], float)
+        for st in stops:
+            rgb, depth, cov = render_view(photo, st["q_rad"], ci, ds, center, np.array([0, 0, 1.0]), args.print_width_m, ik)
+            write(rgb, depth, Path(args.out) / f"stop_{st['index']:02d}")
+            print(f"stop {st['index']}: camera {st['camera_m']}: {100 * cov:.0f} % of the view is the print")
+        print(f"rendered {len(stops)} stops, print centred at {center.tolist()} -> {args.out}")
+        return EXIT_OK
+    scan = json.loads(Path(args.scan).read_text())["scan"]
+    center = np.array(args.print_center if args.print_center else scan["target_m"], float)
+    rgb, depth, cov = render_view(photo, scan["q_rad"], ci, ds, center, np.array(scan["normal"]),
+                                  args.print_width_m, ik)
+    out = write(rgb, depth, Path(args.out))
+    print(f"rendered {args.frames} frames ({100 * cov:.0f} % of the view is the print) -> {out}")
     return EXIT_OK
 
 
@@ -573,10 +841,31 @@ def build_parser() -> argparse.ArgumentParser:
     sp = sub.add_parser("scan-plan", help="scan pose trajectory (camera looking at the target)")
     sp.add_argument("--target", nargs=3, type=float, default=[0.30, 0.0, 0.0], metavar=("X", "Y", "Z"),
                     help="surface point to look at, base_link m (default: the table in front, 30 cm out)")
+    sp.add_argument("--from-search", metavar="CASE", default=None,
+                    help="centre the scan on the crack found by search-capture CASE (overrides --target)")
     sp.add_argument("--normal", nargs=3, type=float, default=[0.0, 0.0, 1.0], metavar=("NX", "NY", "NZ"))
     sp.add_argument("--view-m", type=float, default=0.25, help="camera distance from the surface (D405: 7-50 cm)")
     sp.add_argument("--dwell-s", type=float, default=15.0, help="how long the scan pose is held for the capture")
     sp.add_argument("--out", type=Path)
+    sr = sub.add_parser("search-plan", help="sweep trajectory: the camera looks down at a grid of stops")
+    sr.add_argument("--xs", nargs="+", type=float, default=[0.26, 0.36], help="stop rows, base x (m)")
+    sr.add_argument("--ys", nargs="+", type=float, default=[-0.15, 0.0, 0.15], help="stops per row, base y (m)")
+    sr.add_argument("--view-m", type=float, default=0.25)
+    sr.add_argument("--dwell-s", type=float, default=3.0, help="rest at each stop")
+    sr.add_argument("--out", type=Path)
+    sc = sub.add_parser("search-capture", help="at every stop of the sweep: capture + model; locate the crack")
+    sc.add_argument("--case", required=True)
+    sc.add_argument("--search", type=Path, default=None, help="search-plan output (default data/crack_trace/search.json)")
+    sc.add_argument("--state-file", required=True, type=Path)
+    sc.add_argument("--timeout-s", type=float, default=300.0, help="per stop")
+    sc.add_argument("--burst", type=int, default=8)
+    sc.add_argument("--min-px", type=int, default=150, help="smallest crack (pixels) that counts")
+    sc.add_argument("--tta", action="store_true", help="mirroring TTA (slower)")
+    sc.add_argument("--replay", type=Path, default=None, help="dir of stop_NN recordings (make-replay --search)")
+    sc.add_argument("--serial", default=None)
+    for a in ("--width", "--height", "--fps", "--warmup"):
+        sc.add_argument(a, type=int, default=None)
+    sc.add_argument("--hd", action="store_true")
     cp = sub.add_parser("capture", help="capture at the scan pose, then segment + paths")
     cp.add_argument("--case", required=True)
     cp.add_argument("--scan", type=Path, default=None, help="scan-plan output (default data/crack_trace/scan.json)")
@@ -605,7 +894,10 @@ def build_parser() -> argparse.ArgumentParser:
     pp.add_argument("--out", type=Path)
     mr = sub.add_parser("make-replay", help="render a printed crack photo under the scan pose (offline testing)")
     mr.add_argument("--image", required=True, type=Path)
-    mr.add_argument("--scan", required=True, type=Path)
+    mr.add_argument("--scan", type=Path, default=None, help="render the view at this scan pose")
+    mr.add_argument("--search", type=Path, default=None, help="or: one recording per stop of this search plan")
+    mr.add_argument("--print-center", nargs=3, type=float, default=None, metavar=("X", "Y", "Z"),
+                    help="where the print lies on the table (default: the scan target; with --search 0.30 0 0)")
     mr.add_argument("--like", required=True, type=Path, help="a real D405 recording: intrinsics and depth scale")
     mr.add_argument("--print-width-m", type=float, default=0.20)
     mr.add_argument("--frames", type=int, default=10)
@@ -626,7 +918,10 @@ def main(argv: list[str] | None = None) -> int:
     log = setup_logging("crack_trace", cfg, verbose=args.verbose, quiet=args.quiet)
     if args.cmd == "capture" and args.scan is None:
         args.scan = trace_dir(cfg.root) / "scan.json"
-    return {"scan-plan": cmd_scan_plan, "capture": cmd_capture, "plan": cmd_plan, "check": cmd_check,
+    if args.cmd == "search-capture" and args.search is None:
+        args.search = trace_dir(cfg.root) / "search.json"
+    return {"scan-plan": cmd_scan_plan, "search-plan": cmd_search_plan, "search-capture": cmd_search_capture,
+            "capture": cmd_capture, "plan": cmd_plan, "check": cmd_check,
             "make-replay": cmd_make_replay}[args.cmd](
         cfg, args, log)
 

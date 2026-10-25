@@ -131,3 +131,64 @@ def test_project_inverts_a_pinhole():
     intr = {"fx": 400.0, "fy": 400.0, "ppx": 320.0, "ppy": 240.0}
     uv = ct.project(T, intr, np.array([[0.1, -0.05, 0.5]]))
     np.testing.assert_allclose(uv[0], [320 + 400 * 0.2, 240 - 400 * 0.1])
+
+
+def test_locate_crack_lifts_the_centroid_with_the_surface_depth_and_the_pose():
+    h, w = 480, 848
+    mask = np.zeros((h, w), np.uint8)
+    mask[200:204, 300:500] = 1                                   # a 200 x 4 px crack, centred at (399.5, 201.5)
+    depth = np.full((h, w), 2500, np.uint16)                     # 0.25 m at 1e-4 m / unit
+    T = np.eye(4)
+    T[:3, 3] = [0.3, 0.0, 0.25]
+    T[:3, :3] = np.array([[0, -1, 0], [-1, 0, 0], [0, 0, -1.0]])   # optical z looks down
+    intr = {"fx": 436.0, "fy": 436.0, "ppx": 424.0, "ppy": 240.0}
+    r = ct.locate_crack(mask, depth, 1e-4, intr, T)
+    assert r["depth_m"] == pytest.approx(0.25)
+    u, v = 399.5, 201.5
+    expect = T @ np.array([(u - 424) / 436 * 0.25, (v - 240) / 436 * 0.25, 0.25, 1.0])
+    np.testing.assert_allclose(r["target_base_m"], expect[:3].round(4), atol=1e-4)
+    assert abs(r["target_base_m"][2]) < 1e-3 and not r["touches_border"]
+    assert r["extent_base_m"] == pytest.approx(200 / 436 * 0.25, rel=0.02)
+
+
+def test_locate_crack_flags_the_border_and_refuses_tiny_or_depthless_cracks():
+    h, w = 480, 848
+    depth = np.full((h, w), 2500, np.uint16)
+    intr = {"fx": 436.0, "fy": 436.0, "ppx": 424.0, "ppy": 240.0}
+    edge = np.zeros((h, w), np.uint8)
+    edge[200:204, 0:200] = 1
+    assert ct.locate_crack(edge, depth, 1e-4, intr, np.eye(4))["touches_border"]
+    tiny = np.zeros((h, w), np.uint8)
+    tiny[200:202, 300:310] = 1
+    assert ct.locate_crack(tiny, depth, 1e-4, intr, np.eye(4)) is None
+    mid = np.zeros((h, w), np.uint8)
+    mid[200:204, 300:500] = 1
+    assert ct.locate_crack(mid, np.zeros((h, w), np.uint16), 1e-4, intr, np.eye(4)) is None
+
+
+def test_plan_search_stops_are_continuous_clear_and_rest_where_they_say():
+    t, q, stops = ct.plan_search([0.26, 0.36], [-0.15, 0.0, 0.15], 0.25, 3.0)
+    assert len(stops) == 6
+    assert np.all(np.diff(t) > 0)
+    v = np.abs(np.diff(q, axis=0)) / np.diff(t)[:, None]
+    assert (v <= 0.6 * np.array([0.6, 0.6, 0.6, 1.2, 1.2, 1.2]) + 1e-6).all()
+    assert np.abs(np.diff(q, axis=0)).max() < 0.1               # no jump between samples (the stop pose = leg arrival)
+    for s in stops:
+        i = np.searchsorted(t, 0.5 * (s["t0"] + s["t1"]))
+        np.testing.assert_allclose(q[i], s["q"], atol=1e-9)     # at rest at the stop's pose for the whole dwell
+        assert s["t1"] - s["t0"] == pytest.approx(3.0, abs=0.06)
+
+
+def test_plan_search_refuses_an_unreachable_area():
+    with pytest.raises(ct.IKError, match="reachable"):
+        ct.plan_search([1.2, 1.4], [0.0, 0.1], 0.25, 2.0)
+
+
+def test_render_view_puts_the_print_on_the_plane_with_exact_depth():
+    ik = ArmIK()
+    q, _ = ct.scan_pose(np.array([0.30, 0.0, 0.0]), np.array([0, 0, 1.0]), 0.25, ik)
+    ci = {"width": 848, "height": 480, "fx": 436.0, "fy": 436.0, "ppx": 424.0, "ppy": 240.0}
+    photo = np.full((100, 200, 3), 50, np.uint8)
+    rgb, depth, cov = ct.render_view(photo, q, ci, 1e-4, np.array([0.30, 0.0, 0.0]), np.array([0, 0, 1.0]), 0.20, ik)
+    assert 0.1 < cov < 0.3 and rgb.shape == (480, 848, 3)
+    assert abs(int(depth[240, 424]) * 1e-4 - 0.25) < 0.01

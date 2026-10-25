@@ -61,7 +61,16 @@ J2/J3 wobble seen on 2026-10-22. Whether kd 4 becomes the default is still the o
 ## 2. Camera → crack → trace
 
 ```
-scan-plan   IK: camera 25 cm above the target (default table x=0.30, y=0), looking straight down
+search-plan IK: the camera, looking straight down, visits 6 stops over the table (base x 0.26/0.36, y -0.15/0/0.15,
+            25 cm up, 3 s rest each; ~34 s). Each stop is IK-solved for the camera, and the sweep is rejected if the
+            camera housing or mount would come within 3 cm of the table anywhere, including the runner's move from
+            the fold and back. Stops that cannot be reached are dropped (fewer than 2 left = refused). Rehearsed.
+search CASE ARM + CAMERA. run-trajectory.sh plays the sweep while crack_trace search-capture waits at every stop for
+            the arm to rest, grabs a burst, runs the crack model on the sharpest frame, and lifts the crack's centroid
+            to base_link (surface depth from a ring around the crack, plus the measured pose). The best stop is the
+            biggest crack that does not touch the image edge. Result: data/crack_trace/CASE_search/search_result.json
+            with per-stop overlays.
+scan-plan   (--from-search CASE centres it on that crack.) IK: camera 25 cm above the target (default table x=0.30, y=0), looking straight down
             -> data/crack_trace/scan.json (holds that pose 15 s), rehearsed
 scan CASE   ARM + CAMERA. run-trajectory.sh drives the arm to the scan pose, with demo_move.py --state-file
             publishing the measured pose. Meanwhile crack_trace capture waits until the arm has rested at the scan
@@ -75,7 +84,9 @@ trace CASE  ARM. run-trajectory.sh plays the trace.
 ```
 
 ```bash
-bash scripts/crack_pipeline.sh scan-plan                 # once per target position
+bash scripts/crack_pipeline.sh search-plan               # once
+bash scripts/crack_pipeline.sh search crack01 2          # arm + camera: the camera looks down over the table (half speed)
+bash scripts/crack_pipeline.sh scan-plan --from-search crack01   # scan pose centred on what it found
 bash scripts/crack_pipeline.sh scan  crack01             # arm + camera (Enter at the fold, as usual)
 bash scripts/crack_pipeline.sh plan  crack01             # then LOOK at data/crack_trace/crack01_trace_preview.png
 bash scripts/crack_pipeline.sh trace crack01 2           # arm, half speed
@@ -128,6 +139,31 @@ atomic replace. The file holds physical joint angles (the J1 reference is remove
 (approach/trajectory/return), the velocities and the wall time. The option only adds output: a write error stops the
 publishing, never the run. A stale file is deleted before the run starts. Snapshot:
 [evidence/operator/rebot_setup_runner_2026-10-23](../../evidence/operator/rebot_setup_runner_2026-10-23/README.md).
+
+### What "physically can't" is checked against
+
+Every trajectory the pipeline writes is refused unless all of these hold; the runner's own path check and the guard's
+pre-flight then check it again:
+- every point is reachable by IK (position and pointing within tolerance), 0.05 rad inside the URDF joint limits;
+- no jump between neighbouring joint solutions (a branch change);
+- gripper_link at least 13.5 cm above the base plane (the guard's floor is 12 cm), and each tilt/hover candidate is
+  followed through approach, trace and retract;
+- **the D405 housing and its mount, and the arm's gripper boxes, at least 3 cm above the table over the whole run**,
+  including the runner's min-jerk move from the fold to the first point and back (`arm_ik.check_motion_clearance`);
+- joint peak speeds at most 60 % of the runner's caps; the runner and the guard pre-flight, with the real guard config,
+  then accept every command cycle.
+
+The scan pose clears the table by at least 209 mm at the camera and mount.
+
+### The search, verified offline (2026-10-23)
+
+`scripts/crack_pipeline.sh demo` (2 min 44 s) hides crack print #1 at (0.34, -0.12), off-centre. The sweep is rehearsed
+at x1 and x2; the model runs at every stop (all six see it); the best stop (0) puts the crack at (0.337, -0.114),
+within 6 mm; the scan re-centres on it (J1 -0.34 rad); the scan is captured; the trace is planned (209 mm, hover
+13.9 cm); both rehearsals complete with no guard fault. A joint discontinuity found on the way (the roll about the
+optical axis is free, so a separately solved stop pose differed by 0.04 rad from where the leg arrived; J6 would have
+needed 0.86 rad/s) is fixed by resting each stop at its leg's arrival pose. The camera's footprint at 25 cm is about
+49 x 27 cm of table.
 
 ### Before the first real crack run
 

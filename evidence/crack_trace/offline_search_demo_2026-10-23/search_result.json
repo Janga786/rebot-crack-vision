@@ -1,0 +1,168 @@
+{
+  "schema": "crackvision.crack_search/1",
+  "case": "demo_20261023T211207Z_s",
+  "stops_planned": 6,
+  "stops_done": 6,
+  "found": true,
+  "results": [
+    {
+      "stop": 0,
+      "camera_m": [
+        0.26,
+        -0.15,
+        0.25
+      ],
+      "crack_px": 1871,
+      "located": {
+        "crack_px": 1871,
+        "centroid_px": [
+          287.7,
+          180.4
+        ],
+        "depth_m": 0.25,
+        "target_base_m": [
+          0.3367,
+          -0.1141,
+          -0.0
+        ],
+        "touches_border": false,
+        "extent_base_m": 0.203
+      }
+    },
+    {
+      "stop": 1,
+      "camera_m": [
+        0.26,
+        0.0,
+        0.25
+      ],
+      "crack_px": 1905,
+      "located": {
+        "crack_px": 1905,
+        "centroid_px": [
+          584.3,
+          104.0
+        ],
+        "depth_m": 0.25,
+        "target_base_m": [
+          0.3397,
+          -0.0977,
+          -0.0
+        ],
+        "touches_border": true,
+        "extent_base_m": 0.463
+      }
+    },
+    {
+      "stop": 2,
+      "camera_m": [
+        0.26,
+        0.15,
+        0.25
+      ],
+      "crack_px": 1367,
+      "located": {
+        "crack_px": 1367,
+        "centroid_px": [
+          762.4,
+          299.5
+        ],
+        "depth_m": 0.25,
+        "target_base_m": [
+          0.3411,
+          -0.0319,
+          -0.0
+        ],
+        "touches_border": true,
+        "extent_base_m": 0.525
+      }
+    },
+    {
+      "stop": 3,
+      "camera_m": [
+        0.36,
+        0.15,
+        0.25
+      ],
+      "crack_px": 1568,
+      "located": {
+        "crack_px": 1568,
+        "centroid_px": [
+          741.4,
+          411.1
+        ],
+        "depth_m": 0.25,
+        "target_base_m": [
+          0.3449,
+          -0.0565,
+          -0.0
+        ],
+        "touches_border": true,
+        "extent_base_m": 0.558
+      }
+    },
+    {
+      "stop": 4,
+      "camera_m": [
+        0.36,
+        0.0,
+        0.25
+      ],
+      "crack_px": 1915,
+      "located": {
+        "crack_px": 1915,
+        "centroid_px": [
+          589.3,
+          270.9
+        ],
+        "depth_m": 0.25,
+        "target_base_m": [
+          0.3431,
+          -0.0971,
+          0.0
+        ],
+        "touches_border": true,
+        "extent_base_m": 0.492
+      }
+    },
+    {
+      "stop": 5,
+      "camera_m": [
+        0.36,
+        -0.15,
+        0.25
+      ],
+      "crack_px": 1910,
+      "located": {
+        "crack_px": 1910,
+        "centroid_px": [
+          373.8,
+          302.5
+        ],
+        "depth_m": 0.25,
+        "target_base_m": [
+          0.3444,
+          -0.1128,
+          -0.0
+        ],
+        "touches_border": true,
+        "extent_base_m": 0.386
+      }
+    }
+  ],
+  "best_stop": 0,
+  "target_base_m": [
+    0.3367,
+    -0.1141,
+    -0.0
+  ],
+  "normal_base": [
+    0.0,
+    0.0,
+    1.0
+  ],
+  "crack_px": 1871,
+  "extent_base_m": 0.203,
+  "touches_border": false,
+  "note": "target = crack centroid lifted with the surface depth around it and the measured pose; the surface is assumed horizontal (table)"
+}
