@@ -105,7 +105,7 @@ fit has R² 0.41; the real arm's is 0.9.
   with the A/B overrides are therefore tests calling the runner in-process with the `--rehearse` arguments:
   `test_j4_tune_rehearsals_with_the_ab_overrides_pass_the_guard` (C: `--friction j4=0.18 --gains j4=40/3`, D:
   `--friction j4=0.18 --gains j4=50/3`, and `--gains j4=50/3` alone), plus a one-off in-process rehearsal with
-  `--friction j4=0.3` (the what-if check of §2): all completed, guard pre-flight clean, no guard fault.
+  `--friction j4=0.3` (the what-if check of §2): all completed, guard pre-flight clean, no guard fault. **Fixed 2026-10-29 (after this was written): the wrapper's rehearse branch now passes `${DEMO_EXTRA:-}`; backup in `~/rebot_setup/backup_pre_rehearse_extra_2026-10-29/`, verified with `DEMO_EXTRA="--friction j4=0.18 --gains j4=40/3" … --rehearse j4_tune.json 2` (summary shows both overrides).**
 
 ## 4. The trajectory (`~/rebot_setup/trajectories/j4_tune.json`)
 
@@ -148,8 +148,15 @@ Wrist only (J1/J5/J6 at 0, J2/J3 held) at two poses; **186.6 s at x1** (2565 poi
 
 ## 5. Predictions, written before any arm run
 
-A … E are the runs of §6. Windows are file seconds (the tool multiplies by the run's slow from its summary).
-"rms" is the tool's (standard deviation about the mean). Tolerances are stated so each line can fail.
+A … E are the runs of §6. Windows (`--seg1-window T0:T1`) are seconds of trajectory-file time **from the start of
+the trajectory segment** (the tool multiplies by the run's slow from its summary). The tool finds that segment by its
+kind from the run summary's `path_kinds` (demo_move.py 2026-10-29.3+), not by its number: j4_tune.json starts and ends
+at the fold, so with `--j1-here-is-zero` (after a power cycle) the zero-length approach and return are dropped and the
+trajectory is segment 0; with the saved J1 reference it usually has a short approach and is segment 1. Either way the
+windows below and `--compare` refer to the same part of the file. "rms" is the tool's (standard deviation about the
+mean). Tolerances are stated so each line can fail. **Keep every run's `.json` next to its `.csv` and do not rename
+either:** without it the tool assumes slow 1, the tuned kp / Coulomb values and segment 1 (a loud WARNING, and the
+output is marked), which would put every window in the wrong place for an x2 run.
 
 | # | prediction | falsified if | check |
 |---|---|---|---|
@@ -164,6 +171,9 @@ are then compared against GRAVITY_MODEL's predictions instead.)
 
 ## 6. Operator A/B (never auto-run; each run on its own go; `--check` first, x2 first, then x1 if x2 was clean)
 
+Keep each run's `RUN.json` next to its `RUN.csv` in `~/rebot_setup/runs/` (do not rename or move one without the other):
+§5's checks read the slow, the overrides and the segment kinds from it.
+
 | run | command (x2; repeat with `1` for x1) | purpose |
 |---|---|---|
 | A | `~/rebot_setup/run-trajectory.sh --check ~/rebot_setup/trajectories/j4_tune.json 2` then `~/rebot_setup/run-trajectory.sh ~/rebot_setup/trajectories/j4_tune.json 2` | baseline on the new trajectory (kp 40 / kd 1 / Coulomb 0.5) |
@@ -173,7 +183,7 @@ are then compared against GRAVITY_MODEL's predictions instead.)
 | E | `DEMO_EXTRA="--gains j2=100/4,j3=80/4,j4=KP/KD --ff-bias j2=1.4,j3=-0.6,j4=-0.2 --friction j4=0.18" ~/rebot_setup/run-trajectory.sh [--check] ~/rebot_setup/trajectories/fancy/heart.json 2` with KP/KD = the best of B-D (40/1 if B won) | the real shape, apples to apples with heart_20261025T214843Z (P5) |
 | E' (later) | as E with `--gravity-model $HOME/Projects/rebot_crack_vision/config/robot/gravity_model.yaml` instead of `--ff-bias`, once the survey has been run and the model refitted (GRAVITY_MODEL §9) | friction + gravity together |
 
-- Rehearsing these: `run-trajectory.sh --rehearse` **ignores DEMO_EXTRA** (§3); the in-process test covers C and D.
+- Rehearsing these: `run-trajectory.sh --rehearse` **ignores DEMO_EXTRA** (§3); the in-process test covers C and D. **Fixed 2026-10-29 (after this was written): the wrapper's rehearse branch now passes `${DEMO_EXTRA:-}`; backup in `~/rebot_setup/backup_pre_rehearse_extra_2026-10-29/`, verified with `DEMO_EXTRA="--friction j4=0.18 --gains j4=40/3" … --rehearse j4_tune.json 2` (summary shows both overrides).**
 - The crack pose (J2/J3 −1.25) has not been visited by the arm yet; watch J2 there (up to ~37 mrad of sag predicted if
   the extrapolated model is right; tracking abort 100 mrad → a slow park). If the survey has run first, its log at the
   −1.25/−1.25 pose answers this.
@@ -195,7 +205,7 @@ are then compared against GRAVITY_MODEL's predictions instead.)
 - If P1 shows the crack pose's friction differs from the heart pose's, whether to make the Coulomb term pose- or
   load-dependent (a runner change) or pick the crack workspace's value.
 - The wrapper's rehearse branch could pass `${DEMO_EXTRA:-}` (one line; GRAVITY_MODEL §7 raised it too); not done here
-  (the wrapper was not to be edited).
+  (the wrapper was not to be edited). **Fixed 2026-10-29 (after this was written): the wrapper's rehearse branch now passes `${DEMO_EXTRA:-}`; backup in `~/rebot_setup/backup_pre_rehearse_extra_2026-10-29/`, verified with `DEMO_EXTRA="--friction j4=0.18 --gains j4=40/3" … --rehearse j4_tune.json 2` (summary shows both overrides).**
 
 ## 9. Reproduce
 

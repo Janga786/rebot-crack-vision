@@ -282,14 +282,22 @@ def _short_capture(cfg: Config, out_dir: Path, n: int = 30) -> dict:
     cp.write_recording(info, frames, out_dir)
     v = cp.validate(out_dir)
     scale = float(info["depth_scale_m_per_unit"])
-    d = frames[len(frames) // 2].depth_u16
-    z = float(np.median(d[d > 0])) * scale if (d > 0).any() else None
+    z, valid = scene_depth_m([f.depth_u16 for f in frames], scale)
     return {"frames": len(frames), "seconds": round(secs, 2), "fps": round(cp.measured_fps(frames), 2),
             "resolution": f"{w}x{h}@{fps}", "validation": v["status"],
             "validation_problems": [f"{c['status']} {c['name']}: {c['value']}" for c in v["checks"]
                                     if c["status"] != "PASS"],
             "median_depth_m": None if z is None else round(z, 3),
-            "valid_depth_fraction": round(float((d > 0).mean()), 3), "recording": str(out_dir)}
+            "valid_depth_fraction": round(valid, 3), "recording": str(out_dir)}
+
+
+def scene_depth_m(depths: list, scale: float) -> tuple[float | None, float]:
+    """(camera-to-scene distance in m = the median of the per-frame medians of the valid depth, over the frames that
+    have any; None when no frame has depth) and the mean valid-depth fraction over all frames. Every frame counts:
+    one all-zero frame (e.g. the middle one) no longer reads as 'no depth' when the other 29 are fine."""
+    meds = [float(np.median(d[d > 0])) * scale for d in depths if (d > 0).any()]
+    valid = float(np.mean([(d > 0).mean() for d in depths])) if depths else 0.0
+    return (float(np.median(meds)) if meds else None), valid
 
 
 def check_env(ctx: PreflightCtx) -> list[Check]:
@@ -499,6 +507,9 @@ def check_d405(ctx: PreflightCtx) -> tuple[Check, bool]:
                  f"(5.17 not needed for this run)", **data), True
 
 
+D405_RANGE_M = (0.07, 0.50)   # the D405's working range (short-range camera): outside it depth is mostly invalid by design
+
+
 def check_d405_capture(ctx: PreflightCtx) -> Check:
     out = ctx.root / "data" / "recordings" / f"preflight_{ctx.stamp}"
     try:
@@ -509,9 +520,25 @@ def check_d405_capture(ctx: PreflightCtx) -> Check:
     z = r.get("median_depth_m")
     reason = (f"{r['frames']} frames {r.get('resolution', '')}, {r['fps']:.1f} fps, validate_recording "
               f"{r['validation']}; scene at {'%.0f cm' % (100 * z) if z else 'no depth'}")
+    problems = list(r.get("validation_problems", []))
     if r["validation"] == "FAIL":
-        return _fail("D405 capture", reason + ": " + "; ".join(r.get("validation_problems", []))[:200],
-                     "./env.sh python scripts/camera.py check (USB 3 port, cable)", **r)
+        names = [str(pr).split(None, 1)[-1] if str(pr).startswith(("FAIL ", "WARN ")) else str(pr) for pr in problems]
+        depth_only = bool(names) and all(nm.startswith(("invalid_depth", "depth")) for nm in names)
+        lo, hi = D405_RANGE_M
+        out_of_range = z is None or z < lo or z > hi
+        if depth_only and out_of_range and r.get("fps", 0.0) >= 20.0:
+            # the link streams fine; the depth is invalid because the D405 (working range ~7-50 cm) is looking at
+            # something too close, too far, or at a dark room: a desk-scene condition, not a camera fault
+            why = ("no depth at all: dark scene, or nothing in range" if z is None else
+                   f"too close: {100 * z:.0f} cm < {100 * lo:.0f} cm" if z < lo else
+                   f"too far: {100 * z:.0f} cm > {100 * hi:.0f} cm")
+            return _warn("D405 capture", reason + f" ({why}, outside the D405 range): " + "; ".join(problems)[:200],
+                         "point the camera at a surface 20-50 cm away (the print, your hand) in normal light and "
+                         "run preflight again; at the arm the table is in range", **r)
+        return _fail("D405 capture", reason + ": " + "; ".join(problems)[:200],
+                     "./env.sh python scripts/camera.py check (USB 3 port, cable)"
+                     + ("; the scene is in range, so the invalid depth is not the desk scene" if depth_only
+                        and not out_of_range else ""), **r)
     if r["validation"] == "WARN":
         return _warn("D405 capture", reason + ": " + "; ".join(r.get("validation_problems", []))[:200],
                      "see the validator's hints: ./env.sh python scripts/validate_recording.py " + str(out), **r)
@@ -986,11 +1013,23 @@ class SessionIO:
             self.camera_holders = lambda: device_holders(d405_nodes())
 
 
+def flush_tty_input() -> None:
+    """Drop anything typed ahead on the terminal (e.g. a second Enter after 'yes') so it never reaches the runner's
+    hold prompt as a go. No-op when stdin is not a terminal (tests, pipes)."""
+    try:
+        import termios
+        if sys.stdin is not None and sys.stdin.isatty():
+            termios.tcflush(sys.stdin.fileno(), termios.TCIFLUSH)
+    except (ImportError, OSError, ValueError, AttributeError):
+        pass
+
+
 def run_interactive(cmd: list[str], env: dict) -> int:
     """Run with the terminal handed over. Ctrl-C goes to the child (run-trajectory.sh parks the arm); this process
-    only waits, and never kills the child."""
+    only waits, and never kills the child. Pending terminal input is flushed first (flush_tty_input)."""
     old = signal.signal(signal.SIGINT, lambda *_: None)
     try:
+        flush_tty_input()
         p = subprocess.Popen(cmd, env=env)
         while True:
             try:
@@ -1003,6 +1042,17 @@ def run_interactive(cmd: list[str], env: dict) -> int:
 
 def _write_session(path: Path, doc: dict) -> None:
     path.write_text(json.dumps(doc, indent=1, default=str) + "\n")
+
+
+def merge_demo_extra(extra: str | None) -> str:
+    """The runner extras for a session. Unset -> the kd 4 default. Set without --gains -> the default gains are
+    prepended (the runner would otherwise replace them: DEMO_EXTRA is one word-split string, not merged). Set with
+    --gains -> exactly as given. Set to empty -> empty (the stock tuned gains, an explicit opt-out)."""
+    if extra is None:
+        return DEFAULT_DEMO_EXTRA
+    if not extra.strip() or any(w == "--gains" or w.startswith("--gains=") for w in extra.split()):
+        return extra
+    return f"{DEFAULT_DEMO_EXTRA} {extra.strip()}"
 
 
 def run_session(root: Path, case: str, slow: str, io: SessionIO, *, runner: Path | None = None,
@@ -1034,8 +1084,7 @@ def run_session(root: Path, case: str, slow: str, io: SessionIO, *, runner: Path
     if not pf.get("camera_checked", True) or not pf.get("rehearsed", True):
         say("session: the last preflight skipped the camera or the rehearsals. Run the full preflight.")
         return EXIT_PRECONDITION
-    if "DEMO_EXTRA" not in env:
-        env["DEMO_EXTRA"] = DEFAULT_DEMO_EXTRA
+    env["DEMO_EXTRA"] = merge_demo_extra(env.get("DEMO_EXTRA"))
     pipeline = [str(root / "scripts" / "crack_pipeline.sh")]
     out = trace_dir(root)
     out.mkdir(parents=True, exist_ok=True)
@@ -1046,7 +1095,12 @@ def run_session(root: Path, case: str, slow: str, io: SessionIO, *, runner: Path
     _write_session(spath, doc)
     say(f"session {case}: search -> scan-plan -> scan -> plan -> trace at 1/{slow} speed; runner extras "
         f"DEMO_EXTRA=\"{env['DEMO_EXTRA']}\"" + (" (default kd 4 override)" if env["DEMO_EXTRA"] == DEFAULT_DEMO_EXTRA
-                                                 else " (yours)"))
+                                                 else " (yours, default gains prepended)" if
+                                                 env["DEMO_EXTRA"].startswith(DEFAULT_DEMO_EXTRA + " ") else " (yours)"))
+    if any(w == "--ff-bias" or w.startswith("--ff-bias=") for w in env["DEMO_EXTRA"].split()):
+        say("WARNING: DEMO_EXTRA has --ff-bias: the bias keeps J2 moving above the capture's settle limit "
+            "(|v| < 0.05 rad/s), so search/scan captures may never settle. Not recommended for the session "
+            "(docs/motion/FIRST_CRACK_RUN.md).")
     say(f"preflight: {pf_path.name}, {pf['verdict']}, {age_h:.1f} h old"
         + (f", WARN: {', '.join(pf.get('warns', []))}" if pf.get("warns") else ""))
     say("Before the first arm step: 24 V on, USB2CAN plugged in, the read-only check passed "
@@ -1087,6 +1141,7 @@ def run_session(root: Path, case: str, slow: str, io: SessionIO, *, runner: Path
                 return finish(f"camera_busy_before_{step.key}", EXIT_PRECONDITION)
         t0 = io.now()
         rec: dict[str, Any] = {"step": step.key, "argv": step.argv, "started_utc": _utc_iso(), "started_unix": t0}
+        flush_tty_input()                  # typed-ahead input never reaches the runner's hold prompt
         rc = io.run(["bash", *pipeline, *step.argv], env)
         rec |= {"rc": rc, "ended_utc": _utc_iso()}
         problem = None

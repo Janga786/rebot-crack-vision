@@ -253,6 +253,54 @@ def load_model(path: Path | str = DEFAULT_MODEL, urdf: Path | str | None = None)
     return doc
 
 
+def runner_problems(doc: dict, urdf: Path | str | None = None) -> list[str]:
+    """Every reason ~/rebot_setup/demo_move.py's load_gravity_model would refuse this model document (a replica of its
+    checks, 2026-10-29.3): schema; urdf.sha256 = the runner's URDF (DEFAULT_URDF, the same file); 1..20 bodies, each
+    {link str, xyz 3 finite numbers with |xyz| <= 1 m, kg finite in [-0.5, 2]}, no duplicate (link, xyz), on a moving
+    link of the URDF; total extra mass <= 5 kg; scale a non-empty map of some of j2..j6 to finite numbers in 0..1.5;
+    the model evaluates to finite torques. [] = the runner would accept it."""
+    out: list[str] = []
+    num = lambda v: isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v)
+    if not isinstance(doc, dict) or doc.get("schema") != SCHEMA:
+        return [f"schema {doc.get('schema') if isinstance(doc, dict) else None!r} != {SCHEMA!r}"]
+    urdf = Path(urdf) if urdf is not None else DEFAULT_URDF
+    want = (doc.get("urdf") or {}).get("sha256")
+    if want != file_sha256(urdf):
+        out.append(f"urdf.sha256 {str(want)[:16]}... is not the runner's URDF {file_sha256(urdf)[:16]}...")
+    bodies = doc.get("bodies")
+    if not isinstance(bodies, list) or not 1 <= len(bodies) <= 20:
+        return out + ["bodies must be a list of 1..20 point masses"]
+    ug = UrdfGravity(urdf)
+    moving = set().union(*ug.distal.values())
+    seen, total, extra = set(), 0.0, []
+    for b in bodies:
+        link, xyz, kg = (b.get("link"), b.get("xyz"), b.get("kg")) if isinstance(b, dict) else (None, None, None)
+        if not (isinstance(link, str) and isinstance(xyz, list) and len(xyz) == 3 and all(num(v) for v in xyz + [kg])):
+            out.append(f"bad body {b!r}")
+            continue
+        if max(abs(v) for v in xyz) > 1.0 or not -0.5 <= kg <= 2.0:
+            out.append(f"body {b!r}: |xyz| must be <= 1 m and kg in [-0.5, 2] (the runner refuses it)")
+        key = (link, tuple(float(v) for v in xyz))
+        if key in seen:
+            out.append(f"duplicate body {b!r}")
+        seen.add(key)
+        if link not in moving:
+            out.append(f"body on {link!r}, which is not a moving link of the URDF")
+        total += float(kg)
+        extra.append((link, key[1], float(kg)))
+    if total > 5.0:
+        out.append(f"{total:.2f} kg of extra mass > 5 kg")
+    scale = doc.get("scale")
+    if not isinstance(scale, dict) or not scale or any(k not in ARM[1:] or not num(v) or not 0.0 <= v <= 1.5
+                                                       for k, v in scale.items()):
+        out.append(f"scale must map some of j2..j6 to 0..1.5, got {scale!r}")
+    if not out:
+        g = ug.hold_torques(np.zeros((1, 6)), extra)
+        if not np.all(np.isfinite(g)):
+            out.append("the model does not evaluate")
+    return out
+
+
 def extra_bodies(doc: dict) -> list[tuple[str, tuple[float, float, float], float]]:
     return [(b["link"], tuple(float(v) for v in b["xyz"]), float(b["kg"])) for b in doc["bodies"]]
 

@@ -217,6 +217,25 @@ def test_camera_rows(tmp_path):
     bad = make_ctx(tmp_path, capture=lambda out: {"frames": 30, "fps": 12.0, "validation": "FAIL",
                                                   "validation_problems": ["FAIL dropped_frames: 40"]})
     assert fr.check_d405_capture(bad).status == "FAIL"
+    far = make_ctx(tmp_path, capture=lambda out: {"frames": 30, "fps": 30.0, "validation": "FAIL", "median_depth_m": 1.51,
+                                                  "validation_problems": ["FAIL invalid_depth_fraction: mean=79.9%"]})
+    row = fr.check_d405_capture(far)          # a far / dark desk scene is not a camera fault
+    assert row.status == "WARN" and "20-50 cm" in row.fix
+    near_bad = make_ctx(tmp_path, capture=lambda out: {"frames": 30, "fps": 30.0, "validation": "FAIL", "median_depth_m": 0.3,
+                                                       "validation_problems": ["FAIL invalid_depth_fraction: mean=79.9%"]})
+    assert fr.check_d405_capture(near_bad).status == "FAIL"   # in range and still no depth: a real problem
+    def cap(z, fps=30.0):
+        return make_ctx(tmp_path, capture=lambda out: {"frames": 30, "fps": fps, "validation": "FAIL", "median_depth_m": z,
+                                                       "validation_problems": ["FAIL invalid_depth_fraction: mean=85%"]})
+    row = fr.check_d405_capture(cap(0.55))                    # audit 2026-10-29 item 8: 55 cm is beyond the D405 range
+    assert row.status == "WARN" and "too far" in row.reason and "20-50 cm" in row.fix
+    row = fr.check_d405_capture(cap(0.04))                    # face down on the desk: a scene hint, not a cable hint
+    assert row.status == "WARN" and "too close" in row.reason and "cable" not in row.fix
+    row = fr.check_d405_capture(cap(None))
+    assert row.status == "WARN" and "no depth" in row.reason
+    row = fr.check_d405_capture(cap(0.30))                    # in range and invalid: a real problem
+    assert row.status == "FAIL" and "not the desk scene" in row.fix
+    assert fr.check_d405_capture(cap(0.55, fps=12.0)).status == "FAIL"   # the link does not stream: not the scene
     boom = make_ctx(tmp_path, capture=lambda out: (_ for _ in ()).throw(RuntimeError("Frame didn't arrive")))
     assert fr.check_d405_capture(boom).status == "FAIL"
     nocam = make_ctx(tmp_path, camera=False)
@@ -488,6 +507,22 @@ def test_session_keeps_the_operators_demo_extra_even_when_empty(tmp_path):
     assert pipe2.calls[0][2] == "--gains j4=40/3"
 
 
+def test_session_merges_the_default_gains_into_an_extra_without_gains(tmp_path):
+    """audit 2026-10-29 item 9: DEMO_EXTRA replaces the runner's default, so a session extra without --gains would
+    silently drop kd 4; the default gains are prepended."""
+    _, term, pipe, _ = run_session(tmp_path, ["yes"], env={"DEMO_EXTRA": "--friction j4=0.18"})
+    assert pipe.calls[0][2] == fr.DEFAULT_DEMO_EXTRA + " --friction j4=0.18"
+    assert any("default gains prepended" in ln for ln in term.said)
+    assert fr.merge_demo_extra(None) == fr.DEFAULT_DEMO_EXTRA
+    assert fr.merge_demo_extra("") == ""                                   # explicit opt-out: stock gains
+    assert fr.merge_demo_extra("--gains=j2=100/2 --friction j4=0.2") == "--gains=j2=100/2 --friction j4=0.2"
+
+
+def test_session_warns_about_ff_bias(tmp_path):
+    _, term, _, _ = run_session(tmp_path, ["no"], env={"DEMO_EXTRA": "--ff-bias j2=1.4"})
+    assert any("--ff-bias" in ln and "WARNING" in ln for ln in term.said)
+
+
 def test_session_stops_without_yes(tmp_path):
     rc, term, pipe, root = run_session(tmp_path, ["yes", "no"])
     assert rc == 0 and [c[0] for c in pipe.calls] == ["search"]
@@ -682,9 +717,43 @@ def test_crack_pipeline_script_parses_and_dispatches_the_new_commands():
     assert "set -uo pipefail" not in usage.stdout
 
 
+@pytest.mark.parametrize("sub", ["search", "scan"])
+@pytest.mark.parametrize("rrc,crc,want", [(0, 0, 0), (3, 0, 3), (1, 0, 1), (0, 5, 5), (3, 5, 3)])
+def test_search_and_scan_exit_with_the_arm_runs_code_even_when_the_capture_succeeded(tmp_path, sub, rrc, crc, want):
+    """audit 2 item 5: a failed arm run (runner exit != 0) fails search/scan even when the capture exited 0; the
+    "next:" hint only on success. A copy of the script in a stand-in repo: env.sh = the capture, a stub runner."""
+    repo, runner = tmp_path / "repo", tmp_path / "runner"
+    (repo / "scripts").mkdir(parents=True)
+    (repo / "data" / "crack_trace").mkdir(parents=True)
+    (runner / "runs").mkdir(parents=True)
+    script = repo / "scripts" / "crack_pipeline.sh"
+    script.write_text((REPO / "scripts" / "crack_pipeline.sh").read_text())
+    (repo / "env.sh").write_text(f"#!/usr/bin/env bash\necho 'search: stub capture'\nexit {crc}\n")
+    (runner / "run-trajectory.sh").write_text(f"#!/usr/bin/env bash\necho \"stub runner $*\"\nexit {rrc}\n")
+    for f in (repo / "env.sh", runner / "run-trajectory.sh"):
+        f.chmod(0o755)
+    (repo / "data" / "crack_trace" / ("search.json" if sub == "search" else "scan.json")).write_text("{}")
+    env = {k: v for k, v in os.environ.items() if k != "DEMO_EXTRA"} | {"REBOT_RUNNER": str(runner)}
+    r = subprocess.run(["bash", str(script), sub, "case1", "2"], capture_output=True, text=True, env=env, timeout=60)
+    assert r.returncode == want, r.stdout + r.stderr
+    assert ("next:" in r.stdout) == (want == 0), r.stdout
+    assert ("the arm run ended with exit" in r.stdout) == (rrc != 0), r.stdout
+
+
 def test_cli_parser():
     p = fr.build_parser()
     a = p.parse_args(["session", "crack01"])
     assert a.slow == fr.DEFAULT_SLOW
     assert p.parse_args(["bench", "--live"]).live
     assert p.parse_args(["preflight", "--no-camera"]).no_camera
+
+
+def test_scene_depth_uses_every_frame():
+    """audit 2026-10-29 item 8: the distance is the median of the per-frame medians over all frames; one all-zero
+    middle frame among 29 good in-range frames is not 'no depth' (it read as WARN before; it must FAIL)."""
+    good = np.full((48, 64), 3000, np.uint16)
+    depths = [good.copy() for _ in range(30)]
+    depths[15][:] = 0
+    z, valid = fr.scene_depth_m(depths, 1e-4)
+    assert z == pytest.approx(0.30) and valid == pytest.approx(29 / 30)
+    assert fr.scene_depth_m([np.zeros((4, 4), np.uint16)] * 3, 1e-4) == (None, 0.0)

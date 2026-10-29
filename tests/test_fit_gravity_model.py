@@ -226,3 +226,84 @@ def test_cli_writes_a_loadable_model(tmp_path, synthetic):
     assert doc["fit"]["runs"] and doc["valid_range"]["j2"][0] < -1.0
     assert "extrapolated" in doc and doc["urdf"]["sha256"] == UG.sha256
     assert set(doc["residuals"]["leave_one_run_out"]) == {"urdf", "scales", "scales+bias", "fit"}
+
+
+# ---- audit 2026-10-29 item 6: split bodies stay inside the runner's limits; never write a file the runner refuses -----
+
+def test_split_bodies_carry_the_exact_moment_within_half_a_metre():
+    bodies = [fg.Body("a", "link4", "free"), fg.Body("b", "link5", "free"), fg.Body("c", "link6", "free")]
+    #           near-massless, big moment     small mass, big moment         ordinary body
+    theta = np.array([0.0, 0.06, 0.0, -0.02,   0.03, 0.04, 0.0, 0.0,     0.4, 0.004, 0.0, 0.012])
+    extra = fg.bodies_to_extra(bodies, theta)
+    for link, m_want, mr_want in (("link4", 0.0, [0.06, 0.0, -0.02]), ("link5", 0.03, [0.04, 0.0, 0.0]),
+                                  ("link6", 0.4, [0.004, 0.0, 0.012])):
+        pts = [(np.array(x), kg) for ln, x, kg in extra if ln == link]
+        assert sum(kg for _, kg in pts) == pytest.approx(m_want, abs=1e-12)
+        np.testing.assert_allclose(sum(kg * x for x, kg in pts), mr_want, atol=1e-12)    # exact first moment
+        assert max(np.abs(x).max() for x, _ in pts) <= fg.SPLIT_MAX_XYZ_M + 1e-12
+    assert len([1 for ln, *_ in extra if ln == "link6"]) == 1                            # not split
+    # the moment that put the old 0.05 kg point 1.26 m out: now max(0.05, |mr|/0.5) = 0.126 kg at 0.5 m
+    (_, xyz, kg), (_, origin, kg0) = fg.bodies_to_extra([fg.Body("a", "link4", "free")], np.array([0.0, 0.063, 0.0, 0.0]))
+    assert kg == pytest.approx(0.126) and xyz == pytest.approx((0.5, 0.0, 0.0)) and kg0 == pytest.approx(-0.126)
+
+
+def test_runner_problems_replicates_the_runners_loader():
+    ok = {"schema": gmod.SCHEMA, "urdf": {"sha256": gmod.file_sha256(gmod.DEFAULT_URDF)},
+          "bodies": [{"link": "link5", "xyz": [0.01, 0.0, 0.03], "kg": 0.4}], "scale": {"j2": 1.0, "j3": 1.0}}
+    assert gmod.runner_problems(ok) == []
+    cases = {"schema": {"schema": "x"}, "URDF": {"urdf": {"sha256": "0" * 64}}, "1..20": {"bodies": []},
+             "<= 1 m": {"bodies": [{"link": "link5", "xyz": [1.26, 0.0, 0.0], "kg": 0.05}]},
+             "kg in": {"bodies": [{"link": "link5", "xyz": [0.0, 0.0, 0.0], "kg": -0.6}]},
+             "duplicate": {"bodies": [{"link": "link5", "xyz": [0, 0, 0], "kg": 0.1}] * 2},
+             "moving link": {"bodies": [{"link": "base_link", "xyz": [0, 0, 0], "kg": 0.1}]},
+             "> 5 kg": {"bodies": [{"link": f"link{i}", "xyz": [0, 0, 0], "kg": 2.0} for i in (3, 4, 5)]},
+             "scale": {"scale": {"j1": 1.0}}, "bad body": {"bodies": [{"link": "link5", "xyz": [0, 0, True], "kg": 0.1}]}}
+    for want, bad in cases.items():
+        probs = gmod.runner_problems(ok | bad)
+        assert probs and any(want in p for p in probs), (want, probs)
+    assert gmod.runner_problems(ok | {"scale": {}}) and gmod.runner_problems(ok | {"scale": {"j2": 1.6}})
+
+
+RUNNER = Path.home() / "rebot_setup"
+
+
+@pytest.mark.skipif(not (RUNNER / "demo_move.py").exists(), reason="no ~/rebot_setup runner here")
+def test_runner_problems_agrees_with_the_runners_own_loader(tmp_path):
+    """The real load_gravity_model (in the runner's own interpreter, which has motorbridge) on the same files."""
+    import subprocess
+    py = Path.home() / "miniconda3" / "envs" / "rebot" / "bin" / "python"
+    if not py.exists():
+        pytest.skip("no rebot env")
+    ok = {"schema": gmod.SCHEMA, "urdf": {"sha256": gmod.file_sha256(gmod.DEFAULT_URDF)},
+          "bodies": [{"link": "link5", "xyz": [0.01, 0.0, 0.03], "kg": 0.4}], "scale": {"j2": 1.0, "j3": 1.0}}
+    variants = [ok, ok | {"bodies": [{"link": "link5", "xyz": [1.26, 0.0, 0.0], "kg": 0.05}]},
+                ok | {"bodies": [{"link": "base_link", "xyz": [0, 0, 0], "kg": 0.1}]}, ok | {"scale": {"j2": 1.6}},
+                ok | {"bodies": [{"link": "link5", "xyz": [0, 0, 0], "kg": 0.1}] * 2}]
+    files = []
+    for k, doc in enumerate(variants):
+        f = tmp_path / f"m{k}.yaml"
+        f.write_text(gmod.dump_model_text(doc, "test"))
+        files.append(str(f))
+    code = ("import sys, demo_move as d\n"
+            "for f in sys.argv[1:]:\n"
+            "    try: d.load_gravity_model(f); print('ok')\n"
+            "    except ValueError: print('refused')\n")
+    env = {k: v for k, v in __import__("os").environ.items() if k != "PYTHONPATH"}
+    out = subprocess.run([str(py), "-c", code, *files], cwd=RUNNER, env=env, capture_output=True, text=True,
+                         timeout=120).stdout.split()
+    assert out == ["ok" if not gmod.runner_problems(v) else "refused" for v in variants]
+
+
+def test_cli_refuses_to_write_a_model_the_runner_would_refuse(tmp_path, synthetic, monkeypatch, capsys):
+    paths, _ = synthetic
+    real = fg.model_doc
+
+    def bad_doc(*a, **k):
+        doc = real(*a, **k)
+        doc["bodies"].append({"link": "link5", "xyz": [1.26, 0.0, 0.0], "kg": 0.05})   # the audit's failure
+        return doc
+    monkeypatch.setattr(fg, "model_doc", bad_doc)
+    out = tmp_path / "gravity_model.yaml"
+    rc = fg.main(["--show-runs", str(paths[0]), "--runs", *map(str, paths[1:]), "--write", str(out), "--moving", "no"])
+    assert rc == 1 and not out.exists()
+    assert "would refuse" in capsys.readouterr().out

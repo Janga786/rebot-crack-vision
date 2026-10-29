@@ -250,10 +250,17 @@ def priors(bodies: list[Body]) -> tuple[np.ndarray, np.ndarray]:
     return np.array(mean), np.array(sd)
 
 
+SPLIT_MIN_KG = 0.05      # bodies_to_extra: smallest mass of a split pair's moment-carrying point
+SPLIT_MAX_XYZ_M = 0.5    # ... and the farthest a point is put from its link origin (the runner refuses > 1 m)
+
+
 def bodies_to_extra(bodies: list[Body], theta: np.ndarray, names: list | None = None) -> list[tuple[str, tuple, float]]:
     """Fitted parameters -> point masses (link, xyz, kg) for GravityModel(extra=...). A free body with first moment
-    mr and mass m is the point mass m at mr/m; a near-massless one (|m| < 0.02 kg) cannot be written as one point,
-    so it is split into a 0.05 kg pair (+ at the moment's end, - at the origin) carrying exactly that moment."""
+    mr and mass m is the point mass m at mr/m when that lies within SPLIT_MAX_XYZ_M of the link origin; otherwise
+    (a near-massless body, |m| < 0.02 kg, or a small mass with a large moment) it is split into a pair carrying exactly
+    that mass and moment: mp = max(0.05, |mr| / SPLIT_MAX_XYZ_M) kg at mr/mp (so |xyz| <= 0.5 m, inside the runner's
+    1 m limit) and m - mp at the origin. (Before 2026-10-29 the pair was always 0.05 kg, which put the point up to
+    |mr|/0.05 m away, past the runner's 1 m check, and carried mr x (1 + m/0.05) instead of mr.)"""
     out, k = [], 0
     for b in bodies:
         n0 = len(out)
@@ -265,12 +272,12 @@ def bodies_to_extra(bodies: list[Body], theta: np.ndarray, names: list | None = 
             continue
         m, mr = float(theta[k]), np.asarray(theta[k + 1:k + 4], dtype=float)
         k += 4
-        if abs(m) >= 0.02:
+        if abs(m) >= 0.02 and np.abs(mr / m).max() <= SPLIT_MAX_XYZ_M:
             out.append((b.link, tuple(float(v) for v in mr / m), m))
         elif np.linalg.norm(mr) > 1e-6:
-            mp = 0.05
-            out.append((b.link, tuple(float(v) for v in mr / mp), mp + m))
-            out.append((b.link, (0.0, 0.0, 0.0), -mp))
+            mp = max(SPLIT_MIN_KG, float(np.linalg.norm(mr)) / SPLIT_MAX_XYZ_M)
+            out.append((b.link, tuple(float(v) for v in mr / mp), mp))
+            out.append((b.link, (0.0, 0.0, 0.0), m - mp))
         elif abs(m) > 1e-6:
             out.append((b.link, (0.0, 0.0, 0.0), m))
         if names is not None:
@@ -915,6 +922,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.plots:
         print(f"plot: {plot_residuals(ug, data, names, fit, args.plots)}")
     if args.write:
+        # refuse to write a file the runner would refuse (demo_move.py load_gravity_model's checks, replicated)
+        bad = gmod.runner_problems(json.loads(json.dumps(doc, default=float)))
+        if bad:
+            print(f"NOT writing {args.write}: the runner's load_gravity_model would refuse this model:\n  "
+                  + "\n  ".join(bad))
+            return 1
         args.write.parent.mkdir(parents=True, exist_ok=True)
         header = ("config/robot/gravity_model.yaml - fitted extra point masses for the B601-DM gravity feed-forward\n"
                   "(crackvision.gravity_model/1, written by tools/fit_gravity_model.py; docs/motion/GRAVITY_MODEL.md).\n"

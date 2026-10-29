@@ -60,7 +60,7 @@ dominant term: path rms 7.4 → ~2.5-3 mrad predicted); (b) the gravity model (r
 - `demo_move.py` has `--gains jN=KP/KD` and `--ff-bias`, but **no per-run friction override**: FRICTION comes from
   `first_move_j1.TUNED`. `tuned_gains.yaml` / TUNED stay unchanged until an A/B on the arm says otherwise.
 - `run-trajectory.sh --rehearse` does not pass `DEMO_EXTRA` (GRAVITY_MODEL §9, operator decision pending), so
-  rehearsals with overrides are done by test code calling the runner directly.
+  rehearsals with overrides are done by test code calling the runner directly. **Fixed 2026-10-29 (after this was written): the wrapper's rehearse branch now passes `${DEMO_EXTRA:-}`; backup in `~/rebot_setup/backup_pre_rehearse_extra_2026-10-29/`, verified with `DEMO_EXTRA="--friction j4=0.18 --gains j4=40/3" … --rehearse j4_tune.json 2` (summary shows both overrides).**
 - fakebus J4 is the generic plant (inertia 0.07, viscous 0.5, Coulomb 0.3): rehearsal proves guard safety of the
   command stream, not the tuning.
 - Guard caps for J4: kp <= 50, kd <= 5, |tau_ff| <= 2.5. Torque abort 6.5 Nm (guard). With kd 4 the runner's own

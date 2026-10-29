@@ -280,6 +280,7 @@ def _stop_source(args, cam, stop_index: int):
 
 
 def cmd_search_capture(cfg: Config, args: argparse.Namespace, log: logging.Logger) -> int:
+    t_start_ns = time.time_ns()            # state files older than this are stale (an earlier run): ignored
     plan = json.loads(Path(args.search).read_text())["search"]
     stops = plan["stops"]
     case = naming.derive_case_id(Path(f"{args.case}.png"))
@@ -313,15 +314,16 @@ def cmd_search_capture(cfg: Config, args: argparse.Namespace, log: logging.Logge
             q_stop = np.array(st["q_rad"])
             log.info("stop %d/%d: waiting for the arm", st["index"] + 1, len(stops))
             try:
-                wait_settled(Path(args.state_file), q_stop, args.timeout_s, tol_rad=0.05, hold_s=0.5, log=None)
+                wait_settled(Path(args.state_file), q_stop, args.timeout_s, tol_rad=0.05, hold_s=0.5, log=None,
+                             not_before_ns=t_start_ns)
             except TimeoutError as exc:
                 log.error("stop %d skipped: %s", st["index"], exc)
                 if "left the scan pose" in str(exc):
                     break
                 continue
-            s0 = read_state(Path(args.state_file))
+            s0 = read_state(Path(args.state_file), t_start_ns)
             frames = list(_stop_source(args, cam, st["index"]))
-            s1 = read_state(Path(args.state_file))
+            s1 = read_state(Path(args.state_file), t_start_ns)
             if not frames or s0 is None or s1 is None or not settled([s0, s1], q_stop, 0.05, 0.05):
                 log.error("stop %d skipped: the arm moved during the capture", st["index"])
                 continue
@@ -409,12 +411,26 @@ def cmd_search_capture(cfg: Config, args: argparse.Namespace, log: logging.Logge
 
 # ---- capture -----------------------------------------------------------------------------------------------------
 
-def read_state(path: Path) -> dict | None:
+MTIME_TOLERANCE_NS = 1_000_000_000
+
+
+def read_state(path: Path, not_before_ns: int | None = None) -> dict | None:
+    """The runner's arm state, or None. With not_before_ns (time.time_ns() when the capture started), a state file
+    written before that (mtime) or carrying an older wall_time_ns is ignored: a stale pose from an earlier run must
+    never be taken for the arm's pose now (audit 2026-10-29, item 3)."""
     try:
+        # the filesystem's mtime clock is coarse and lags time.time_ns() by ~1 ms (measured 2026-10-29), so the
+        # mtime test gets a 1 s tolerance; the wall_time_ns the runner wrote into the file stays the strict test
+        if not_before_ns is not None and Path(path).stat().st_mtime_ns < not_before_ns - MTIME_TOLERANCE_NS:
+            return None
         d = json.loads(Path(path).read_text())
     except (OSError, json.JSONDecodeError):
         return None
-    return d if d.get("schema") == STATE_SCHEMA else None
+    if not isinstance(d, dict) or d.get("schema") != STATE_SCHEMA:
+        return None
+    if not_before_ns is not None and not (isinstance(d.get("wall_time_ns"), int) and d["wall_time_ns"] >= not_before_ns):
+        return None
+    return d
 
 
 def settled(states: list[dict], q_scan: np.ndarray, tol_rad: float, vel_tol: float) -> bool:
@@ -432,14 +448,16 @@ def settled(states: list[dict], q_scan: np.ndarray, tol_rad: float, vel_tol: flo
 
 
 def wait_settled(state_file: Path, q_scan: np.ndarray, timeout_s: float, *, tol_rad: float = 0.04,
-                 vel_tol: float = 0.05, hold_s: float = 0.6, poll_s: float = 0.05, log=None) -> dict:
-    """Poll the runner's state file until the arm has rested at q_scan for hold_s. Returns the last state."""
+                 vel_tol: float = 0.05, hold_s: float = 0.6, poll_s: float = 0.05, log=None,
+                 not_before_ns: int | None = None) -> dict:
+    """Poll the runner's state file until the arm has rested at q_scan for hold_s. Returns the last state.
+    States older than not_before_ns (see read_state) are ignored."""
     t_end = time.monotonic() + timeout_s
     window: list[dict] = []
     last_wall = None
     said = None
     while time.monotonic() < t_end:
-        s = read_state(state_file)
+        s = read_state(state_file, not_before_ns)
         if s is not None and s["wall_time_ns"] != last_wall:
             last_wall = s["wall_time_ns"]
             window = [w for w in window + [s] if s["wall_time_ns"] - w["wall_time_ns"] <= hold_s * 1e9]
@@ -513,6 +531,7 @@ def run_perception(cfg: Config, case_id: str, src: Path, quiet: bool = True) -> 
 
 
 def cmd_capture(cfg: Config, args: argparse.Namespace, log: logging.Logger) -> int:
+    t_start_ns = time.time_ns()            # state files older than this are stale (an earlier run): ignored
     scan = json.loads(Path(args.scan).read_text())["scan"]
     q_scan = np.array(scan["q_rad"])
     case_id = naming.derive_case_id(Path(f"{args.case}.png"))
@@ -538,7 +557,7 @@ def cmd_capture(cfg: Config, args: argparse.Namespace, log: logging.Logger) -> i
     try:
         log.info("waiting for the arm to settle at the scan pose (state file %s)", args.state_file)
         try:
-            wait_settled(Path(args.state_file), q_scan, args.timeout_s, log=log)
+            wait_settled(Path(args.state_file), q_scan, args.timeout_s, log=log, not_before_ns=t_start_ns)
         except TimeoutError as exc:
             log.error("%s", exc)
             return EXIT_RUNTIME
@@ -546,10 +565,10 @@ def cmd_capture(cfg: Config, args: argparse.Namespace, log: logging.Logger) -> i
         states, frames = [], []
         for f in cam.frames(args.burst):
             frames.append(f)
-            s = read_state(Path(args.state_file))
+            s = read_state(Path(args.state_file), t_start_ns)
             if s is not None:
                 states.append(s)
-        after = read_state(Path(args.state_file))
+        after = read_state(Path(args.state_file), t_start_ns)
         states += [after] if after else []
     finally:
         cam_ctx.__exit__(None, None, None)

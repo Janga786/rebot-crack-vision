@@ -28,13 +28,15 @@
 #                             table + overlay + verdict (data/crack_trace/bench/CASE/). bench --live: the filtered
 #                             live view (http://127.0.0.1:8090, Ctrl-C to stop) for aiming.
 #   session CASE [slow]       search -> scan-plan --from-search -> scan -> plan -> preview -> trace, slow 2 and the kd 4
-#                             override by default (DEMO_EXTRA wins if set), a typed yes before every step, stops on any
+#                             override by default (DEMO_EXTRA set without --gains: the kd 4 gains are prepended; with
+#                             --gains: used as given; empty: stock gains), a typed yes before every step, stops on any
 #                             failure. Calls only the subcommands above; every arm step is run-trajectory.sh's.
 #   archive CASE              copies the case, the runner's run files, the preflight and the guard events into
 #                             evidence/operator/first-crack-run-<date>/ with sha256s and a README to fill in.
 #
 # Every ARM step is the operator's: it goes through ~/rebot_setup/run-trajectory.sh (guard pre-flight, hold at the
-# fold, Enter to go, stop/off). Extra runner flags via DEMO_EXTRA, e.g. DEMO_EXTRA="--gains j2=100/4,j3=80/4".
+# fold, Enter to go, stop/off). Extra runner flags via DEMO_EXTRA, e.g. DEMO_EXTRA="--gains j2=100/4,j3=80/4" (split on
+# spaces, unquoted: no quotes or spaces inside a value; no --ff-bias for search/scan, the capture would not settle).
 # Camera mount and tool tip are nominal (CAD prior) until GEOM-05/07: expect a few cm of offset; the planner hovers.
 set -uo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -74,7 +76,10 @@ case "$cmd" in
     wait "$cap"; crc=$?
     grep -E "^stop|^search" "$OUT/${CASE}_search.log"
     [ "$rrc" -eq 0 ] || echo "the arm run ended with exit $rrc"
-    [ "$crc" -eq 0 ] && echo "next: $0 scan-plan --from-search $CASE" || { echo "search exit $crc (see the log)"; exit "$crc"; } ;;
+    [ "$crc" -eq 0 ] || echo "search exit $crc (see the log)"
+    # a failed arm run fails the step even when the capture succeeded (the arm run's code first)
+    [ "$rrc" -eq 0 ] && [ "$crc" -eq 0 ] && echo "next: $0 scan-plan --from-search $CASE"
+    exit $(( rrc ? rrc : crc )) ;;
 
   scan-plan)
     "${CT[@]}" scan-plan --out "$SCAN" "$@" || die "scan-plan failed"
@@ -83,7 +88,7 @@ case "$cmd" in
   scan)
     CASE=${1:?usage: scan CASE [slow]}; SLOW=${2:-1}
     [ -f "$SCAN" ] || die "no $SCAN: run scan-plan first"
-    mkdir -p "$RUNNER/runs" "$OUT"
+    mkdir -p "$RUNNER/runs" "$OUT"; rm -f "$STATE"   # never let the capture read an earlier run's pose
     "${CT[@]}" -q capture --case "$CASE" --scan "$SCAN" --state-file "$STATE" > "$OUT/${CASE}_capture.log" 2>&1 &
     cap=$!
     echo "capture waiting in the background (log $OUT/${CASE}_capture.log)"
@@ -93,7 +98,10 @@ case "$cmd" in
     wait "$cap"; crc=$?
     cat "$OUT/${CASE}_capture.log" | grep -vE "^\s*$" | tail -5
     [ "$rrc" -eq 0 ] || echo "the arm run ended with exit $rrc"
-    [ "$crc" -eq 0 ] && echo "next: $0 plan $CASE" || { echo "capture exit $crc (see the log)"; exit "$crc"; } ;;
+    [ "$crc" -eq 0 ] || echo "capture exit $crc (see the log)"
+    # a failed arm run fails the step even when the capture succeeded (the arm run's code first)
+    [ "$rrc" -eq 0 ] && [ "$crc" -eq 0 ] && echo "next: $0 plan $CASE"
+    exit $(( rrc ? rrc : crc )) ;;
 
   plan)
     CASE=${1:?usage: plan CASE [plan args]}; shift
@@ -145,5 +153,5 @@ case "$cmd" in
   preflight|bench|session|archive)
     "$REPO/env.sh" python -m crackvision.first_run "$cmd" "$@" ;;
 
-  *) sed -n '2,38p' "$0"; exit 2 ;;
+  *) sed -n '2,40p' "$0"; exit 2 ;;
 esac

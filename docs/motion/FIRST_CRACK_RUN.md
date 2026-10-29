@@ -48,8 +48,22 @@ The tools do not make these for you:
    ../../../env.sh python -m arm_guard approve --by <your name> --note "reviewed for the first crack run"
    ```
 2. **kd 4 on J2/J3 for this run.** `session` passes `DEMO_EXTRA="--gains j2=100/4,j3=80/4"` to the runner unless
-   you set `DEMO_EXTRA` yourself. Setting it to empty (`DEMO_EXTRA= bash scripts/crack_pipeline.sh session …`) runs
-   the stock kd 1. Making kd 4 the permanent default is a separate decision (TODO.md item 0).
+   you set `DEMO_EXTRA` yourself. Making kd 4 the permanent default is a separate decision (TODO.md item 0).
+   **How `DEMO_EXTRA` combines** (the runner *replaces* its gains with whatever `--gains` it is given; nothing is
+   merged on the runner side, so `session` merges for you):
+   - unset → `--gains j2=100/4,j3=80/4`;
+   - set **without** `--gains` (e.g. `DEMO_EXTRA="--friction j4=0.18"`) → the kd 4 gains are **prepended**:
+     `--gains j2=100/4,j3=80/4 --friction j4=0.18` (the session's first line says "default gains prepended");
+   - set **with** `--gains` → used exactly as given, so include the kd 4 gains yourself, e.g.
+     `DEMO_EXTRA="--gains j2=100/4,j3=80/4,j4=40/3"`;
+   - set to empty (`DEMO_EXTRA= bash scripts/crack_pipeline.sh session …`) → nothing: the stock kd 1.
+
+   When you call `run-trajectory.sh` or `crack_pipeline.sh search|scan|trace` by hand, nothing merges: put the kd 4
+   gains in `DEMO_EXTRA` yourself. **No quotes and no spaces inside a value:** `DEMO_EXTRA` is split on spaces,
+   unquoted (`--gains j2=100/4,j3=80/4` works; `--gains "j2=100/4, j3=80/4"` does not).
+   **No `--ff-bias` in `DEMO_EXTRA` for the session:** the capture's settle check needs |v| < 0.05 rad/s on every
+   joint, and the bias keeps J2 moving above that, so the search stops and the scan may never settle (the session
+   prints a WARNING if it sees `--ff-bias`).
 3. **D405 firmware 5.17.** This run does not need it. The camera ran at 30 fps with no dropped frames on 5.15.1.55.
 4. **Which print.** Print #1, the single clean crack, is the recommended first target. In
    `data/crack_targets/crack_prints.pdf` it is page 1. Print it "fit to page" on matte paper. The crack then runs
@@ -105,8 +119,10 @@ VERDICT: CRACK ACCEPTED: component #1, 212 mm long, 3.0 mm wide, at 24.8 cm, mea
 ```
 
 The overlay is `data/crack_trace/bench/<CASE>/overlay.png`: accepted components red, rejected ones yellow, the
-number at each component. Exit 0 = accepted, 3 = nothing accepted. **Do not go to the arm until bench accepts the
-print's crack at about 25 cm.**
+number at each component. Exit 0 = accepted, 3 = nothing accepted, **or** the camera is busy (another program, e.g.
+`bench --live`, holds it: the message says which process) or could not be opened. Exit 2 = that bench CASE folder
+already exists: pick another CASE name, or pass `--force` to overwrite it (`bench print01 --force`). **Do not go to
+the arm until bench accepts the print's crack at about 25 cm.**
 
 ## 2. Physical setup
 
@@ -141,8 +157,11 @@ forward. `bench --live` is stopped. Nothing else is using the arm or the camera.
    ```
    Before each step the session prints what will happen and what you will see, and waits for a typed **`yes`**.
    Anything else stops the session, and nothing more runs. At each arm step, run-trajectory.sh enables, moves to
-   the fold and holds; **you press Enter** at its prompt. `stop` + Enter parks to the fold and switches off;
-   `off` + Enter switches off at once (the arm drops). The **24 V switch is the e-stop at all times: a raised arm
+   the fold and holds; **you press Enter** at its prompt (only an empty line starts the run; any other text is
+   answered with "type Enter to run, stop, or off"). Typed while the arm is still moving to zero: `stop` or `off`
+   is acted on as soon as it holds (stop = park + off, off = off at the fold); an Enter or anything else is discarded.
+   `stop` + Enter parks to the fold and switches off; `off` + Enter switches off at once (at the fold prompt: off
+   at the fold; while moving: the arm drops). The **24 V switch is the e-stop at all times: a raised arm
    drops.**
 
    1. **search.** The camera visits the 6 stops. You get one `stop N:` line per stop, then
@@ -187,10 +206,11 @@ forward. `bench --live` is stopped. Nothing else is using the arm or the camera.
 | capture `no crack found in the view: nothing to trace` (exit 3) | The scan view has no accepted crack. | Look at the capture's overlay. The search target may be off: run search again. |
 | plan `no trace: …` | The crack cannot be traced within reach, clearance and joint limits. | Move the print closer to x 0.30, y 0. |
 | the preview's green is not on red, or the red is not your crack | The trace would follow the wrong thing. | Type anything but `yes`. Archive the case and look at the component table. |
-| `REFUSED (… nothing was enabled)` | A runner pre-check or the guard pre-flight failed. Nothing moved. | Read the reason. "not starting from the folded rest": fold the arm by hand. J1 not forward: turn the base. |
-| `J1 reference unknown … type yes` | J1 lost its turn count over a 24 V cycle. | Turn the base by hand to face forward, then type `yes`. |
+| `REFUSED (… nothing was enabled)` | A runner pre-check or the guard pre-flight failed, or you pressed Ctrl-C / typed `stop` before anything was enabled. Nothing moved. | Read the reason. "not starting from the folded rest": fold the arm by hand. J1 not forward: turn the base. "gravity margin": plan the pose with less reach (or run without `--gravity-model`). |
+| `J1 reference unknown … type yes` | J1 lost its turn count over a 24 V cycle. | Turn the base by hand to face forward, then type `yes`. Ctrl-C or anything else: not confirmed, exit 4, nothing enabled. |
 | `no go within 300 s: disabling` | You did not press Enter within 5 minutes. Switched off at the fold. | The session stops (outcome `no_go_timeout`). Start again when ready. |
 | `ABORT: [tracking/torque/velocity …]` then `PARK` | The runner's own abort. | Nothing: it parks slowly and switches off. The session stops. |
+| `WARNING while holding after the guard fault: [stream] …; still holding` | The 200 Hz loop skipped a cycle while holding. The hold is re-sent; the motors never stopped holding. | Nothing. `stop` / `off` still work. |
 | `GUARD FAULT, HOLDING: <reason>` | The guard refused a command and holds the arm. **Nothing is switched off.** | Look at the arm. `stop` + Enter: reset (logged) and slow park. If parking faults again: support the arm, `off` + Enter. |
 | `uncontrollable fault` | Bus error, stale feedback or a motor fault code. | It holds 0.5 s, then switches off: **a raised arm drops.** |
 | the trace is a few cm off the crack | Calibration error (GEOM-05/07), expected. | Measure the offset, write it in the archive README. Do not lower the hover. |

@@ -264,7 +264,7 @@ runner would leave **if the model is right** there.
   flag (only the commands change). The fake bus has no rest contact at the fold; with the model's 8.2 Nm as its load,
   the simulated J3 sank through the fold during the fade-in (+0.05 rad, a guard fault) — something the real forearm,
   sitting on its rest, cannot do.
-- **Byte-identical default:** the heart rehearsal (`run-trajectory.sh --rehearse trajectories/fancy/heart.json`) wrote
+- **Byte-identical default:** the heart rehearsal (`~/rebot_setup/run-trajectory.sh --rehearse ~/rebot_setup/trajectories/fancy/heart.json`) wrote
   the same CSV (ref/pos/vel/torq/ff of every joint every cycle; md5 `29beb50f31108975c2421428fb0e3d8c`) before and after
   the change, and `test_without_the_flag_the_command_stream_is_byte_identical_to_the_pre_change_runner` compares every
   enable, MIT command (pos, vel, kp, kd, tau) and disable of a guarded smoke run against the pre-change script.
@@ -273,7 +273,19 @@ runner would leave **if the model is right** there.
   without the model (verified: identical CSV, `gravity_model: null`). The with-model rehearsal of the heart is
   therefore `test_heart_rehearsal_with_the_model_completes_under_the_guard` (the same arguments as `--rehearse`,
   in-process, with the repo's yaml): completed, no guard fault, pre-flight clean, |J3 ff| ≤ 9.95 Nm. A real run and
-  `--check` do take `DEMO_EXTRA`.
+  `--check` do take `DEMO_EXTRA`. **Fixed 2026-10-29 (after this was written): the wrapper's rehearse branch now passes `${DEMO_EXTRA:-}`; backup in `~/rebot_setup/backup_pre_rehearse_extra_2026-10-29/`, verified with `DEMO_EXTRA="--friction j4=0.18 --gains j4=40/3" … --rehearse j4_tune.json 2` (summary shows both overrides).**
+- **Audit fixes 2026-10-29 (demo_move.py 2026-10-29.3):** (a) the runner's cap check (`ff_for`) evaluates gravity at
+  the *measured* pose while the guard pre-flight used the reference: on the crack demo trace J2 needs 9.90 Nm at the
+  reference, so ~20 mrad of sag put it over the 10 Nm cap mid-path, and the park that followed sent a feed-forward of
+  0 (dropping J2 by ~0.1 rad). Now: in the park and in the hold after a guard fault, a feed-forward that would trip
+  the cap is **clamped to ±(cap − 0.05 Nm), never stepped to 0**; (b) the pre-flight also evaluates the feed-forward
+  gravity at the reference ±0.05 rad on J2-J4 (every 0.05 s of the path; the 26 neighbours where a joint is within
+  20 % of its cap) and **refuses** a run where that passes a cap, naming the joint and the margin (the summary records
+  `guard_preflight.gravity_margin_nm`); this applies with and without `--gravity-model`; (c) with `--gravity-model`,
+  the Coulomb trim also applies when gravity alone is within the 0.05 Nm margin (the total is then held at cap −
+  0.05 Nm; only gravity over the cap aborts). Every cap and abort is unchanged. Result: the crack demo trace with the
+  model is **refused at pre-flight** (J2 has no margin for a 0.05 rad sag): the correct, safe outcome; the heart and
+  the survey with the model still pass.
 
 ## 8. The survey (`tools/make_gravity_survey.py`)
 
@@ -338,14 +350,31 @@ After the survey and a refit, rerunning the builder with the refitted model reac
    the run at **x2** (`… gravity_survey.json 2`), without `--gravity-model`. Watch J2 at the far poses (predicted up to
    ~58 mrad of sag if the model is right; tracking abort 100 mrad → a slow park).
 3. **OPERATOR, ARM:** the same at **x1** (`… gravity_survey.json 1`) if x2 was clean.
-4. Workstation: refit with the survey runs added, e.g. `./env.sh python tools/fit_gravity_model.py --runs
-   ~/rebot_setup/runs/demo_*.csv ~/rebot_setup/runs/traj_smoke_raise_*.csv ~/rebot_setup/runs/traj_gravity_survey_*.csv
-   --write config/robot/gravity_model.yaml --plots docs/motion/figures`; check `extrapolated`, the residuals and the
-   crack feed-forward table; rerun the survey builder (it may now reach further) and repeat 2-4 if it does.
-5. **OPERATOR, ARM:** A/B the heart: `run-trajectory.sh ~/rebot_setup/trajectories/fancy/heart.json 2` (A, as before),
-   then `DEMO_EXTRA="--gravity-model $HOME/Projects/rebot_crack_vision/config/robot/gravity_model.yaml"
-   run-trajectory.sh ~/rebot_setup/trajectories/fancy/heart.json 2` (B). (`--check` first takes `DEMO_EXTRA` too.)
-   Compare: `./env.sh python tools/analyze_run_gains.py --compare A.csv B.csv`.
+4. Workstation: refit with exactly today's runs (the yaml's `fit.runs`, the first seven of them the show runs for
+   leave-one-run-out) plus the survey runs:
+   ```bash
+   R=~/rebot_setup/runs
+   ./env.sh python tools/fit_gravity_model.py \
+     --show-runs $R/traj_box_20261025T215102Z.csv $R/traj_figure8_20261023T204705Z.csv $R/traj_figure8_20261023T204854Z.csv \
+       $R/traj_heart_20261023T205033Z.csv $R/traj_heart_20261023T205318Z.csv $R/traj_heart_20261025T214843Z.csv \
+       $R/traj_showreel_20261025T213800Z.csv \
+     --runs $R/demo_show_20261017T195627Z.csv $R/demo_show_20261018T190512Z.csv $R/demo_show_20261018T190824Z.csv \
+       $R/demo_show_20261018T200442Z.csv $R/demo_show_20261018T203519Z.csv $R/demo_show_20261019T203251Z.csv \
+       $R/demo_show_20261019T224204Z.csv $R/demo_show_20261021T203048Z.csv $R/demo_show_20261021T220450Z.csv \
+       $R/demo_show_20261021T220721Z.csv $R/demo_wave_20261017T194533Z.csv $R/traj_smoke_raise_20261022T190924Z.csv \
+       $R/traj_smoke_raise_20261022T192035Z.csv $R/traj_gravity_survey_*.csv \
+     --write config/robot/gravity_model.yaml --plots docs/motion/figures
+   ```
+   (The default run globs would also pick up any new `traj_heart_*` run, e.g. step 5's, as a show run: list them
+   explicitly.) `--write` refuses a model the runner's loader would refuse (|xyz| ≤ 1 m, kg, links, scales: the same
+   checks). Check `extrapolated`, the residuals and the crack feed-forward table; rerun the survey builder (it may now
+   reach further) and repeat 2-4 if it does. **Keep every run's `.json` next to its `.csv` and do not rename either:**
+   the tools read the slow, the gains/friction overrides and the segment kinds from it (without it they assume the
+   defaults, with a WARNING).
+5. **OPERATOR, ARM:** A/B the heart: `~/rebot_setup/run-trajectory.sh ~/rebot_setup/trajectories/fancy/heart.json 2`
+   (A, as before), then `DEMO_EXTRA="--gravity-model $HOME/Projects/rebot_crack_vision/config/robot/gravity_model.yaml"
+   ~/rebot_setup/run-trajectory.sh ~/rebot_setup/trajectories/fancy/heart.json 2` (B). (`--check` first takes
+   `DEMO_EXTRA` too.) Compare: `./env.sh python tools/analyze_run_gains.py --compare A.csv B.csv`.
 6. **OPERATOR, ARM:** the crack demo trace with the model (`DEMO_EXTRA="--gravity-model …"`), only once steps 2-4 have
    made the crack workspace measured rather than extrapolated (or the operator accepts the extrapolation).
 

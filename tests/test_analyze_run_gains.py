@@ -205,7 +205,7 @@ def test_run_params_come_from_the_run_summary_and_cli(tmp_path, capsys):
     gains = {j: [40.0, 1.0] for j in ("j1", "j2", "j3", "j4", "j5", "j6", "j7")}
     write_friction_run(b, sgn_rad=-0.0005, const_rad=0.0, ff_coulomb=0.18, seed=2,
                        summary={"gains": gains, "friction": {"j1": 1.0, "j2": 1.0, "j3": 2.0, "j4": 0.18, "j5": 0.3}})
-    assert arg.run_params(a)[2] == "tuned defaults" and arg.run_params(a)[1]["j4"] == 0.5
+    assert arg.run_params(a)[2].startswith("tuned defaults (NO RUN SUMMARY") and arg.run_params(a)[1]["j4"] == 0.5
     kp, fr, src = arg.run_params(b)
     assert src == "run summary" and fr["j4"] == 0.18 and kp["j1"] == 40.0
     assert arg.main([str(a), str(b), "--friction-fit", "--what-if-friction", "j4=0.18", "--what-if-kp", "j4=50"]) == 0
@@ -235,3 +235,63 @@ def test_seg1_window_selects_file_time_scaled_by_the_runs_slow(tmp_path):
     assert arg.main([str(p), "--friction-fit", "--seg1-window", "0:20"]) == 0
     with pytest.raises(SystemExit):
         arg.main([str(p), "--seg1-window", "5:1"])
+
+
+# ---- audit 2026-10-29 items 4 / 5 ------------------------------------------------------------------------------------
+
+def _relabel(path: Path, seg_map: dict) -> None:
+    """Rewrite the seg column (e.g. a run whose zero-length approach was dropped: trajectory = segment 0)."""
+    rows = list(csv.reader(open(path, newline="")))
+    for r in rows[1:]:
+        r[2] = str(seg_map[int(r[2])])
+    with open(path, "w", newline="") as fh:
+        csv.writer(fh).writerows(rows)
+
+
+def test_trajectory_segment_is_found_by_kind_from_the_summary(tmp_path, capsys):
+    """j4_tune.json / gravity_survey.json with --j1-here-is-zero: no approach, so the trajectory is segment 0 and the
+    return is segment 1. The summary's path_kinds says so; --seg1-window and --friction-fit use segment 0."""
+    p = tmp_path / "run.csv"
+    write_friction_run(p, sgn_rad=-0.008, const_rad=0.0,
+                       summary={"slow": 1.0, "choreo": "trajectory", "outcome": "completed",
+                                "path_kinds": [["trajectory", 32.0], ["return", 4.0]]})
+    _relabel(p, {0: 0, 1: 0, 2: 1})
+    rows = arg.load(p)
+    assert arg.trajectory_segment(p, rows)[:2] == (0, "run summary path_kinds")
+    w = arg.seg1_window(rows, (1.0, 3.0), p)
+    assert {x["seg"] for x in w} == {"0"} and abs(float(w[0]["t_s"]) - 1.0) < 0.006
+    assert arg.main([str(p), "--friction-fit"]) == 0
+    out = capsys.readouterr().out
+    assert "segment 0 (the trajectory)" in out and "outcome completed" in out and "0 trajectory, 1 return" in out
+    assert arg.main(["--compare", str(p), str(p), "--seg1-window", "1:20"]) == 0
+
+
+def test_a_missing_summary_is_a_loud_warning_and_marks_the_output(tmp_path, capsys):
+    p = tmp_path / "run.csv"
+    write_friction_run(p, sgn_rad=-0.008, const_rad=0.0)
+    assert arg.main([str(p), "--friction-fit"]) == 0
+    cap = capsys.readouterr()
+    assert "WARNING: no run summary run.json" in cap.err and "ASSUMING slow 1" in cap.err and "j4 40" in cap.err
+    assert "NO RUN SUMMARY" in cap.out and "outcome unknown" in cap.out
+
+
+def test_empty_cells_in_any_used_column_are_dropped_not_a_crash(tmp_path):
+    p = tmp_path / "run.csv"
+    write_run(p, lag_rad=0.0, torque_offset=0.0, ripple=0.0)
+    rows = list(csv.reader(open(p, newline="")))
+    hdr = rows[0]
+    for k, col in ((10, "j4_pos"), (20, "j1_torq"), (30, "j6_ff"), (40, "j5_vel")):
+        rows[k][hdr.index(col)] = ""
+    with open(p, "w", newline="") as fh:
+        csv.writer(fh).writerows(rows)
+    assert len(arg.load(p)) == 4000 - 4
+    assert arg.main([str(p), "--friction-fit"]) == 0
+
+
+def test_compare_prints_ripple_to_a_hundredth_of_a_mrad(tmp_path, capsys):
+    a, b = tmp_path / "a.csv", tmp_path / "b.csv"
+    write_run(a, lag_rad=0.0, torque_offset=0.0, ripple=0.0005)
+    write_run(b, lag_rad=0.0, torque_offset=0.0, ripple=0.0004)
+    assert arg.main(["--compare", str(a), str(b)]) == 0
+    out = capsys.readouterr().out
+    assert " 0.35 ->  0.28 (-0.07)" in out

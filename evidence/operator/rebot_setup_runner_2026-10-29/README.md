@@ -163,3 +163,119 @@ Runner suite: **59 tests, all pass** (53 before + 6), none skipped:
 | `trajectories/j4_tune.json` | none | 2 | completed, no guard fault; pre-flight 77 241 cycles accepted, keep-out margin ≥ 41 mm |
 | `trajectories/j4_tune.json` | `--friction j4=0.18 --gains j4=40/3`; `--friction j4=0.18 --gains j4=50/3`; `--gains j4=50/3` (in-process test) | 1 | all completed, no guard fault |
 | `trajectories/j4_tune.json` | `--friction j4=0.3` (in-process, the what-if check in J4_TUNING §2) | 1 | completed, no guard fault |
+
+## 2026-10-29, later: `run-trajectory.sh` rehearse branch passes `DEMO_EXTRA`
+
+One-line change (readiness pass before the first physical run): the `--rehearse` branch now appends `${DEMO_EXTRA:-}`
+to the `demo_move.py --simulate --guard-sim …` command, exactly as the `--check` and real-run branches already did, so a
+rehearsal exercises the same per-run overrides (`--gains`, `--ff-bias`, `--gravity-model`, `--friction`) the operator
+will run. Pre-change copy: `~/rebot_setup/backup_pre_rehearse_extra_2026-10-29/run-trajectory.sh` (sha256 `75866449…`);
+after: `run-trajectory.sh` here (sha256 `083bdcda…`). Verified: `DEMO_EXTRA="--friction j4=0.18 --gains j4=40/3"
+run-trajectory.sh --rehearse trajectories/j4_tune.json 2` completed with `friction_override: {"j4": 0.18}` and
+`gains_override: {"j4": [40, 3]}` in the summary; without `DEMO_EXTRA` the heart rehearsal CSV is unchanged
+(md5 `29beb50f…`). Nothing else in the wrapper changed; real runs are unaffected.
+
+## 2026-10-29, audit 1 fixes (readiness audit before the first physical crack run)
+
+Pre-change copies: `~/rebot_setup/backup_pre_audit1_2026-10-29/` and `before_audit1/` here (`SHA256SUMS.before_audit1`).
+After: the files here (`SHA256SUMS`). Nothing was run on the arm; only unit tests and `run-trajectory.sh --rehearse`.
+
+| File | sha256 before | sha256 after |
+|---|---|---|
+| `run-trajectory.sh` | `083bdcda566e02bdd7f09d1575bd7827aac5004dee99ea3682f646ef0fc27644` | `052619cd35d3f710f0fc6c981b7868259fba5409078b0c43e0681832082107fb` |
+| `demo_move.py` (2026-10-29.2 → 2026-10-29.3) | `5392448974569b76474e0173333d3d37597abce3f93f0637e04fe3e90acacee3` | `43104d80b28f8fed52e68ae9b6a56bf362b57b47c8bfe6b3ce8a0e310b13aa16` |
+| `test_demo_move.py` | `f3c5f33dc77d80832770ba3f1e4c80f7b1956b5a920a6853d307ac6219606fc0` | `11be1019a72198063cfb7dec61786e7fd7aacf422d2fc5ab35c432666a1c148b` |
+
+What changed:
+- **run-trajectory.sh, hold prompt (audit 1, BLOCKER):** only an empty line writes the go file; `stop` = SIGINT (park
+  + off), `off` = write `DEMO_OFF` (switch off at the fold now), anything else prints "type Enter to run, stop, or off"
+  and keeps waiting. Before, any text (`yes`, `off`) started the trajectory. Header text updated.
+- **run-trajectory.sh, stale input (audit 2, BLOCKER):** pending terminal input is drained (`while read -r -t 0.05 _`)
+  right before the ">>> Holding at zero" prompt, so an Enter typed while the arm moved to zero no longer starts the run.
+  (`first_run.py` also `tcflush`es the terminal before handing it to the runner.)
+- **demo_move.py:** run summary `path_kinds` = (kind, duration) of every segment (a zero-length approach/return is
+  dropped, so the trajectory can be segment 0; `tools/analyze_run_gains.py` now picks it by kind). `park()` and the
+  guard hold clamp a feed-forward that would trip the cap to ±(cap − 0.05 Nm) instead of stepping it to 0. The guard
+  pre-flight also evaluates the feed-forward gravity at the reference ±0.05 rad on J2-J4 (`gravity_sag_check`, every
+  0.05 s; summary `guard_preflight.gravity_margin_nm`) and refuses a run where that passes a cap, naming the joint and
+  the margin (with and without `--gravity-model`). `--gravity-model`: the Coulomb trim also applies when gravity alone
+  is within the 0.05 Nm margin. The guard hold target is clamped to the joint limits like `park()`, and a
+  `PermissionError` from a DemoMotor cap there is logged instead of escaping (which disabled the motors). No default
+  gain, friction, cap or arm_guard.toml value changed; every existing cap and abort is kept.
+- **test_demo_move.py:** `AuditFixes` (6 tests): segment kinds + a fold-to-fold file as segment 0; the sag check's
+  message/margin; the crack demo trace with the repo model refused up front; the model trim inside the margin; park
+  and guard hold clamp (not zero) the feed-forward; guard hold clamps the target and survives a refused command.
+
+Verification: runner suite **65 tests OK** (59 + 6). Default command stream unchanged: heart rehearsal CSV md5
+`29beb50f31108975c2421428fb0e3d8c` (before and after), and both byte-identity tests pass. Rehearsals (`--rehearse`,
+real guard config), all completed with no guard fault unless noted: heart x1; search.json, scan.json and
+demo_20261029T013007Z_trace.json x2 with `DEMO_EXTRA="--gains j2=100/4,j3=80/4"`; gravity_survey.json x2;
+j4_tune.json x2; heart x1 and gravity_survey.json x2 with `--gravity-model`. The crack demo trace with
+`--gravity-model` (x1 and x2) is now **refused at pre-flight**: "j2 feed-forward gravity reaches 10.42 Nm with j2/j3/j4
+−0.05 rad of sag, margin −0.42 Nm" (the correct, safe outcome: J2 sits 0.05-0.10 Nm from the cap at the reference).
+Fake-backend reproductions of audit items 1 and 2 (pty-driven `run-trajectory.sh` with a stub `demo_move.py`): a stray
+Enter during zeroing, `yes`, or `off` no longer start the run (`off` switches off; an empty line after the prompt does
+start it).
+
+## 2026-10-29, audit 2 fixes (readiness audit pass 2: six minor findings)
+
+Pre-change copies: `~/rebot_setup/backup_pre_audit2_2026-10-29/` and `before_audit2/` here (`SHA256SUMS.before_audit2`).
+After: the files here (`SHA256SUMS`). Nothing was run on the arm and the CAN bus was never opened: only unit tests,
+`run-trajectory.sh --rehearse`, and the wrapper driven on a pty against a stub `demo_move.py` (fake runner).
+
+| File | sha256 before | sha256 after |
+|---|---|---|
+| `run-trajectory.sh` | `052619cd35d3f710f0fc6c981b7868259fba5409078b0c43e0681832082107fb` | `9c1333f82c6ffde77d8a3fd89d19b6e7852028de8d8ff2d642d0474b459288db` |
+| `demo_move.py` (2026-10-29.3 → 2026-10-29.4) | `43104d80b28f8fed52e68ae9b6a56bf362b57b47c8bfe6b3ce8a0e310b13aa16` | `5352950a792d4681845beba5b61bf823cda1bfd74609511c207bb8894b7195f0` |
+| `test_demo_move.py` | `11be1019a72198063cfb7dec61786e7fd7aacf422d2fc5ab35c432666a1c148b` | `e9d5deae53d91bc705380bf6b49dd8605d61c522fb891529a26e26398aba9958` |
+
+Also changed in the repo (not copied here): `scripts/crack_pipeline.sh` (item 5) and `tests/test_first_run.py` (its test).
+
+What changed:
+1. **run-trajectory.sh, early input:** the drain before the hold prompt no longer throws everything away. A line `stop`
+   typed while the arm moves to zero = SIGINT as soon as it holds at zero (park to the fold + off; the hold prompt is
+   skipped, the run-phase stop/off loop runs); `off` = writes `DEMO_OFF` (off at the fold); an empty line or anything
+   else is still dropped (a stray Enter never starts the run). Header text updated.
+2. **demo_move.py, Ctrl-C before enabling:** `run()` installs a SIGINT handler on its first line (the wrapper starts
+   it in the background, where SIGINT was ignored until `control()` installed its handlers, so a Ctrl-C during the
+   pre-check was lost and the run went on to enable). If it fired, the run refuses after the bus pre-check, before the
+   check-only/confirmation step, or at the top of `control()` before the first enable: "REFUSED (nothing was
+   enabled): Ctrl-C / stop received before enabling", outcome `refused`, exit 3. `control()` still installs its own
+   handlers (and restores this one); the caller's handler is restored at the end. The wrapper's trap message now
+   says what a Ctrl-C does in each phase.
+3. **demo_move.py, feed-forward fade on abort:** `park()` and `guard_recover()` take `fade` (default 1.0 for direct
+   callers); `control()` passes the fade of the last command (`min(1, t / SETTLE_S)`, 0 at enable), recorded as
+   `stats.ff_fade_at_abort`. An abort in the first second after enable no longer steps J3 from 1x to 2.5x URDF
+   gravity (the 2026-10-17 kick); the park log says "feed-forward fade-in kept at …" when it is below 1.
+4. **demo_move.py, stream gap in the post-fault hold:** a `stream` abort (> 50 ms between cycles) while holding after
+   a guard fault logs a WARNING (`stats.hold_stream_gaps`), restarts the gap clock and re-sends the hold at once; it
+   no longer disables (the motors hold their last command through a gap, CAN timeout 0). stale/status/bus/guard there
+   still disable as before.
+5. **crack_pipeline.sh search/scan (repo):** exit `$(( rrc ? rrc : crc ))`: a failed arm run fails the step even when
+   the capture succeeded; "next:" only when both exit 0. `first_run.py` session needs no change (any rc != 0 =
+   STOPPED, the runner summary outcome is checked too).
+6. **run-trajectory.sh, J1 "type yes":** the INT trap sets a flag; the question reads in 1 s slices and a Ctrl-C ends
+   it: "Ctrl-C: not confirmed; nothing was enabled.", exit 4 (before, `read` kept waiting).
+
+Tests: `AuditFixes2` (6 new): Ctrl-C (real SIGINT) during the bus pre-check refuses with no enable/send_mit and the
+handler restored; a flag left before `control()` refuses there; `park(fade=0.2)` sends the faded J3 feed-forward
+(within 1e-6; > 0.5 Nm below the fade-1 value); a simulated run stopped 0.2 s after enable parks with
+`ff_fade_at_abort` in [0.2, 0.21) and the first J3 park command on the fake bus = the faded feed-forward within 1e-6;
+a stream gap in the guard hold warns, re-sends at once and keeps holding; stale/status/bus/guard there still disable.
+Repo: `test_search_and_scan_exit_with_the_arm_runs_code_even_when_the_capture_succeeded` (10 cases; the old script
+returned 0 with the arm run at exit 3).
+
+Verification: runner suite **71 tests OK** (65 + 6); repo suite **750 passed, 1 skipped** (740 + 10). Default command stream unchanged: heart rehearsal CSV md5
+`29beb50f31108975c2421428fb0e3d8c` (unchanged), both byte-identity tests pass. Rehearsals (`--rehearse`, real guard
+config), all completed, no guard fault: heart x1; search.json, scan.json, demo_20261029T013007Z_trace.json x2 with
+`DEMO_EXTRA="--gains j2=100/4,j3=80/4"` (search/scan with `--state-file`); gravity_survey.json x2; j4_tune.json x2.
+pty (stub runner): `stop` typed at 0.8 s during zeroing → parked (exit 3); `off` typed then → off at the hold; a stray
+Enter at 0.8 s → dropped (no go); `yes` during zeroing then Enter at the prompt → runs; Enter / stop / off / Ctrl-C at
+the prompt and stop / off during the run unchanged; J1 question: Ctrl-C (also after typing `ye`) → exit 4 within 1 s,
+`no` / EOF → exit 4, `yes` then Enter → runs.
+
+## 2026-10-29, audit pass 3: one line in `run-trajectory.sh`
+
+After an early `stop` or `off` (typed while the arm moved to zero) the wrapper now drains any further buffered lines, so a
+second `stop` typed early cannot reach the run loop as a second Ctrl-C (which means "switch off now"). Backup:
+`~/rebot_setup/backup_pre_audit3_2026-10-29/run-trajectory.sh`. Heart rehearsal unchanged (md5 29beb50f…).

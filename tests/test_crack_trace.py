@@ -192,3 +192,33 @@ def test_render_view_puts_the_print_on_the_plane_with_exact_depth():
     rgb, depth, cov = ct.render_view(photo, q, ci, 1e-4, np.array([0.30, 0.0, 0.0]), np.array([0, 0, 1.0]), 0.20, ik)
     assert 0.1 < cov < 0.3 and rgb.shape == (480, 848, 3)
     assert abs(int(depth[240, 424]) * 1e-4 - 0.25) < 0.01
+
+
+def test_read_state_ignores_a_state_file_older_than_the_capture_start(tmp_path):
+    """audit 2026-10-29 item 3: a stale arm_state.json from an earlier run is never taken for the pose now."""
+    f = tmp_path / "arm_state.json"
+    old = time.time_ns() - 60 * 10**9
+    f.write_text(json.dumps(state(Q_SCAN, wall=old)))
+    os.utime(f, ns=(old, old))
+    t_start = time.time_ns()
+    assert ct.read_state(f) is not None                       # without a start time: as before
+    assert ct.read_state(f, t_start) is None                  # older mtime -> ignored
+    f.write_text(json.dumps(state(Q_SCAN, wall=old)))         # fresh mtime but an old timestamp inside -> ignored
+    assert ct.read_state(f, t_start) is None
+    t0 = time.time_ns()                                       # capture starts, then the runner writes a state whose
+    f.write_text(json.dumps(state(Q_SCAN)))                   # mtime sits a few ms BEHIND the wall clock (the fs clock
+    os.utime(f, ns=(t0 - 5 * 10**6, t0 - 5 * 10**6))          # lags ~1 ms, measured 2026-10-29) -> still used
+    assert ct.read_state(f, t0) is not None
+    f.write_text(json.dumps(state(Q_SCAN)))                   # fresh file, fresh timestamp -> used
+    assert ct.read_state(f, t_start) is not None
+
+
+def test_wait_settled_does_not_settle_on_a_stale_state_file(tmp_path):
+    f = tmp_path / "arm_state.json"
+    old = time.time_ns() - 60 * 10**9
+    f.write_text(json.dumps(state(Q_SCAN, mode="final_hold", wall=old)))   # the end of an earlier run
+    os.utime(f, ns=(old, old))
+    with pytest.raises(TimeoutError, match="left the scan pose"):            # read as now: wrong
+        ct.wait_settled(f, Q_SCAN, timeout_s=0.4, hold_s=0.3, poll_s=0.01)
+    with pytest.raises(TimeoutError, match="did not settle"):                # ignored: keeps waiting
+        ct.wait_settled(f, Q_SCAN, timeout_s=0.4, hold_s=0.3, poll_s=0.01, not_before_ns=time.time_ns())

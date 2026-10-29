@@ -13,6 +13,9 @@ Abort handling (the arm may be raised, so it must not simply drop):
     return from the measured pose to the start pose with the same gains, then disable all. A second Ctrl-C, a bus
     error or a lost motor during the park disables immediately.
   - uncontrollable faults (bus error, stale feedback, a motor fault status): hold 0.5 s if possible, disable all.
+  - the park (and the hold after a guard fault) keeps the feed-forward fade-in where it was at the abort: an abort in
+    the first second after enabling never steps J3 from 1x to the full 2.5x URDF gravity.
+  - a Ctrl-C before anything is enabled (bus pre-check, path check, guard pre-flight) = refuse: nothing is enabled.
 The 24 V switch is still the e-stop: cutting it while the arm is raised DROPS the arm.
 
 arm_guard (2026-10-21; ~/Projects/rebot_crack_vision/packages/arm_guard, docs/motion/ARM_GUARD.md):
@@ -59,6 +62,7 @@ from __future__ import annotations
 import argparse
 import csv
 import hashlib
+import itertools
 import json
 import math
 import os
@@ -71,7 +75,7 @@ from typing import Any, Optional
 import first_move_j1 as fm
 import gravity
 
-SCRIPT_VERSION = "2026-10-29.2"   # + --friction (per-run Coulomb feed-forward override, j1-j6, 0..3 Nm; default unchanged); 2026-10-29.1: --gravity-model (per-run fitted gravity: crackvision.gravity_model/1 file, URDF sha256 checked; default unchanged); 2026-10-25.1: --ff-bias (per-run feed-forward offset, path only); 2026-10-23.1: --state-file; 2026-10-22.1: --gains (per-run override); 2026-10-21.1: arm_guard pre-flight / fault handling, --trajectory
+SCRIPT_VERSION = "2026-10-29.4"   # + audit-2 fixes: Ctrl-C before enabling = refuse (nothing enabled); park/guard hold keep the feed-forward fade of the abort (no 1x -> 2.5x J3 step in the first second); a stream gap while holding after a guard fault warns and keeps holding (default command stream unchanged); 2026-10-29.3: audit fixes: summary path_kinds; park/guard-hold clamp the feed-forward at the cap instead of zeroing it; pre-flight checks gravity at the reference +-0.05 rad on J2-J4; --gravity-model trims the Coulomb term up to the cap; guard hold clamped to the limits (default command stream unchanged); 2026-10-29.2: --friction (per-run Coulomb feed-forward override, j1-j6, 0..3 Nm; default unchanged); 2026-10-29.1: --gravity-model (per-run fitted gravity: crackvision.gravity_model/1 file, URDF sha256 checked; default unchanged); 2026-10-25.1: --ff-bias (per-run feed-forward offset, path only); 2026-10-23.1: --state-file; 2026-10-22.1: --gains (per-run override); 2026-10-21.1: arm_guard pre-flight / fault handling, --trajectory
 NAMES = [n for n, *_ in fm.MOTORS]
 GAINS = {n: fm.TUNED[n][:2] for n in fm.TUNED} | {"j7": (40.0, 0.5)}
 GRAV_SCALE = {n: fm.TUNED[n][2] for n in fm.TUNED} | {"j7": 0.0}
@@ -592,8 +596,9 @@ def model_feed_forward(gm: gravity.GravityModel, q: dict, v_ref: dict, fade: flo
     """--gravity-model: for a covered joint, gravity = s x model, where the part above min(s, 1) x plain URDF fades in
     over the first second (as the scale above 1 does today: at the fold the forearm rests on the J2 motor); other
     joints keep plain URDF x the tuned scale. + the Coulomb term and the --ff-bias offset as today, except that the
-    Coulomb term is reduced where the sum would come within FF_LIMIT_MARGIN_NM of the cap. Gravity (+ bias) alone over
-    that is left as it is, so ff_for's cap check and the guard pre-flight still stop the run."""
+    Coulomb term is reduced where the sum would come within FF_LIMIT_MARGIN_NM of the cap (also when gravity alone is
+    already within that margin: the total is then held at cap - margin). Gravity (+ bias) alone over the cap is left as
+    it is, so ff_for's cap check and the guard pre-flight still stop the run."""
     g, g0 = gm.hold_torques(q), GM_PLAIN.hold_torques(q)
     out = {}
     for n in NAMES:
@@ -605,11 +610,67 @@ def model_feed_forward(gm: gravity.GravityModel, q: dict, v_ref: dict, fade: flo
             grav = (min(sc, 1.0) + fade * max(sc - 1.0, 0.0)) * g0.get(n, 0.0)
         steady = grav + bias * FF_BIAS.get(n, 0.0)
         fric = FRICTION[n] * math.tanh(v_ref.get(n, 0.0) / fm.FRICTION_VEL_EPS)
-        lim = fm.FF_CAP_BY_MODEL[fm.MODEL_OF[n]] - FF_LIMIT_MARGIN_NM
-        if abs(steady + fric) > lim and abs(steady) <= lim:
+        cap = fm.FF_CAP_BY_MODEL[fm.MODEL_OF[n]]
+        lim = cap - FF_LIMIT_MARGIN_NM
+        # audit 2026-10-29: also when gravity (+ bias) alone is within the margin of the cap (lim < |steady| <= cap):
+        # the total is then held at lim (the Coulomb term gives way first); only |steady| > cap is left to abort
+        if abs(steady + fric) > lim and abs(steady) <= cap:
             fric = math.copysign(lim, steady + fric) - steady
         out[n] = steady + fric
     return out
+
+
+def clamp_ff(ff: dict) -> dict:
+    """Each joint's feed-forward limited to +-(cap - FF_LIMIT_MARGIN_NM). Used only where ff_for would abort while the
+    arm is already being parked or held (park, guard hold): a step of the feed-forward to 0 under load would drop the
+    arm by gravity / kp (audit 2026-10-29: J2 9.9 Nm -> ~0.1 rad); holding just inside the cap is the safe choice."""
+    out = {}
+    for n, v in ff.items():
+        lim = fm.FF_CAP_BY_MODEL[fm.MODEL_OF[n]] - FF_LIMIT_MARGIN_NM
+        out[n] = max(-lim, min(lim, v))
+    return out
+
+
+GRAV_SAG_RAD = 0.05     # guard_preflight: gravity is also evaluated at the reference +- this on J2, J3, J4
+GRAV_SAG_DT = 0.05      # ... every this many seconds of the path (<= 0.03 rad of travel at the 0.6 rad/s plan cap)
+GRAV_SAG_JOINTS = ("j2", "j3", "j4")
+
+
+def gravity_sag_check(path, gm: gravity.GravityModel, dt: float = GRAV_SAG_DT, e: float = GRAV_SAG_RAD) -> tuple[list[str], dict]:
+    """ff_for evaluates gravity at the MEASURED pose, the guard pre-flight at the reference. A sag (or lead) of up to e
+    rad on J2-J4 must not push the feed-forward gravity (+ nothing else: v = 0, no bias) past the cap, or ff_for aborts
+    mid-path. Worst case over the reference and the 26 neighbours {-e, 0, +e}^3 (the neighbours only where some joint's
+    gravity is within 20 % of its cap: a 0.05 rad box moves it by far less). Returns (problems, worst per joint)."""
+    caps = {n: fm.FF_CAP_BY_MODEL[fm.MODEL_OF[n]] for n in NAMES}
+    deltas = [d for d in itertools.product((-e, 0.0, e), repeat=len(GRAV_SAG_JOINTS)) if any(d)]
+    worst = {n: {"nm": 0.0, "t_s": None, "delta_rad": None} for n in NAMES}
+    k = 0
+    while k * dt <= path.duration:
+        t = k * dt
+        _, q, _ = path.at(t)
+        g = feed_forward(gm, q, {}, 1.0)
+        cands = [(None, g)]
+        if any(abs(g[n]) > 0.8 * caps[n] for n in NAMES):
+            for d in deltas:
+                qq = dict(q) | {n: q[n] + dn for n, dn in zip(GRAV_SAG_JOINTS, d)}
+                cands.append((d, feed_forward(gm, qq, {}, 1.0)))
+        for d, gg in cands:
+            for n in NAMES:
+                if abs(gg[n]) > worst[n]["nm"]:
+                    worst[n] = {"nm": abs(gg[n]), "t_s": round(t, 3), "delta_rad": d}
+        k += 1
+    problems = []
+    for n in NAMES:
+        w = worst[n]
+        if w["nm"] > caps[n]:
+            at = "at the reference" if w["delta_rad"] is None else (
+                "with " + ", ".join(f"{j} {dj:+.2f}" for j, dj in zip(GRAV_SAG_JOINTS, w["delta_rad"])) + " rad of sag")
+            problems.append(f"gravity margin: {n} feed-forward gravity reaches {w['nm']:.2f} Nm {at} (path t "
+                            f"{w['t_s']:.1f} s), {w['nm'] - caps[n]:.2f} Nm over its {caps[n]:g} Nm cap (margin "
+                            f"{caps[n] - w['nm']:+.2f} Nm): a {e} rad sag there would abort the run mid-path. Plan the "
+                            "pose with more margin (less reach)"
+                            + (", or run without --gravity-model" if GM_PLAIN is not None else ""))
+    return problems, worst
 
 
 def sampled_peaks(path, dt: float = CHECK_DT) -> dict[str, float]:
@@ -649,10 +710,45 @@ def guard_preflight(path, zeroing, measured: dict, start: dict, gm: gravity.Grav
             yield t, {n: (q[n], v[n], *GAINS[n], ff[n]) for n in NAMES}
             k += 1
             t = k * period
-    return preflight.check_plan(GUARD.cfg, measured, ticks())
+    pf = preflight.check_plan(GUARD.cfg, measured, ticks())
+    sag_problems, worst = gravity_sag_check(path, gm)
+    pf["problems"] = list(pf["problems"]) + sag_problems
+    pf["gravity_margin_nm"] = {n: round(fm.FF_CAP_BY_MODEL[fm.MODEL_OF[n]] - w["nm"], 3) for n, w in worst.items()}
+    return pf
+
+
+EARLY_STOP = {"n": 0}   # Ctrl-C received before control() installed its own handlers
+
+
+def _early_signal(signum, _frame):  # noqa: ANN001
+    EARLY_STOP["n"] += 1
+
+
+def early_refusal(summary: dict, log) -> int:
+    """A Ctrl-C arrived before anything was enabled: refuse (nothing is enabled)."""
+    summary["outcome"], summary["refusal"] = "refused", "Ctrl-C (operator stop) before enabling"
+    log("REFUSED (nothing was enabled): Ctrl-C / stop received before enabling")
+    log("outcome: refused (Ctrl-C before enabling; nothing was enabled)")
+    return fm.EXIT_REFUSED
 
 
 def run(argv: list[str], rt: Optional[fm.Runtime] = None, bus_factory=None, sim_setup=None) -> int:
+    """SIGINT is caught from the very start (bus pre-check, path check, guard pre-flight; run-trajectory.sh starts this
+    in the background, where SIGINT would otherwise be ignored until control() installs its handlers): a Ctrl-C there
+    makes the run refuse before anything is enabled. control() installs its own handlers (abort -> park) and restores
+    this one; the caller's handler is restored at the end."""
+    EARLY_STOP["n"] = 0
+    old = None
+    if rt is None or rt.install_signals:
+        old = signal.signal(signal.SIGINT, _early_signal)
+    try:
+        return _run_main(argv, rt, bus_factory, sim_setup)
+    finally:
+        if old is not None:
+            signal.signal(signal.SIGINT, old)
+
+
+def _run_main(argv: list[str], rt: Optional[fm.Runtime] = None, bus_factory=None, sim_setup=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--choreo", default="wave", choices=sorted(CHOREOS))
     ap.add_argument("--slow", type=float, default=1.0, help="multiply every duration (>= 1)")
@@ -900,6 +996,8 @@ def _run(args, rt, bus_factory, choreo, gm, base, summary, sim_setup, traj=None)
                 return fm.EXIT_REFUSED
         start = {n: readings[n]["pos"] for n in NAMES}
         summary["start"] = start
+        if EARLY_STOP["n"]:
+            return early_refusal(summary, log)
         # The waypoints are absolute angles: they assume encoder zero = the folded pose (set by the vendor,
         # never changed). Starting in the fold proves it before a big move (a re-zeroed motor would read far off).
         global J1_OFFSET, J2_ALLOW_DROOP
@@ -978,6 +1076,9 @@ def _run(args, rt, bus_factory, choreo, gm, base, summary, sim_setup, traj=None)
             log("REFUSED (path check; nothing was enabled):\n  " + "\n  ".join(problems))
             return fm.EXIT_REFUSED
         if traj:
+            # the kind of every segment (a zero-length approach/return is dropped, so the trajectory may be seg 0):
+            # tools/analyze_run_gains.py picks the trajectory segment by kind from here
+            summary["path_kinds"] = [[k, round(seg[1], 4)] for k, seg in zip(path.kinds, path.segs)]
             pieces = ", ".join(f"{k} {seg[1]:.1f} s" for k, seg in zip(path.kinds, path.segs))
             log(f"pre-checks OK; path OK: trajectory {Path(args.trajectory).name} ({traj[0]['n_points']} points, "
                 f"purpose {traj[0].get('purpose')!r}, x{args.slow:g} slower): {pieces}; gripper stays >= "
@@ -990,7 +1091,7 @@ def _run(args, rt, bus_factory, choreo, gm, base, summary, sim_setup, traj=None)
         if GUARD is not None:
             pf = guard_preflight(path, zeroing, measured, start, gm)
             summary["guard_preflight"] = {k: pf[k] for k in ("problems", "warnings", "offsets", "n_ticks")} \
-                | {"min_keepout_m": pf["min_keepout_m"]}
+                | {"min_keepout_m": pf["min_keepout_m"], "gravity_margin_nm": pf.get("gravity_margin_nm")}
             if pf["problems"]:
                 summary["outcome"], summary["refusal"] = "refused", ["arm_guard: " + x for x in pf["problems"]]
                 log("REFUSED (arm_guard pre-flight: the guard would stop this run; nothing was enabled):\n  "
@@ -1008,6 +1109,8 @@ def _run(args, rt, bus_factory, choreo, gm, base, summary, sim_setup, traj=None)
         log("start: " + ", ".join(f"{n} {q:+.3f}" for n, q in start.items()))
         log("ABORT -> controlled PARK back to this start pose, then all motors off. 24 V switch = e-stop: "
             "cutting it while raised DROPS the arm.")
+        if EARLY_STOP["n"]:
+            return early_refusal(summary, log)
         if args.check_only:
             summary["outcome"] = "check_ok"
             return fm.EXIT_OK
@@ -1048,6 +1151,10 @@ def control(args, rt, raw_ctrl, motors, path: Path_, start, gm, base, summary, m
     if rt.install_signals:
         for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
             old[sig] = signal.signal(sig, on_signal)
+    if EARLY_STOP["n"] or stop["n"]:     # a Ctrl-C before this point: nothing is enabled yet -> refuse
+        for sig, h in old.items():
+            signal.signal(sig, h)
+        return early_refusal(summary, log)
     fh = open(f"{base}.csv", "w", newline="")
     w = csv.writer(fh)
     w.writerow(["t_s", "mode", "seg"] + [f"{n}_{k}" for n in NAMES for k in ("ref", "pos", "vel", "torq", "ff")])
@@ -1085,8 +1192,10 @@ def control(args, rt, raw_ctrl, motors, path: Path_, start, gm, base, summary, m
             log(f"WARNING: --state-file {state_file}: {e}; no longer publishing the arm state")
             state_file = None
 
-    def ff_for(q: dict, v_ref: dict, fade: float, bias: float = 0.0) -> dict:
+    def ff_for(q: dict, v_ref: dict, fade: float, bias: float = 0.0, clamp: bool = False) -> dict:
         out = feed_forward(gm, q, v_ref, fade, bias)
+        if clamp:                                   # park / guard hold only: never abort there, hold inside the cap
+            return clamp_ff(out)
         for n, ff in out.items():
             cap = fm.FF_CAP_BY_MODEL[fm.MODEL_OF[n]]
             if abs(ff) > cap:
@@ -1144,6 +1253,7 @@ def control(args, rt, raw_ctrl, motors, path: Path_, start, gm, base, summary, m
 
     period = 1.0 / LOOP_HZ
     outcome = "aborted"
+    fade_cmd = [0.0]     # the feed-forward fade of the last command (0 at enable, min(1, t / SETTLE_S) after)
     try:
         try:
             # ---- enable one by one, each immediately holding its measured position ------------------------------
@@ -1214,7 +1324,8 @@ def control(args, rt, raw_ctrl, motors, path: Path_, start, gm, base, summary, m
                     if seg != last_seg and seg < len(path.segs):
                         log(f"  segment {seg}: {path.segs[seg][1]:.1f} s")
                         last_seg = seg
-                ff = ff_for(q_meas, v_ref, min(1.0, t / SETTLE_S),
+                fade_cmd[0] = min(1.0, t / SETTLE_S)
+                ff = ff_for(q_meas, v_ref, fade_cmd[0],
                             bias_scale(t - t_path, path.duration) if mode == "path" and FF_BIAS else 0.0)
                 cycle(q_ref, v_ref, ff, mode, seg, t, TRACK_ABORT_RAD, t_prev)
                 slack = next_t - clock()
@@ -1233,12 +1344,16 @@ def control(args, rt, raw_ctrl, motors, path: Path_, start, gm, base, summary, m
         if trigger is not None:
             log(f"ABORT: [{trigger.trigger}] {trigger.detail}")
             if trigger.controllable and len(enabled) == len(NAMES):
+                # park / guard hold keep the fade-in where the abort found it (an abort during the first second
+                # must not step J3 from 1x to 2.5x URDF gravity)
+                fade = fade_cmd[0]
+                stats["ff_fade_at_abort"] = fade
                 if trigger.trigger == "guard":
                     outcome = "park_guard_fault"
                 else:
-                    outcome = park(rt, motors, q_meas, start, ff_for, cycle, stats, stop, log)
+                    outcome = park(rt, motors, q_meas, start, ff_for, cycle, stats, stop, log, fade=fade)
                 while outcome == "park_guard_fault":       # hold until the operator says park (reset + park)
-                    outcome = guard_recover(rt, motors, q_meas, start, ff_for, cycle, stats, stop, log)
+                    outcome = guard_recover(rt, motors, q_meas, start, ff_for, cycle, stats, stop, log, fade=fade)
             elif enabled:
                 log("the operator switches off: holding 0.5 s, then disabling all" if trigger.trigger == "operator_off"
                     else "uncontrollable fault: holding 0.5 s where possible, then disabling all")
@@ -1286,13 +1401,15 @@ def control(args, rt, raw_ctrl, motors, path: Path_, start, gm, base, summary, m
     return fm.EXIT_OK if outcome == "completed" else fm.EXIT_ABORTED
 
 
-def park(rt, motors, q_meas, start, ff_for, cycle, stats, stop, log) -> str:
-    """Slow min-jerk return from the measured pose to the start pose, then the caller disables all."""
+def park(rt, motors, q_meas, start, ff_for, cycle, stats, stop, log, fade: float = 1.0) -> str:
+    """Slow min-jerk return from the measured pose to the start pose, then the caller disables all. fade = the
+    feed-forward fade-in at the abort (control() passes it; kept for the whole park)."""
     clock, sleep = rt.clock, rt.sleep
     q0 = {n: min(max(q, limits(n)[0]), limits(n)[1]) for n, q in q_meas.items()}   # e.g. J3 sagged past its stop
     start = dict(start) | {"j1": q0["j1"]}   # fold the arm; the base stays where it is (it carries no gravity)
     T = max(3.0, max(1.875 * abs(start[n] - q0[n]) / PARK_SPEED for n in NAMES))
-    log(f"PARK: returning to the start pose over {T:.1f} s (Ctrl-C again = disable now)")
+    log(f"PARK: returning to the start pose over {T:.1f} s (Ctrl-C again = disable now)"
+        + (f"; feed-forward fade-in kept at {fade:.3f} (as at the abort)" if fade < 1.0 else ""))
     stats["parked"] = True
     sigs_at_start = stop["n"]
     period = 1.0 / LOOP_HZ
@@ -1316,9 +1433,12 @@ def park(rt, motors, q_meas, start, ff_for, cycle, stats, stop, log) -> str:
             q_ref = {n: v[0] for n, v in qv.items()}
             v_ref = {n: v[1] for n, v in qv.items()}
             try:
-                ff = ff_for(q_meas, v_ref, 1.0)
-            except Abort:
-                ff = {n: 0.0 for n in q0}
+                ff = ff_for(q_meas, v_ref, fade)
+            except Abort as a:   # never a step to 0 while holding under load: clamp just inside the cap instead
+                ff = ff_for(q_meas, v_ref, fade, clamp=True)
+                if not stats.get("park_ff_clamped"):
+                    stats["park_ff_clamped"] = True
+                    log(f"PARK: {a.detail}: feed-forward clamped to +-(cap - {FF_LIMIT_MARGIN_NM} Nm), not zeroed")
             try:
                 cycle(q_ref, v_ref, ff, "park", -2, t, PARK_TRACK_ABORT_RAD, t_prev)
             except Abort as a:
@@ -1363,11 +1483,13 @@ def poll_stop(rt, stop: dict) -> None:
         stop["n"] += 1
 
 
-def guard_recover(rt, motors, q_meas, start, ff_for, cycle, stats, stop, log) -> str:
+def guard_recover(rt, motors, q_meas, start, ff_for, cycle, stats, stop, log, fade: float = 1.0) -> str:
     """The guard faulted: it sent a hold and latched, and now turns every command into a hold at the latched pose.
     Keep streaming (the arm keeps holding, feedback stays fresh) and wait for the operator; never disable on our
     own (a raised arm would drop). The next Ctrl-C/'stop' resets the guard with a logged reason and parks slowly to
-    the fold; a Ctrl-C during that park switches off (park()'s own rule)."""
+    the fold; a Ctrl-C during that park switches off (park()'s own rule). fade = the feed-forward fade-in at the
+    abort (kept here and in the park). A gap in the command stream (> STALL_S between cycles) only warns: the motors
+    keep holding their last command through it (CAN timeout 0), so the hold is re-sent at once and kept."""
     clock, sleep = rt.clock, rt.sleep
     stats["guard_faults"] = stats.get("guard_faults", 0) + 1
     detail = (GUARD.latched if GUARD is not None else "") or "?"
@@ -1378,7 +1500,7 @@ def guard_recover(rt, motors, q_meas, start, ff_for, cycle, stats, stop, log) ->
     sigs = stop["n"]
     period = 1.0 / LOOP_HZ
     zero = {n: 0.0 for n in NAMES}
-    q_hold = dict(q_meas)
+    q_hold = {n: min(max(q, limits(n)[0]), limits(n)[1]) for n, q in q_meas.items()}   # as park(): e.g. J3 past its stop
     t0 = clock()
     t_prev = [t0]
     next_t, next_note = t0 + period, t0 + GUARD_NOTE_S
@@ -1390,15 +1512,34 @@ def guard_recover(rt, motors, q_meas, start, ff_for, cycle, stats, stop, log) ->
         if stop["n"] != sigs:
             break
         try:
-            ff = ff_for(q_meas, {}, 1.0)
-        except Abort:
-            ff = dict(zero)
+            ff = ff_for(q_meas, {}, fade)
+        except Abort as a:   # never a step to 0 while holding under load: clamp just inside the cap instead
+            ff = ff_for(q_meas, {}, fade, clamp=True)
+            if not stats.get("hold_ff_clamped"):
+                stats["hold_ff_clamped"] = True
+                log(f"  {a.detail}: feed-forward clamped to +-(cap - {FF_LIMIT_MARGIN_NM} Nm) while holding, not zeroed")
         try:   # the guard replaces the target with its latched hold; tracking/torque bounds do not apply here
-            cycle(q_hold, zero, ff, "guard_hold", -5, clock() - t0, math.inf, t_prev)
+            try:
+                cycle(q_hold, zero, ff, "guard_hold", -5, clock() - t0, math.inf, t_prev)
+            except Abort as a:
+                if a.trigger != "stream":
+                    raise
+                # a late cycle (the host stalled): nothing was sent this cycle, the motors still hold the last
+                # command (CAN timeout 0). Never disable for it here (a raised arm would drop): re-send the hold now.
+                stats["hold_stream_gaps"] = stats.get("hold_stream_gaps", 0) + 1
+                log(f"  WARNING while holding after the guard fault: [stream] {a.detail}; the motors hold through a "
+                    f"gap (CAN timeout 0): re-sending the hold, still holding (gap {stats['hold_stream_gaps']})")
+                t_prev[0] = clock()
+                cycle(q_hold, zero, ff, "guard_hold", -5, clock() - t0, math.inf, t_prev)
         except Abort as a:
-            if a.trigger in ("stale", "status", "bus", "stream", "guard"):
+            if a.trigger in ("stale", "status", "bus", "guard"):
                 log(f"while holding after the guard fault: [{a.trigger}] {a.detail}; cannot hold, disabling")
                 return "aborted_guard_hold_failed"
+        except PermissionError as e:   # a DemoMotor cap refused one command: keep holding (never drop the arm here)
+            if not stats.get("hold_permission_logged"):
+                stats["hold_permission_logged"] = True
+                log(f"  WARNING while holding after the guard fault: a command was refused ({e}); still holding, "
+                    "Ctrl-C / 'stop' = reset and park, 'off' = switch off")
         if clock() >= next_note:
             log(f"  still HOLDING after the guard fault ({clock() - t0:.0f} s): Ctrl-C / 'stop' = reset and park")
             next_note += GUARD_NOTE_S
@@ -1420,7 +1561,7 @@ def guard_recover(rt, motors, q_meas, start, ff_for, cycle, stats, stop, log) ->
         GUARD.reset(reason)
     stats["guard_resets"] = stats.get("guard_resets", 0) + 1
     log(f"arm_guard reset by the operator ({reason}); parking")
-    return park(rt, motors, q_meas, start, ff_for, cycle, stats, stop, log)
+    return park(rt, motors, q_meas, start, ff_for, cycle, stats, stop, log, fade=fade)
 
 
 if __name__ == "__main__":

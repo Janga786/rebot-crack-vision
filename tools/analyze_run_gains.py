@@ -24,8 +24,14 @@ torque offset is a feed-forward problem, not a gain problem; ripple is the oscil
         Hz band that shared part carries; and a what-if: the error had the run used another Coulomb value (the sign term
         moved by (F_run - X) / kp) and/or another kp (the whole error x kp_run / kp, quasi-static). Several runs: also
         the across-run mean / sd of the implied Coulomb (docs/motion/J4_TUNING.md)
-  --seg1-window T0:T1 (with any of the above): only that part of the trajectory (file seconds, x the run's slow),
-        e.g. one pose of ~/rebot_setup/trajectories/j4_tune.json
+  --seg1-window T0:T1 (with any of the above): only that part of the TRAJECTORY segment (seconds of trajectory-file
+        time from the start of that segment, x the run's slow), e.g. one pose of ~/rebot_setup/trajectories/j4_tune.json
+
+The trajectory segment is found by its kind, not its number: demo_move.py (2026-10-29.3+) writes "path_kinds" (the
+(kind, duration) of every segment) into the run summary RUN.json. A zero-length approach or return is dropped (e.g.
+j4_tune.json / gravity_survey.json, which start and end at the fold, run with --j1-here-is-zero), so the trajectory can
+be segment 0. Older summaries: inferred from the trajectory file's duration. No summary: segment 1 is ASSUMED, with a
+WARNING (as are slow 1 and the tuned kp / Coulomb values). Keep every RUN.json next to its RUN.csv; do not rename them.
 """
 
 from __future__ import annotations
@@ -33,7 +39,9 @@ from __future__ import annotations
 import argparse
 import csv
 import gzip
+import hashlib
 import json
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -41,10 +49,16 @@ import numpy as np
 JOINTS = ["j1", "j2", "j3", "j4", "j5"]
 
 
+USED_COLS = ["t_s", "seg"] + [f"j{i}_{c}" for i in range(1, 7) for c in ("ref", "pos", "vel", "torq", "ff")]
+
+
 def load(path: Path) -> list[dict]:
+    """The 'path' rows of a run CSV that have every used column (a row with an empty cell, e.g. a motor that gave no
+    feedback that cycle, is dropped instead of crashing the float conversions)."""
     opener = gzip.open if str(path).endswith(".gz") else open
     with opener(path, "rt", newline="") as fh:
-        return [x for x in csv.DictReader(fh) if x["mode"] == "path" and x["j2_pos"] != ""]
+        return [x for x in csv.DictReader(fh) if x.get("mode") == "path"
+                and all((x.get(c) or "").strip() != "" for c in USED_COLS)]
 
 
 def band_rms(x: np.ndarray, dt: float, lo: float = 2.5, hi: float = 40.0) -> tuple[float, float]:
@@ -166,7 +180,7 @@ def run_params(csv_path: Path) -> tuple[dict, dict, str]:
     s = run_summary(csv_path)
     kp = {j: float(gmod.KP[j]) for j in JOINTS}
     fric = {j: float(gmod.RUNNER_FRICTION[j]) for j in JOINTS}
-    src = "tuned defaults"
+    src = "tuned defaults" + ("" if s else " (NO RUN SUMMARY: ASSUMED)")
     if isinstance(s.get("gains"), dict) and isinstance(s.get("friction"), dict):
         kp |= {j: float(s["gains"][j][0]) for j in JOINTS if j in s["gains"]}
         fric |= {j: float(s["friction"][j]) for j in JOINTS if j in s["friction"]}
@@ -290,11 +304,13 @@ def friction_fit(rows: list[dict], kp: dict, fric: dict, what_if_friction: dict 
     return out
 
 
-def friction_summary(results: dict, seg: int = 1) -> dict:
-    """Across runs, per joint: mean / sd / min / max of the implied Coulomb (and of the sign term) on one segment."""
+def friction_summary(results: dict, seg: int | None = None) -> dict:
+    """Across runs, per joint: mean / sd / min / max of the implied Coulomb (and of the sign term) on one segment: each
+    run's trajectory segment (r["trajectory_seg"], else 1) unless seg is given."""
     out = {}
     for j in JOINTS:
-        ds = [r["friction_fit"][j]["segments"].get(seg) for r in results.values() if "friction_fit" in r]
+        ds = [r["friction_fit"][j]["segments"].get(seg if seg is not None else r.get("trajectory_seg", 1))
+              for r in results.values() if "friction_fit" in r]
         ds = [d for d in ds if d is not None and not d.get("static")]
         c = [d["implied_coulomb_nm"] for d in ds]
         s = [d["error"]["sgn_mrad"] for d in ds]
@@ -306,15 +322,15 @@ def friction_summary(results: dict, seg: int = 1) -> dict:
     return out
 
 
-def print_friction_fit(name: str, src: str, ff: dict) -> None:
-    print(f"  friction fit (kp / Coulomb feed-forward F_ff from the {src}), segment 1 (the trajectory). e in mrad "
+def print_friction_fit(name: str, src: str, ff: dict, seg: int = 1, labels: str = "0 approach, 1 path, 2 return") -> None:
+    print(f"  friction fit (kp / Coulomb feed-forward F_ff from the {src}), segment {seg} (the trajectory). e in mrad "
           "(visc per rad/s, inert per rad/s2), tq-ff in Nm; * = sign column confounded (VIF > 15)")
     print("  joint  kp  F_ff |  e: const   sgn  [Nm@kp]   visc  inert   R2 | tq-ff: const   sgn    visc   inert    R2 | "
           "implied F (up/down) | corr e3  coh e3 @Hz (n seg, 95% zero)  2.5-40 Hz rms: shared/own | what-if: F  kp  sgn  mean  rms")
     for j, jo in ff.items():
-        d = jo["segments"].get(1)
+        d = jo["segments"].get(seg)
         if d is None or d.get("static"):
-            print(f"  {j}  {jo['kp']:4.0f} {jo['runner_friction_nm']:4.2f} | (does not move in segment 1)")
+            print(f"  {j}  {jo['kp']:4.0f} {jo['runner_friction_nm']:4.2f} | (does not move in segment {seg})")
             continue
         E, T = d["error"], d["torque"]
         c = d.get("coherence_with_j3")
@@ -331,7 +347,7 @@ def print_friction_fit(name: str, src: str, ff: dict) -> None:
               f"{T['const_nm']:+6.2f} {T['sgn_nm']:+6.3f} {T['visc_nm_s_per_rad']:+6.2f} {T['inertia_nm_s2_per_rad']:+7.4f} {T['r2']:4.2f}"
               f"{'*' if d['confounded'] else ' '}| {d['implied_coulomb_nm']:5.2f} {uds:13s} | {coh}{wis}")
     has_wi = any("what_if" in d for jo in ff.values() for d in jo["segments"].values())
-    print("  by segment (0 approach, 1 path, 2 return): e sgn mrad / tq-ff sgn Nm / implied F / R2(e) / rms mrad"
+    print(f"  by segment ({labels}): e sgn mrad / tq-ff sgn Nm / implied F / R2(e) / rms mrad"
           + (" -> what-if rms" if has_wi else ""))
     for j, jo in ff.items():
         parts = []
@@ -361,22 +377,101 @@ def compare(a: dict, b: dict) -> dict:
 
 
 def seg1_window(rows: list[dict], window: tuple[float, float], csv_path: Path) -> list[dict]:
-    """The rows of segment 1 between window[0] and window[1] seconds of trajectory-file time (x the run's slow)."""
+    """The rows of the trajectory segment (trajectory_segment: by kind, not number) between window[0] and window[1]
+    seconds of trajectory-file time from that segment's start (x the run's slow)."""
     slow = float(run_summary(csv_path).get("slow") or 1.0)
-    s1 = [x for x in rows if x["seg"] == "1"]
+    k = str(trajectory_segment(csv_path, rows)[0])
+    s1 = [x for x in rows if x["seg"] == k]
     if not s1:
         return []
     t0 = float(s1[0]["t_s"])
     return [x for x in s1 if window[0] * slow <= float(x["t_s"]) - t0 <= window[1] * slow]
 
 
+_WARNED: set[str] = set()
+
+
+def summary_path(csv_path: Path) -> Path:
+    return Path(str(csv_path).removesuffix(".gz").removesuffix(".csv") + ".json")
+
+
 def run_summary(csv_path: Path) -> dict:
-    """The demo_move.py summary next to a run log (RUN.json), if there is one."""
-    p = Path(str(csv_path).removesuffix(".gz").removesuffix(".csv") + ".json")
+    """The demo_move.py summary next to a run log (RUN.json), if there is one. Missing: a loud WARNING (once per run)
+    naming what is then assumed."""
+    p = summary_path(csv_path)
     try:
         return json.loads(p.read_text())
     except (OSError, ValueError):
+        if str(p) not in _WARNED:
+            _WARNED.add(str(p))
+            from crackvision import gravity_model as gmod
+            print(f"WARNING: no run summary {p.name} next to {Path(csv_path).name}: ASSUMING slow 1, kp "
+                  + ", ".join(f"{j} {gmod.KP[j]:g}" for j in JOINTS) + ", Coulomb feed-forward "
+                  + ", ".join(f"{j} {gmod.RUNNER_FRICTION[j]:g}" for j in JOINTS)
+                  + " Nm (the tuned defaults; per-run --gains/--friction overrides are NOT known) and segment 1 = the "
+                  "trajectory. Numbers that depend on them may be WRONG. Keep every .json next to its .csv; do not "
+                  "rename either.", file=sys.stderr, flush=True)
         return {}
+
+
+def _traj_file_duration(s: dict) -> float | None:
+    """An older summary (no path_kinds): the trajectory file's duration x slow, if the file is still there unchanged."""
+    h = s.get("trajectory") or {}
+    try:
+        raw = Path(h["path"]).read_bytes()
+        if hashlib.sha256(raw).hexdigest() != h.get("sha256"):
+            return None
+        return float(json.loads(raw)["points"][-1]["t_s"]) * float(s.get("slow") or 1.0)
+    except (OSError, KeyError, ValueError, TypeError, IndexError):
+        return None
+
+
+def trajectory_segment(csv_path: Path, rows: list[dict]) -> tuple[int, str, list[str] | None]:
+    """(the segment number of the trajectory, how it was found, the kind of every segment or None). rows = the run's
+    path rows (before any window)."""
+    s = run_summary(csv_path)
+    segs = sorted({int(x["seg"]) for x in rows})
+    kinds = s.get("path_kinds")
+    if isinstance(kinds, list) and kinds:
+        names = [str(k[0]) if isinstance(k, (list, tuple)) else str(k) for k in kinds]
+        if "trajectory" in names:
+            return names.index("trajectory"), "run summary path_kinds", names
+    if s.get("choreo") == "trajectory":
+        dur = _traj_file_duration(s)
+        if dur:
+            span = {k: float(rr[-1]["t_s"]) - float(rr[0]["t_s"]) for k in segs
+                    for rr in [[x for x in rows if int(x["seg"]) == k]]}
+            k = min(span, key=lambda k: abs(span[k] - dur))
+            if abs(span[k] - dur) <= 0.05 + 0.02 * dur:
+                return k, "inferred: the segment as long as the trajectory file", None
+        if segs == [0, 1, 2]:
+            return 1, "inferred: 3 segments", ["approach", "trajectory", "return"]
+        if len(segs) == 1:
+            return segs[0], "inferred: 1 segment", ["trajectory"]
+        print(f"WARNING: {Path(csv_path).name}: cannot tell which segment is the trajectory (segments {segs}, the "
+              "summary has no path_kinds); ASSUMING segment 1", file=sys.stderr, flush=True)
+        return 1, "ASSUMED segment 1 (ambiguous)", None
+    if not s:
+        if len(segs) == 1:
+            return segs[0], "ASSUMED (no run summary; the only segment)", None
+        print(f"WARNING: {Path(csv_path).name}: no run summary: ASSUMING segment 1 is the trajectory (segments "
+              f"{segs})", file=sys.stderr, flush=True)
+        return 1, "ASSUMED segment 1 (no run summary)", None
+    return 1, "choreography run: segment 1", None
+
+
+def seg_labels(kinds: list[str] | None, segs) -> str:
+    if kinds:
+        return ", ".join(f"{k} {n}" for k, n in enumerate(kinds))
+    return ", ".join(str(k) for k in segs) + " (kinds unknown)"
+
+
+def outcome_text(csv_path: Path) -> str:
+    s = run_summary(csv_path)
+    if not s:
+        return "outcome unknown (no run summary)"
+    trig = s.get("trigger") or {}
+    return f"outcome {s.get('outcome')}" + (f" (trigger {trig.get('id')}: {trig.get('detail')})" if trig else "")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -414,6 +509,10 @@ def main(argv: list[str] | None = None) -> int:
         ap.error("--what-if-friction / --what-if-kp need --friction-fit")
     if args.compare:
         ra, rb = (seg1_window(load(p), window, p) if window else load(p) for p in args.compare)
+        for tag, p in zip("AB", args.compare):
+            print(f"{tag}: {outcome_text(p)}" + (f"; window {window[0]:g}..{window[1]:g} s of segment "
+                  f"{trajectory_segment(p, load(p))[0]} (the trajectory)" if window else ""),
+                  file=sys.stderr if args.json else sys.stdout)
         if min(len(ra), len(rb)) < 500:
             print("--compare: a run with fewer than 500 path rows (aborted or refused?)")
             return 1
@@ -429,8 +528,9 @@ def main(argv: list[str] | None = None) -> int:
               "    ripple (mrad) A -> B     hold flips A -> B")
         for j, d in cmp_.items():
             f = lambda k: f"{d[k]['A']:+6.1f} -> {d[k]['B']:+6.1f} ({d[k]['B-A']:+5.1f})"
+            f2 = lambda k: f"{d[k]['A']:5.2f} -> {d[k]['B']:5.2f} ({d[k]['B-A']:+5.2f})"   # ripple: to 0.01 mrad
             print(f"  {j}  {f('mean_err_mrad')}  {f('rms_err_mrad')}  {f('max_err_mrad')}  {f('torque_minus_ff_mean_nm')}"
-                  f"  {f('ripple_mrad')}  {d['hold_flips']['A']:4d} -> {d['hold_flips']['B']:4d}")
+                  f"  {f2('ripple_mrad')}  {d['hold_flips']['A']:4d} -> {d['hold_flips']['B']:4d}")
         return 0
     if not args.csv:
         ap.error("give run CSVs, or --compare A.csv B.csv")
@@ -441,23 +541,31 @@ def main(argv: list[str] | None = None) -> int:
     result = {}
     for p in args.csv:
         rows = load(p)
+        tseg, tsrc, kinds = trajectory_segment(p, rows) if rows else (1, "no rows", None)
+        segs = sorted({int(x["seg"]) for x in rows})
         if window:
             rows = seg1_window(rows, window, p)
         if len(rows) < 500:
-            print(f"{p}: only {len(rows)} path rows (an aborted or refused run?): skipped")
+            print(f"{p}: only {len(rows)} path rows (an aborted or refused run?): skipped; {outcome_text(p)}")
             continue
-        result[p.name] = {"joints": analyse(rows)} | ({"directions": directions(rows)} if args.directions else {}) \
+        result[p.name] = {"joints": analyse(rows), "outcome": outcome_text(p), "summary_missing": not run_summary(p),
+                          "trajectory_seg": tseg, "trajectory_seg_from": tsrc, "segment_kinds": kinds,
+                          "segment_labels": seg_labels(kinds, segs)} \
+            | ({"directions": directions(rows)} if args.directions else {}) \
             | ({"gravity_model": rescore(rows, model)} if model is not None else {})
         if args.friction_fit:
             kp, fric, src = run_params(p)
             result[p.name] |= {"params_from": src, "friction_fit": friction_fit(rows, kp, fric, wif, wik)}
     summary = friction_summary(result) if args.friction_fit and len(result) > 1 else None
     if args.json:
-        print(json.dumps(result | ({"across_runs_segment_1": summary} if summary else {}), indent=1))
+        print(json.dumps(result | ({"across_runs_trajectory_segment": summary} if summary else {}), indent=1))
         return 0
     for name, r in result.items():
-        print(f"== {name}")
-        print("  joint  mean   rms   max  ripple@Hz     tq-ff   peak tq  peak ff   rms by segment (0 approach, 1 path, 2 return)")
+        print(f"== {name}" + ("   [NO RUN SUMMARY: slow / kp / Coulomb / trajectory segment ASSUMED]"
+                               if r["summary_missing"] else ""))
+        print(f"  {r['outcome']}; trajectory = segment {r['trajectory_seg']} ({r['trajectory_seg_from']})"
+              + (f"; window {window[0]:g}..{window[1]:g} s of it" if window else ""))
+        print(f"  joint  mean   rms   max  ripple@Hz     tq-ff   peak tq  peak ff   rms by segment ({r['segment_labels']})")
         for j, v in r["joints"].items():
             print(f"  {j}  {v['mean_err_mrad']:+6.1f} {v['rms_err_mrad']:5.1f} {v['max_err_mrad']:5.1f}  "
                   f"{v['ripple_mrad']:4.2f}@{v['ripple_hz']:4.1f}  {v['torque_minus_ff_mean_nm']:+6.2f} Nm  {v['peak_torque_nm']:5.1f}  "
@@ -475,10 +583,10 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  {j} stationary after moving " + ", ".join(
                 f"{k}: tq-ff {v['torque_minus_ff_nm']:+.2f} Nm, err {v['static_err_mrad']:+.1f} mrad (n={v['n']})" for k, v in d.items()))
         if "friction_fit" in r:
-            print_friction_fit(name, r["params_from"], r["friction_fit"])
+            print_friction_fit(name, r["params_from"], r["friction_fit"], r["trajectory_seg"], r["segment_labels"])
     if summary:
-        print(f"== across {len(result)} runs, segment 1: implied Coulomb friction (runner feed-forward + sign coefficient "
-              "of the torq - ff fit), Nm")
+        print(f"== across {len(result)} runs, the trajectory segment of each: implied Coulomb friction (runner feed-forward "
+              "+ sign coefficient of the torq - ff fit), Nm")
         for j, v in summary.items():
             print(f"  {j}  mean {v['implied_coulomb_mean_nm']:5.3f}  sd {v['implied_coulomb_sd_nm']:5.3f}  range "
                   f"{v['implied_coulomb_min_nm']:5.3f}..{v['implied_coulomb_max_nm']:5.3f}  (n={v['n_runs']}; mean sign "
