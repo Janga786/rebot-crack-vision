@@ -11,12 +11,27 @@
 #   scan CASE [slow]          ARM + CAMERA: run-trajectory.sh moves the arm to the scan pose and holds it; meanwhile
 #                             crack_trace capture waits for the arm to settle, captures, and runs the crack model.
 #                             You press Enter at the fold like any run-trajectory.sh run. The arm returns to the fold.
-#   plan CASE [plan args]     path3d -> the trace trajectory + preview image, rehearsed in simulation (x1 and x2)
+#   plan CASE [plan args]     path3d -> the trace trajectory (the best accepted crack; --all-paths: every crack) +
+#                             preview image, rehearsed in simulation (x1 and x2)
 #   trace CASE [slow]         ARM: run-trajectory.sh plays data/crack_trace/CASE_trace.json (approach, trace, fold)
 #   demo [IMAGE [X Y]]        no hardware: the whole chain with IMAGE printed 20 cm wide at (X, Y) on the table (default
 #                             crack test print #1 at 0.34 -0.12): search-plan, rendered camera views, the sweep with
 #                             the arm state replayed in real time (tools/replay_arm_state.py, no motor) and the model
 #                             run at every stop, scan-plan --from-search, scan + capture, plan, guarded rehearsals.
+#
+# The first run on the powered arm (docs/motion/FIRST_CRACK_RUN.md; logic in src/crackvision/first_run.py):
+#   preflight                 go/no-go at the desk: env, model, guard approval + hooks, runner sha256, camera free +
+#                             D405 USB 3 + a validated capture, stale files cleaned, disk, search.json/scan.json
+#                             regenerated and rehearsed x1 and x2, print PDF, crack gate on -> data/crack_trace/
+#                             preflight_<UTC>.json; exit 0 only with no FAIL. Nothing moves.
+#   bench [CASE]              CAMERA, ARM OFF: the print under the camera now, the crack gate, a plain-words component
+#                             table + overlay + verdict (data/crack_trace/bench/CASE/). bench --live: the filtered
+#                             live view (http://127.0.0.1:8090, Ctrl-C to stop) for aiming.
+#   session CASE [slow]       search -> scan-plan --from-search -> scan -> plan -> preview -> trace, slow 2 and the kd 4
+#                             override by default (DEMO_EXTRA wins if set), a typed yes before every step, stops on any
+#                             failure. Calls only the subcommands above; every arm step is run-trajectory.sh's.
+#   archive CASE              copies the case, the runner's run files, the preflight and the guard events into
+#                             evidence/operator/first-crack-run-<date>/ with sha256s and a README to fill in.
 #
 # Every ARM step is the operator's: it goes through ~/rebot_setup/run-trajectory.sh (guard pre-flight, hold at the
 # fold, Enter to go, stop/off). Extra runner flags via DEMO_EXTRA, e.g. DEMO_EXTRA="--gains j2=100/4,j3=80/4".
@@ -127,5 +142,8 @@ case "$cmd" in
     echo "== 5. plan + rehearse"; "$0" plan "$CASE" || exit 1
     echo "demo OK: trajectory $OUT/${CASE}_trace.json, preview $OUT/${CASE}_trace_preview.png" ;;
 
-  *) sed -n '2,26p' "$0"; exit 2 ;;
+  preflight|bench|session|archive)
+    "$REPO/env.sh" python -m crackvision.first_run "$cmd" "$@" ;;
+
+  *) sed -n '2,38p' "$0"; exit 2 ;;
 esac

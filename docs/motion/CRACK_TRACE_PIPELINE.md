@@ -66,19 +66,21 @@ search-plan IK: the camera, looking straight down, visits 6 stops over the table
             camera housing or mount would come within 3 cm of the table anywhere, including the runner's move from
             the fold and back. Stops that cannot be reached are dropped (fewer than 2 left = refused). Rehearsed.
 search CASE ARM + CAMERA. run-trajectory.sh plays the sweep while crack_trace search-capture waits at every stop for
-            the arm to rest, grabs a burst, runs the crack model on the sharpest frame, and lifts the crack's centroid
-            to base_link (surface depth from a ring around the crack, plus the measured pose). The best stop is the
-            biggest crack that does not touch the image edge. Result: data/crack_trace/CASE_search/search_result.json
-            with per-stop overlays.
+            the arm to rest, grabs a burst, runs the crack model on its 3 sharpest frames (burst vote), keeps the
+            components the crack gate accepts, and lifts the best one's centroid to base_link (surface depth from a
+            ring around it, plus the measured pose). The best stop is the highest-scoring accepted crack that does
+            not touch the image edge. Result: data/crack_trace/CASE_search/search_result.json with per-stop overlays
+            (accepted red, rejected yellow) and per-stop component tables.
 scan-plan   (--from-search CASE centres it on that crack.) IK: camera 25 cm above the target (default table x=0.30, y=0), looking straight down
             -> data/crack_trace/scan.json (holds that pose 15 s), rehearsed
 scan CASE   ARM + CAMERA. run-trajectory.sh drives the arm to the scan pose, with demo_move.py --state-file
             publishing the measured pose. Meanwhile crack_trace capture waits until the arm has rested at the scan
             pose, grabs a 10-frame burst, keeps the sharpest frame and writes the case: RGB, aligned depth, and the
-            §9 capture record with the MEASURED joint angles. Then segment + paths (the accepted stages). The arm
-            returns to the fold.
-plan CASE   path3d (pixels -> base_link surface points) -> trace: the tool tip follows each crack (longest first,
-            up to 3) at a hover height, pointing into the surface; approach and retract 4 cm above.
+            §9 capture record with the MEASURED joint angles. Then the crack gate (model on the 3 sharpest frames,
+            vote, per-component table) and paths on the accepted components only. The arm returns to the fold.
+plan CASE   path3d (pixels -> base_link surface points) -> trace: the tool tip follows the best accepted crack
+            (its longest main-path segment; --all-paths: every crack and branch, up to 3 segments) at a hover
+            height, pointing into the surface; approach and retract 4 cm above.
             Writes data/crack_trace/CASE_trace.json, a preview, and a plan report. Rehearsed at x1 and x2.
 trace CASE  ARM. run-trajectory.sh plays the trace.
 ```
@@ -90,11 +92,57 @@ bash scripts/crack_pipeline.sh scan-plan --from-search crack01   # scan pose cen
 bash scripts/crack_pipeline.sh scan  crack01             # arm + camera (Enter at the fold, as usual)
 bash scripts/crack_pipeline.sh plan  crack01             # then LOOK at data/crack_trace/crack01_trace_preview.png
 bash scripts/crack_pipeline.sh trace crack01 2           # arm, half speed
-bash scripts/crack_pipeline.sh demo                      # all of it offline, no hardware (about 1 minute)
+bash scripts/crack_pipeline.sh demo                      # all of it offline, no hardware (about 3 minutes)
+
+# the first run on the powered arm: follow docs/motion/FIRST_CRACK_RUN.md
+bash scripts/crack_pipeline.sh preflight                 # go/no-go at the desk (rehearsals only; nothing moves)
+bash scripts/crack_pipeline.sh bench --live              # camera, arm off: aim at the print (Ctrl-C to stop)
+bash scripts/crack_pipeline.sh bench print01             # camera, arm off: crack gate table + overlay + verdict
+bash scripts/crack_pipeline.sh session print01           # search -> scan-plan -> scan -> plan -> trace, yes per step
+bash scripts/crack_pipeline.sh archive print01           # copy the run into evidence/operator/first-crack-run-<date>/
 ```
 
-**The preview is the human check.** It shows the camera image with the model's crack mask in red and the planned
-path projected back into the image in green; a circle marks the start. If green does not sit on red, do not run it.
+The operator's runbook for the first run on the arm, with the physical setup, the decisions that are the operator's
+and a "you see / it means / do this" table, is [FIRST_CRACK_RUN.md](FIRST_CRACK_RUN.md).
+
+**The preview is the human check.** It shows the camera image with the accepted crack components in red, the
+components the crack gate rejected in yellow, and the planned path projected back into the image in green; a
+circle marks the start. Each accepted component carries its number (`#id`) at its centroid, and the bottom left
+lists them, best first: length and width in mm, mean probability, ridge fraction, flank asymmetry, tortuosity,
+width variation and working distance (`JOINT?` when the straight-and-even flag is set). If green does not sit on
+red, or the traced component is not the crack you laid down, do not run it.
+
+### The crack gate (2026-10-28)
+
+The model's argmax mask also holds crack-like background: texture blobs, specks that flicker between frames, and
+on the 2026-10-22 desk recording a lamp frame 1.9 m away that the old chain called a crack in all 30 frames.
+`crackvision.crack_filter` decides per connected component, before anything is skeletonised (measurements and
+reasoning: [CRACK_SELECTION_RESEARCH.md](../perception/CRACK_SELECTION_RESEARCH.md)):
+
+| Gate | Default (`config/project.yaml` `crack_filter:`) | Needs |
+|---|---|---|
+| hysteresis: a confident core | seed p > 0.9, grown into p > 0.5 | - |
+| confidence | component mean p >= 0.8 | - |
+| length | skeleton >= 15 px; >= 10 mm | -; depth |
+| width | <= 10 mm | depth |
+| working distance | ring depth 0.07-0.50 m | depth |
+| in the surface | ring plane residual <= 3 mm, plane tilt <= 60 deg, interior within 5 mm of the plane | depth |
+| dark ridge | >= 50 % of skeleton pixels on a black-hat response >= 8 grey levels | grey image |
+| stable | pixel in >= 2 of the 3 sharpest burst frames | burst |
+| joint / seam | tortuosity <= 1.08, width CV <= 0.30, width >= 2 px: **flagged, not rejected** (`joint_reject: false`) | - |
+
+A gate without its input (no depth map) is skipped and named in the table's `gates_skipped`; with a depth map, a
+component without valid surface depth around it is rejected. The table (`data/camera/CASE/CASE_components.json`,
+schema in [INTERFACES.md §3.15](../INTERFACES.md)) is printed by `capture` and drawn on the preview.
+
+Flags: `capture --no-filter` and `search-capture --no-filter` restore the previous behaviour exactly (batch
+segment stage with TTA on the raw mask; whole-mask centroid, stops ranked by pixel count, `--min-px`).
+`capture --tta` runs the in-process model with mirroring (124 ms instead of 56 ms a frame). `plan --all-paths`
+traces every crack and branch, `--max-segments N` caps it. `scripts/camera.py snap --filter` and `live --filter`
+use the same gate (off by default there). The Phase-1 batch chain (`run_test.sh`) is unchanged unless
+`crack_filter.batch: true`.
+
+Run time: the model on 3 frames takes 170 ms (the network is loaded and warmed up while the arm is still moving). The table takes 70-250 ms on the 848 px prints (2k-29k mask pixels), less on a single crack.
 
 ### How high the tool hovers, and why
 
@@ -132,6 +180,18 @@ this.
 - Tests: `tests/test_arm_ik.py` and `tests/test_crack_trace.py` (34). Runner: `test_guarded_runs.StateFile` (2), and
   all 43 runner tests pass with the change.
 
+### Verification with the crack gate (offline, 2026-10-28)
+
+`scripts/crack_pipeline.sh demo` (2 min 44 s, print #1 at (0.34, -0.12)): every one of the 6 stops accepts exactly
+one component, 218-222 mm where the print is whole (75 and 115 mm at the two stops that cut it off at the image
+edge). The best stop is now 5 (score 202; before, stop 0 by pixel count), with the centre at (0.336, -0.116). At the
+scan, capture accepts 1 of 1 (218 mm, 3.0 mm wide, p 0.91, at 25 cm, depth used) and plan traces it as before: 209 mm,
+hover 13.8 cm, tilt 10 deg, 14.6 s. Both rehearsals complete with no guard fault and a keep-out margin of at least
+18 mm. On the crack-free desk recording the gate accepts nothing in 30 of 30 frames; before, all 30 counted as
+a crack. Per-print numbers, the no-crack controls and what still gets through are in
+[CRACK_SELECTION_RESEARCH.md, Results](../perception/CRACK_SELECTION_RESEARCH.md). Tests: `tests/test_crack_filter.py`
+(17, including the real-model desk-frame and print-#1 checks).
+
 ### Runner change (`~/rebot_setup/demo_move.py` 2026-10-23.1)
 
 `--state-file FILE`: about 20 times a second the runner writes the measured pose as `rebot.arm_state/1` JSON, with an
@@ -166,6 +226,8 @@ needed 0.86 rad/s) is fixed by resting each stop at its leg's arrival pose. The 
 49 x 27 cm of table.
 
 ### Before the first real crack run
+
+Follow [FIRST_CRACK_RUN.md](FIRST_CRACK_RUN.md) (preflight, bench, session, archive). In short:
 
 1. The D405 must be on the wrist mount as end_effector.yaml assumes: the gripper face that points up at the fold,
    with the stock 15° Seeed mount. Check it visually.

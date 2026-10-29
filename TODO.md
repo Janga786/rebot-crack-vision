@@ -69,7 +69,8 @@ Runbook: [docs/motion/CRACK_TRACE_PIPELINE.md](docs/motion/CRACK_TRACE_PIPELINE.
 [evidence/operator/powered-show-runs-2026-10-23_25](evidence/operator/powered-show-runs-2026-10-23_25/README.md).
 - **Shown on the powered arm, all completed with no guard fault:** figure-8 (x2, x1), heart (x2, three gain settings),
   showreel (figure-8, star, heart; x2), box (x2). Not yet run: spiral, rose, lissajous, wave, helix, raster, crack.
-- **Crack pipeline** (`scripts/crack_pipeline.sh search-plan | search | scan-plan [--from-search] | scan | plan | trace | demo`):
+- **Crack pipeline** (`scripts/crack_pipeline.sh search-plan | search | scan-plan [--from-search] | scan | plan | trace | demo`,
+  and for the first run on the arm `preflight | bench | session | archive`, 2026-10-29):
   the search sweep (6 camera stops looking down, the crack model at every stop, the crack located in base_link), the
   centred scan, and the trace; every trajectory is refused unless reachable, jump-free, and clear of the table
   (gripper 13.5 cm, camera and mount 3 cm over the whole run including the fold moves). The offline `demo` passes end to
@@ -83,9 +84,11 @@ Open, each on the operator's go for the arm:
    A constant feed-forward bias halved the steady sag (J2 +10.6 -> -2.8 mrad, J3 -10.0 -> -5.3, J4 -5.4 -> -2.4) but not
    the rms: the approach and return dominate, so fit a pose-dependent gravity correction from these logs.
    Still needed from the operator: which part oscillates, how fast, and when (the encoders cannot see link flex).
-2. Run the search and the crack pipeline once the D405 is on USB 3: check it sits on the wrist as `end_effector.yaml`
-   assumes, lay a printed crack in the search area (x 0.22-0.40 m, y +-0.2 m), `search`, `scan-plan --from-search`,
-   `scan`, look at the preview, `trace` at x2.
+2. Run the search and the crack pipeline: follow **[docs/motion/FIRST_CRACK_RUN.md](docs/motion/FIRST_CRACK_RUN.md)**
+   (`crack_pipeline.sh preflight`, `bench`, `session CASE`, `archive CASE`). The D405 is on USB 3 and preflight is GO
+   on the workstation (2026-10-29; one WARN: the guard approval still needs the operator's name). Check the camera
+   sits on the wrist as `end_effector.yaml` assumes, lay print #1 in the search area (x 0.22-0.40 m, y +-0.2 m),
+   bench it, then run the session (x2, kd 4 override by default) and archive it.
 3. Hand-eye (GEOM-05) and tool (GEOM-07) calibration: until then the trace may be a few cm off and hovers about 14 cm
    above a table crack.
 
