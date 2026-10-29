@@ -1,0 +1,3903 @@
+{
+ "traj_heart_20261023T205033Z.csv.gz": {
+  "joints": {
+   "j1": {
+    "mean_err_mrad": 2.2,
+    "rms_err_mrad": 2.0,
+    "max_err_mrad": 6.1,
+    "ripple_mrad": 0.27,
+    "ripple_hz": 2.8,
+    "torque_minus_ff_mean_nm": 0.16,
+    "peak_torque_nm": 1.3,
+    "peak_ff_nm": 1.0,
+    "hold_flips": 0,
+    "by_segment_rms_mrad": {
+     "0": 0.6,
+     "1": 1.2,
+     "2": 0.6
+    }
+   },
+   "j2": {
+    "mean_err_mrad": 10.6,
+    "rms_err_mrad": 9.7,
+    "max_err_mrad": 30.1,
+    "ripple_mrad": 0.95,
+    "ripple_hz": 3.3,
+    "torque_minus_ff_mean_nm": 1.0,
+    "peak_torque_nm": 4.2,
+    "peak_ff_nm": 1.7,
+    "hold_flips": 0,
+    "by_segment_rms_mrad": {
+     "0": 7.8,
+     "1": 4.1,
+     "2": 10.8
+    }
+   },
+   "j3": {
+    "mean_err_mrad": -10.0,
+    "rms_err_mrad": 7.8,
+    "max_err_mrad": 24.9,
+    "ripple_mrad": 1.07,
+    "ripple_hz": 2.5,
+    "torque_minus_ff_mean_nm": -0.85,
+    "peak_torque_nm": 10.5,
+    "peak_ff_nm": 9.0,
+    "hold_flips": 0,
+    "by_segment_rms_mrad": {
+     "0": 9.2,
+     "1": 4.1,
+     "2": 10.7
+    }
+   },
+   "j4": {
+    "mean_err_mrad": -5.4,
+    "rms_err_mrad": 8.0,
+    "max_err_mrad": 19.5,
+    "ripple_mrad": 1.21,
+    "ripple_hz": 3.0,
+    "torque_minus_ff_mean_nm": -0.24,
+    "peak_torque_nm": 2.4,
+    "peak_ff_nm": 2.2,
+    "hold_flips": 0,
+    "by_segment_rms_mrad": {
+     "0": 6.8,
+     "1": 7.6,
+     "2": 3.3
+    }
+   },
+   "j5": {
+    "mean_err_mrad": 0.2,
+    "rms_err_mrad": 2.9,
+    "max_err_mrad": 8.2,
+    "ripple_mrad": 0.46,
+    "ripple_hz": 2.8,
+    "torque_minus_ff_mean_nm": -0.02,
+    "peak_torque_nm": 0.3,
+    "peak_ff_nm": 0.3,
+    "hold_flips": 0,
+    "by_segment_rms_mrad": {
+     "0": 1.0,
+     "1": 3.5,
+     "2": 0.2
+    }
+   }
+  },
+  "params_from": "run summary",
+  "friction_fit": {
+   "j1": {
+    "kp": 100.0,
+    "runner_friction_nm": 1.0,
+    "segments": {
+     "0": {
+      "n": 1691,
+      "v_ref_max": 0.01,
+      "a_ref_max": 1.0,
+      "mean_err_mrad": 0.76,
+      "rms_err_mrad": 0.57,
+      "static": true
+     },
+     "1": {
+      "n": 4164,
+      "v_ref_max": 0.18,
+      "a_ref_max": 2.0,
+      "mean_err_mrad": 1.45,
+      "rms_err_mrad": 1.24,
+      "error": {
+       "const_mrad": 1.45,
+       "sgn_mrad": 0.09,
+       "sgn_nm_at_kp": 0.009,
+       "visc_mrad_per_rad_s": -2.13,
+       "inertia_mrad_per_rad_s2": -0.085,
+       "r2": 0.017
+      },
+      "torque": {
+       "const_nm": 0.083,
+       "sgn_nm": 0.02,
+       "visc_nm_s_per_rad": -0.611,
+       "inertia_nm_s2_per_rad": -0.008,
+       "r2": 0.112
+      },
+      "vif_sgn": 8.6,
+      "confounded": false,
+      "implied_coulomb_nm": 1.02,
+      "implied_coulomb_up_down_nm": [
+       0.745,
+       1.245
+      ],
+      "corr_with_j3": -0.03,
+      "coherence_with_j3": {
+       "coherence": 0.41,
+       "at_hz": 2.73,
+       "n_segments": 7,
+       "zero_coherence_95": 0.39,
+       "band_rms_mrad": 0.29,
+       "shared_band_rms_mrad": 0.12,
+       "own_band_rms_mrad": 0.26
+      }
+     },
+     "2": {
+      "n": 1689,
+      "v_ref_max": 0.01,
+      "a_ref_max": 1.0,
+      "mean_err_mrad": 5.33,
+      "rms_err_mrad": 0.57,
+      "static": true
+     }
+    }
+   },
+   "j2": {
+    "kp": 100.0,
+    "runner_friction_nm": 1.0,
+    "segments": {
+     "0": {
+      "n": 1691,
+      "v_ref_max": 0.2,
+      "a_ref_max": 8.0,
+      "mean_err_mrad": 4.74,
+      "rms_err_mrad": 7.82,
+      "error": {
+       "const_mrad": 1.84,
+       "sgn_mrad": -5.53,
+       "sgn_nm_at_kp": -0.553,
+       "visc_mrad_per_rad_s": 18.35,
+       "inertia_mrad_per_rad_s2": 0.516,
+       "r2": 0.027
+      },
+      "torque": {
+       "const_nm": 0.137,
+       "sgn_nm": -0.535,
+       "visc_nm_s_per_rad": 1.172,
+       "inertia_nm_s2_per_rad": 0.0544,
+       "r2": 0.027
+      },
+      "vif_sgn": 1.8,
+      "confounded": false,
+      "implied_coulomb_nm": 0.465,
+      "corr_with_j3": -0.63,
+      "coherence_with_j3": {
+       "coherence": 1.0,
+       "at_hz": 3.32,
+       "n_segments": 2,
+       "zero_coherence_95": 0.95,
+       "band_rms_mrad": 0.69,
+       "shared_band_rms_mrad": 0.62,
+       "own_band_rms_mrad": 0.3
+      }
+     },
+     "1": {
+      "n": 4164,
+      "v_ref_max": 0.06,
+      "a_ref_max": 2.0,
+      "mean_err_mrad": 16.58,
+      "rms_err_mrad": 4.09,
+      "error": {
+       "const_mrad": 16.58,
+       "sgn_mrad": 1.12,
+       "sgn_nm_at_kp": 0.112,
+       "visc_mrad_per_rad_s": -8.49,
+       "inertia_mrad_per_rad_s2": 0.023,
+       "r2": 0.027
+      },
+      "torque": {
+       "const_nm": 1.601,
+       "sgn_nm": 0.132,
+       "visc_nm_s_per_rad": -1.8,
+       "inertia_nm_s2_per_rad": 0.0038,
+       "r2": 0.015
+      },
+      "vif_sgn": 18.5,
+      "confounded": true,
+      "implied_coulomb_nm": 1.132,
+      "implied_coulomb_up_down_nm": [
+       1.281,
+       0.981
+      ],
+      "corr_with_j3": -0.03,
+      "coherence_with_j3": {
+       "coherence": 0.89,
+       "at_hz": 3.12,
+       "n_segments": 7,
+       "zero_coherence_95": 0.39,
+       "band_rms_mrad": 0.99,
+       "shared_band_rms_mrad": 0.86,
+       "own_band_rms_mrad": 0.49
+      }
+     },
+     "2": {
+      "n": 1689,
+      "v_ref_max": 0.34,
+      "a_ref_max": 15.0,
+      "mean_err_mrad": 1.94,
+      "rms_err_mrad": 10.81,
+      "error": {
+       "const_mrad": 12.32,
+       "sgn_mrad": -5.61,
+       "sgn_nm_at_kp": -0.561,
+       "visc_mrad_per_rad_s": -53.88,
+       "inertia_mrad_per_rad_s2": 0.217,
+       "r2": 0.207
+      },
+      "torque": {
+       "const_nm": 1.174,
+       "sgn_nm": -0.577,
+       "visc_nm_s_per_rad": -5.964,
+       "inertia_nm_s2_per_rad": 0.0228,
+       "r2": 0.24
+      },
+      "vif_sgn": 1.8,
+      "confounded": false,
+      "implied_coulomb_nm": 0.423,
+      "corr_with_j3": -0.07,
+      "coherence_with_j3": {
+       "coherence": 0.78,
+       "at_hz": 3.32,
+       "n_segments": 2,
+       "zero_coherence_95": 0.95,
+       "band_rms_mrad": 0.8,
+       "shared_band_rms_mrad": 0.63,
+       "own_band_rms_mrad": 0.5
+      }
+     }
+    }
+   },
+   "j3": {
+    "kp": 80.0,
+    "runner_friction_nm": 2.0,
+    "segments": {
+     "0": {
+      "n": 1691,
+      "v_ref_max": 0.28,
+      "a_ref_max": 11.0,
+      "mean_err_mrad": -6.02,
+      "rms_err_mrad": 9.24,
+      "error": {
+       "const_mrad": -0.46,
+       "sgn_mrad": 4.31,
+       "sgn_nm_at_kp": 0.345,
+       "visc_mrad_per_rad_s": 11.97,
+       "inertia_mrad_per_rad_s2": -0.249,
+       "r2": 0.051
+      },
+      "torque": {
+       "const_nm": -0.102,
+       "sgn_nm": 0.391,
+       "visc_nm_s_per_rad": 0.154,
+       "inertia_nm_s2_per_rad": -0.0192,
+       "r2": 0.024
+      },
+      "vif_sgn": 1.6,
+      "confounded": false,
+      "implied_coulomb_nm": 2.391
+     },
+     "1": {
+      "n": 4164,
+      "v_ref_max": 0.14,
+      "a_ref_max": 4.0,
+      "mean_err_mrad": -12.05,
+      "rms_err_mrad": 4.13,
+      "error": {
+       "const_mrad": -12.05,
+       "sgn_mrad": 0.65,
+       "sgn_nm_at_kp": 0.052,
+       "visc_mrad_per_rad_s": -31.84,
+       "inertia_mrad_per_rad_s2": 0.062,
+       "r2": 0.278
+      },
+      "torque": {
+       "const_nm": -1.012,
+       "sgn_nm": 0.046,
+       "visc_nm_s_per_rad": -3.018,
+       "inertia_nm_s2_per_rad": -0.0075,
+       "r2": 0.334
+      },
+      "vif_sgn": 12.9,
+      "confounded": false,
+      "implied_coulomb_nm": 2.046,
+      "implied_coulomb_up_down_nm": [
+       2.248,
+       1.845
+      ]
+     },
+     "2": {
+      "n": 1689,
+      "v_ref_max": 0.48,
+      "a_ref_max": 22.0,
+      "mean_err_mrad": -8.96,
+      "rms_err_mrad": 10.69,
+      "error": {
+       "const_mrad": 11.89,
+       "sgn_mrad": -15.79,
+       "sgn_nm_at_kp": -1.263,
+       "visc_mrad_per_rad_s": -47.34,
+       "inertia_mrad_per_rad_s2": -0.09,
+       "r2": 0.545
+      },
+      "torque": {
+       "const_nm": 0.904,
+       "sgn_nm": -1.241,
+       "visc_nm_s_per_rad": -4.456,
+       "inertia_nm_s2_per_rad": -0.0042,
+       "r2": 0.547
+      },
+      "vif_sgn": 1.6,
+      "confounded": false,
+      "implied_coulomb_nm": 0.759
+     }
+    }
+   },
+   "j4": {
+    "kp": 40.0,
+    "runner_friction_nm": 0.5,
+    "segments": {
+     "0": {
+      "n": 1691,
+      "v_ref_max": 0.08,
+      "a_ref_max": 3.0,
+      "mean_err_mrad": -11.07,
+      "rms_err_mrad": 6.77,
+      "error": {
+       "const_mrad": -1.62,
+       "sgn_mrad": -11.12,
+       "sgn_nm_at_kp": -0.445,
+       "visc_mrad_per_rad_s": -21.02,
+       "inertia_mrad_per_rad_s2": 0.021,
+       "r2": 0.405
+      },
+      "torque": {
+       "const_nm": -0.095,
+       "sgn_nm": -0.444,
+       "visc_nm_s_per_rad": -1.092,
+       "inertia_nm_s2_per_rad": 0.0015,
+       "r2": 0.428
+      },
+      "vif_sgn": 3.4,
+      "confounded": false,
+      "implied_coulomb_nm": 0.056,
+      "corr_with_j3": 0.81,
+      "coherence_with_j3": {
+       "coherence": 1.0,
+       "at_hz": 3.12,
+       "n_segments": 2,
+       "zero_coherence_95": 0.95,
+       "band_rms_mrad": 1.29,
+       "shared_band_rms_mrad": 1.06,
+       "own_band_rms_mrad": 0.73
+      },
+      "what_if": {
+       "friction_nm": 0.18,
+       "kp": 40.0,
+       "sgn_mrad": -3.12,
+       "mean_err_mrad": -4.9,
+       "rms_err_mrad": 5.46,
+       "rms_about_zero_mrad": 7.33
+      }
+     },
+     "1": {
+      "n": 4164,
+      "v_ref_max": 0.1,
+      "a_ref_max": 3.0,
+      "mean_err_mrad": -5.88,
+      "rms_err_mrad": 7.63,
+      "error": {
+       "const_mrad": -5.87,
+       "sgn_mrad": -8.05,
+       "sgn_nm_at_kp": -0.322,
+       "visc_mrad_per_rad_s": 2.06,
+       "inertia_mrad_per_rad_s2": -0.003,
+       "r2": 0.926
+      },
+      "torque": {
+       "const_nm": -0.262,
+       "sgn_nm": -0.324,
+       "visc_nm_s_per_rad": -0.17,
+       "inertia_nm_s2_per_rad": -0.002,
+       "r2": 0.922
+      },
+      "vif_sgn": 10.6,
+      "confounded": false,
+      "implied_coulomb_nm": 0.176,
+      "implied_coulomb_up_down_nm": [
+       0.206,
+       0.145
+      ],
+      "corr_with_j3": -0.4,
+      "coherence_with_j3": {
+       "coherence": 0.56,
+       "at_hz": 3.32,
+       "n_segments": 7,
+       "zero_coherence_95": 0.39,
+       "band_rms_mrad": 1.24,
+       "shared_band_rms_mrad": 0.81,
+       "own_band_rms_mrad": 0.95
+      },
+      "what_if": {
+       "friction_nm": 0.18,
+       "kp": 40.0,
+       "sgn_mrad": -0.05,
+       "mean_err_mrad": -5.87,
+       "rms_err_mrad": 2.07,
+       "rms_about_zero_mrad": 6.23
+      }
+     },
+     "2": {
+      "n": 1689,
+      "v_ref_max": 0.14,
+      "a_ref_max": 7.0,
+      "mean_err_mrad": 1.68,
+      "rms_err_mrad": 3.26,
+      "error": {
+       "const_mrad": 1.83,
+       "sgn_mrad": -1.04,
+       "sgn_nm_at_kp": -0.042,
+       "visc_mrad_per_rad_s": 22.78,
+       "inertia_mrad_per_rad_s2": -0.022,
+       "r2": 0.015
+      },
+      "torque": {
+       "const_nm": 0.052,
+       "sgn_nm": -0.036,
+       "visc_nm_s_per_rad": 0.615,
+       "inertia_nm_s2_per_rad": 0.0001,
+       "r2": 0.005
+      },
+      "vif_sgn": 3.3,
+      "confounded": false,
+      "implied_coulomb_nm": 0.464,
+      "corr_with_j3": 0.49,
+      "coherence_with_j3": {
+       "coherence": 0.97,
+       "at_hz": 3.32,
+       "n_segments": 2,
+       "zero_coherence_95": 0.95,
+       "band_rms_mrad": 1.41,
+       "shared_band_rms_mrad": 1.1,
+       "own_band_rms_mrad": 0.87
+      },
+      "what_if": {
+       "friction_nm": 0.18,
+       "kp": 40.0,
+       "sgn_mrad": 6.96,
+       "mean_err_mrad": -4.49,
+       "rms_err_mrad": 4.37,
+       "rms_about_zero_mrad": 6.26
+      }
+     }
+    }
+   },
+   "j5": {
+    "kp": 40.0,
+    "runner_friction_nm": 0.3,
+    "segments": {
+     "0": {
+      "n": 1691,
+      "v_ref_max": 0.0,
+      "a_ref_max": 0.0,
+      "mean_err_mrad": -1.86,
+      "rms_err_mrad": 0.99,
+      "static": true
+     },
+     "1": {
+      "n": 4164,
+      "v_ref_max": 0.18,
+      "a_ref_max": 2.0,
+      "mean_err_mrad": 0.59,
+      "rms_err_mrad": 3.5,
+      "error": {
+       "const_mrad": 0.42,
+       "sgn_mrad": -4.37,
+       "sgn_nm_at_kp": -0.175,
+       "visc_mrad_per_rad_s": 8.12,
+       "inertia_mrad_per_rad_s2": -0.084,
+       "r2": 0.885
+      },
+      "torque": {
+       "const_nm": -0.011,
+       "sgn_nm": -0.177,
+       "visc_nm_s_per_rad": 0.051,
+       "inertia_nm_s2_per_rad": -0.0025,
+       "r2": 0.909
+      },
+      "vif_sgn": 8.6,
+      "confounded": false,
+      "implied_coulomb_nm": 0.123,
+      "implied_coulomb_up_down_nm": [
+       0.147,
+       0.103
+      ],
+      "corr_with_j3": -0.0,
+      "coherence_with_j3": {
+       "coherence": 0.23,
+       "at_hz": 2.54,
+       "n_segments": 7,
+       "zero_coherence_95": 0.39,
+       "band_rms_mrad": 0.46,
+       "shared_band_rms_mrad": 0.18,
+       "own_band_rms_mrad": 0.43
+      }
+     },
+     "2": {
+      "n": 1689,
+      "v_ref_max": 0.0,
+      "a_ref_max": 0.0,
+      "mean_err_mrad": 1.11,
+      "rms_err_mrad": 0.19,
+      "static": true
+     }
+    }
+   }
+  }
+ },
+ "traj_heart_20261023T205318Z.csv.gz": {
+  "joints": {
+   "j1": {
+    "mean_err_mrad": 2.2,
+    "rms_err_mrad": 2.1,
+    "max_err_mrad": 8.7,
+    "ripple_mrad": 0.31,
+    "ripple_hz": 2.8,
+    "torque_minus_ff_mean_nm": 0.17,
+    "peak_torque_nm": 1.5,
+    "peak_ff_nm": 1.0,
+    "hold_flips": 0,
+    "by_segment_rms_mrad": {
+     "0": 2.3,
+     "1": 1.6,
+     "2": 2.3
+    }
+   },
+   "j2": {
+    "mean_err_mrad": 10.5,
+    "rms_err_mrad": 9.5,
+    "max_err_mrad": 29.8,
+    "ripple_mrad": 0.7,
+    "ripple_hz": 3.2,
+    "torque_minus_ff_mean_nm": 0.99,
+    "peak_torque_nm": 4.1,
+    "peak_ff_nm": 1.7,
+    "hold_flips": 0,
+    "by_segment_rms_mrad": {
+     "0": 7.8,
+     "1": 3.9,
+     "2": 10.6
+    }
+   },
+   "j3": {
+    "mean_err_mrad": -10.0,
+    "rms_err_mrad": 7.7,
+    "max_err_mrad": 24.9,
+    "ripple_mrad": 0.8,
+    "ripple_hz": 2.5,
+    "torque_minus_ff_mean_nm": -0.86,
+    "peak_torque_nm": 10.3,
+    "peak_ff_nm": 9.0,
+    "hold_flips": 0,
+    "by_segment_rms_mrad": {
+     "0": 9.0,
+     "1": 3.9,
+     "2": 10.6
+    }
+   },
+   "j4": {
+    "mean_err_mrad": -5.4,
+    "rms_err_mrad": 7.8,
+    "max_err_mrad": 19.8,
+    "ripple_mrad": 1.17,
+    "ripple_hz": 3.0,
+    "torque_minus_ff_mean_nm": -0.24,
+    "peak_torque_nm": 2.4,
+    "peak_ff_nm": 2.2,
+    "hold_flips": 0,
+    "by_segment_rms_mrad": {
+     "0": 6.3,
+     "1": 7.5,
+     "2": 3.3
+    }
+   },
+   "j5": {
+    "mean_err_mrad": 0.2,
+    "rms_err_mrad": 2.8,
+    "max_err_mrad": 8.1,
+    "ripple_mrad": 0.48,
+    "ripple_hz": 2.9,
+    "torque_minus_ff_mean_nm": -0.02,
+    "peak_torque_nm": 0.3,
+    "peak_ff_nm": 0.3,
+    "hold_flips": 0,
+    "by_segment_rms_mrad": {
+     "0": 0.5,
+     "1": 3.5,
+     "2": 0.1
+    }
+   }
+  },
+  "params_from": "run summary",
+  "friction_fit": {
+   "j1": {
+    "kp": 100.0,
+    "runner_friction_nm": 1.0,
+    "segments": {
+     "0": {
+      "n": 1688,
+      "v_ref_max": 0.01,
+      "a_ref_max": 1.0,
+      "mean_err_mrad": 3.05,
+      "rms_err_mrad": 2.3,
+      "static": true
+     },
+     "1": {
+      "n": 4164,
+      "v_ref_max": 0.18,
+      "a_ref_max": 3.0,
+      "mean_err_mrad": 1.55,
+      "rms_err_mrad": 1.61,
+      "error": {
+       "const_mrad": 1.57,
+       "sgn_mrad": 0.6,
+       "sgn_nm_at_kp": 0.06,
+       "visc_mrad_per_rad_s": -4.02,
+       "inertia_mrad_per_rad_s2": -0.074,
+       "r2": 0.018
+      },
+      "torque": {
+       "const_nm": 0.097,
+       "sgn_nm": 0.067,
+       "visc_nm_s_per_rad": -0.803,
+       "inertia_nm_s2_per_rad": -0.0058,
+       "r2": 0.041
+      },
+      "vif_sgn": 8.6,
+      "confounded": false,
+      "implied_coulomb_nm": 1.067,
+      "implied_coulomb_up_down_nm": [
+       0.586,
+       1.462
+      ],
+      "corr_with_j3": -0.3,
+      "coherence_with_j3": {
+       "coherence": 0.32,
+       "at_hz": 2.73,
+       "n_segments": 7,
+       "zero_coherence_95": 0.39,
+       "band_rms_mrad": 0.31,
+       "shared_band_rms_mrad": 0.12,
+       "own_band_rms_mrad": 0.28
+      }
+     },
+     "2": {
+      "n": 1692,
+      "v_ref_max": 0.01,
+      "a_ref_max": 1.0,
+      "mean_err_mrad": 3.04,
+      "rms_err_mrad": 2.29,
+      "static": true
+     }
+    }
+   },
+   "j2": {
+    "kp": 100.0,
+    "runner_friction_nm": 1.0,
+    "segments": {
+     "0": {
+      "n": 1688,
+      "v_ref_max": 0.35,
+      "a_ref_max": 16.0,
+      "mean_err_mrad": 4.63,
+      "rms_err_mrad": 7.77,
+      "error": {
+       "const_mrad": 1.18,
+       "sgn_mrad": -6.11,
+       "sgn_nm_at_kp": -0.611,
+       "visc_mrad_per_rad_s": 17.84,
+       "inertia_mrad_per_rad_s2": 0.3,
+       "r2": 0.031
+      },
+      "torque": {
+       "const_nm": 0.043,
+       "sgn_nm": -0.618,
+       "visc_nm_s_per_rad": 1.094,
+       "inertia_nm_s2_per_rad": 0.0347,
+       "r2": 0.036
+      },
+      "vif_sgn": 1.8,
+      "confounded": false,
+      "implied_coulomb_nm": 0.382,
+      "corr_with_j3": -0.61,
+      "coherence_with_j3": {
+       "coherence": 0.95,
+       "at_hz": 2.54,
+       "n_segments": 2,
+       "zero_coherence_95": 0.95,
+       "band_rms_mrad": 0.61,
+       "shared_band_rms_mrad": 0.49,
+       "own_band_rms_mrad": 0.36
+      }
+     },
+     "1": {
+      "n": 4164,
+      "v_ref_max": 0.06,
+      "a_ref_max": 3.0,
+      "mean_err_mrad": 16.43,
+      "rms_err_mrad": 3.94,
+      "error": {
+       "const_mrad": 16.43,
+       "sgn_mrad": 0.19,
+       "sgn_nm_at_kp": 0.019,
+       "visc_mrad_per_rad_s": 10.52,
+       "inertia_mrad_per_rad_s2": 0.01,
+       "r2": 0.02
+      },
+      "torque": {
+       "const_nm": 1.581,
+       "sgn_nm": 0.052,
+       "visc_nm_s_per_rad": -0.349,
+       "inertia_nm_s2_per_rad": 0.0025,
+       "r2": 0.006
+      },
+      "vif_sgn": 18.5,
+      "confounded": true,
+      "implied_coulomb_nm": 1.052,
+      "implied_coulomb_up_down_nm": [
+       1.336,
+       0.767
+      ],
+      "corr_with_j3": -0.04,
+      "coherence_with_j3": {
+       "coherence": 0.87,
+       "at_hz": 3.12,
+       "n_segments": 7,
+       "zero_coherence_95": 0.39,
+       "band_rms_mrad": 0.74,
+       "shared_band_rms_mrad": 0.6,
+       "own_band_rms_mrad": 0.43
+      }
+     },
+     "2": {
+      "n": 1692,
+      "v_ref_max": 0.32,
+      "a_ref_max": 16.0,
+      "mean_err_mrad": 1.96,
+      "rms_err_mrad": 10.6,
+      "error": {
+       "const_mrad": 12.37,
+       "sgn_mrad": -5.97,
+       "sgn_nm_at_kp": -0.597,
+       "visc_mrad_per_rad_s": -51.22,
+       "inertia_mrad_per_rad_s2": 0.298,
+       "r2": 0.206
+      },
+      "torque": {
+       "const_nm": 1.186,
+       "sgn_nm": -0.625,
+       "visc_nm_s_per_rad": -5.745,
+       "inertia_nm_s2_per_rad": 0.0347,
+       "r2": 0.247
+      },
+      "vif_sgn": 1.8,
+      "confounded": false,
+      "implied_coulomb_nm": 0.375,
+      "corr_with_j3": -0.12,
+      "coherence_with_j3": {
+       "coherence": 0.9,
+       "at_hz": 2.54,
+       "n_segments": 2,
+       "zero_coherence_95": 0.95,
+       "band_rms_mrad": 0.69,
+       "shared_band_rms_mrad": 0.58,
+       "own_band_rms_mrad": 0.37
+      }
+     }
+    }
+   },
+   "j3": {
+    "kp": 80.0,
+    "runner_friction_nm": 2.0,
+    "segments": {
+     "0": {
+      "n": 1688,
+      "v_ref_max": 0.48,
+      "a_ref_max": 21.0,
+      "mean_err_mrad": -5.54,
+      "rms_err_mrad": 9.02,
+      "error": {
+       "const_mrad": 0.59,
+       "sgn_mrad": 4.72,
+       "sgn_nm_at_kp": 0.378,
+       "visc_mrad_per_rad_s": 13.43,
+       "inertia_mrad_per_rad_s2": -0.158,
+       "r2": 0.065
+      },
+      "torque": {
+       "const_nm": -0.018,
+       "sgn_nm": 0.445,
+       "visc_nm_s_per_rad": 0.171,
+       "inertia_nm_s2_per_rad": -0.0087,
+       "r2": 0.033
+      },
+      "vif_sgn": 1.6,
+      "confounded": false,
+      "implied_coulomb_nm": 2.445
+     },
+     "1": {
+      "n": 4164,
+      "v_ref_max": 0.15,
+      "a_ref_max": 7.0,
+      "mean_err_mrad": -12.15,
+      "rms_err_mrad": 3.95,
+      "error": {
+       "const_mrad": -12.15,
+       "sgn_mrad": 0.2,
+       "sgn_nm_at_kp": 0.016,
+       "visc_mrad_per_rad_s": -30.84,
+       "inertia_mrad_per_rad_s2": 0.046,
+       "r2": 0.401
+      },
+      "torque": {
+       "const_nm": -1.024,
+       "sgn_nm": 0.025,
+       "visc_nm_s_per_rad": -3.14,
+       "inertia_nm_s2_per_rad": -0.0059,
+       "r2": 0.432
+      },
+      "vif_sgn": 12.9,
+      "confounded": false,
+      "implied_coulomb_nm": 2.025,
+      "implied_coulomb_up_down_nm": [
+       2.387,
+       1.664
+      ]
+     },
+     "2": {
+      "n": 1692,
+      "v_ref_max": 0.45,
+      "a_ref_max": 23.0,
+      "mean_err_mrad": -9.33,
+      "rms_err_mrad": 10.6,
+      "error": {
+       "const_mrad": 9.09,
+       "sgn_mrad": -12.64,
+       "sgn_nm_at_kp": -1.011,
+       "visc_mrad_per_rad_s": -50.0,
+       "inertia_mrad_per_rad_s2": -0.147,
+       "r2": 0.483
+      },
+      "torque": {
+       "const_nm": 0.693,
+       "sgn_nm": -0.988,
+       "visc_nm_s_per_rad": -4.749,
+       "inertia_nm_s2_per_rad": -0.0164,
+       "r2": 0.494
+      },
+      "vif_sgn": 1.6,
+      "confounded": false,
+      "implied_coulomb_nm": 1.012
+     }
+    }
+   },
+   "j4": {
+    "kp": 40.0,
+    "runner_friction_nm": 0.5,
+    "segments": {
+     "0": {
+      "n": 1688,
+      "v_ref_max": 0.14,
+      "a_ref_max": 7.0,
+      "mean_err_mrad": -11.15,
+      "rms_err_mrad": 6.27,
+      "error": {
+       "const_mrad": -2.21,
+       "sgn_mrad": -9.99,
+       "sgn_nm_at_kp": -0.4,
+       "visc_mrad_per_rad_s": -29.11,
+       "inertia_mrad_per_rad_s2": 0.015,
+       "r2": 0.431
+      },
+      "torque": {
+       "const_nm": -0.116,
+       "sgn_nm": -0.405,
+       "visc_nm_s_per_rad": -1.371,
+       "inertia_nm_s2_per_rad": 0.0019,
+       "r2": 0.457
+      },
+      "vif_sgn": 3.4,
+      "confounded": false,
+      "implied_coulomb_nm": 0.095,
+      "corr_with_j3": 0.83,
+      "coherence_with_j3": {
+       "coherence": 0.99,
+       "at_hz": 3.12,
+       "n_segments": 2,
+       "zero_coherence_95": 0.95,
+       "band_rms_mrad": 1.22,
+       "shared_band_rms_mrad": 0.96,
+       "own_band_rms_mrad": 0.77
+      },
+      "what_if": {
+       "friction_nm": 0.18,
+       "kp": 40.0,
+       "sgn_mrad": -1.99,
+       "mean_err_mrad": -4.96,
+       "rms_err_mrad": 4.94,
+       "rms_about_zero_mrad": 7.01
+      }
+     },
+     "1": {
+      "n": 4164,
+      "v_ref_max": 0.1,
+      "a_ref_max": 4.0,
+      "mean_err_mrad": -5.9,
+      "rms_err_mrad": 7.5,
+      "error": {
+       "const_mrad": -5.9,
+       "sgn_mrad": -7.94,
+       "sgn_nm_at_kp": -0.318,
+       "visc_mrad_per_rad_s": 2.42,
+       "inertia_mrad_per_rad_s2": 0.014,
+       "r2": 0.928
+      },
+      "torque": {
+       "const_nm": -0.262,
+       "sgn_nm": -0.321,
+       "visc_nm_s_per_rad": -0.141,
+       "inertia_nm_s2_per_rad": -0.001,
+       "r2": 0.925
+      },
+      "vif_sgn": 10.6,
+      "confounded": false,
+      "implied_coulomb_nm": 0.179,
+      "implied_coulomb_up_down_nm": [
+       0.209,
+       0.148
+      ],
+      "corr_with_j3": -0.54,
+      "coherence_with_j3": {
+       "coherence": 0.62,
+       "at_hz": 3.32,
+       "n_segments": 7,
+       "zero_coherence_95": 0.39,
+       "band_rms_mrad": 1.2,
+       "shared_band_rms_mrad": 0.77,
+       "own_band_rms_mrad": 0.93
+      },
+      "what_if": {
+       "friction_nm": 0.18,
+       "kp": 40.0,
+       "sgn_mrad": 0.06,
+       "mean_err_mrad": -5.9,
+       "rms_err_mrad": 2.02,
+       "rms_about_zero_mrad": 6.23
+      }
+     },
+     "2": {
+      "n": 1692,
+      "v_ref_max": 0.13,
+      "a_ref_max": 7.0,
+      "mean_err_mrad": 1.59,
+      "rms_err_mrad": 3.27,
+      "error": {
+       "const_mrad": 1.82,
+       "sgn_mrad": -0.84,
+       "sgn_nm_at_kp": -0.034,
+       "visc_mrad_per_rad_s": 21.15,
+       "inertia_mrad_per_rad_s2": -0.012,
+       "r2": 0.013
+      },
+      "torque": {
+       "const_nm": 0.05,
+       "sgn_nm": -0.03,
+       "visc_nm_s_per_rad": 0.554,
+       "inertia_nm_s2_per_rad": 0.0008,
+       "r2": 0.004
+      },
+      "vif_sgn": 3.4,
+      "confounded": false,
+      "implied_coulomb_nm": 0.47,
+      "corr_with_j3": 0.53,
+      "coherence_with_j3": {
+       "coherence": 0.95,
+       "at_hz": 3.32,
+       "n_segments": 2,
+       "zero_coherence_95": 0.95,
+       "band_rms_mrad": 1.4,
+       "shared_band_rms_mrad": 1.15,
+       "own_band_rms_mrad": 0.79
+      },
+      "what_if": {
+       "friction_nm": 0.18,
+       "kp": 40.0,
+       "sgn_mrad": 7.16,
+       "mean_err_mrad": -4.58,
+       "rms_err_mrad": 4.4,
+       "rms_about_zero_mrad": 6.35
+      }
+     }
+    }
+   },
+   "j5": {
+    "kp": 40.0,
+    "runner_friction_nm": 0.3,
+    "segments": {
+     "0": {
+      "n": 1688,
+      "v_ref_max": 0.0,
+      "a_ref_max": 0.0,
+      "mean_err_mrad": -1.72,
+      "rms_err_mrad": 0.5,
+      "static": true
+     },
+     "1": {
+      "n": 4164,
+      "v_ref_max": 0.18,
+      "a_ref_max": 4.0,
+      "mean_err_mrad": 0.59,
+      "rms_err_mrad": 3.52,
+      "error": {
+       "const_mrad": 0.42,
+       "sgn_mrad": -4.43,
+       "sgn_nm_at_kp": -0.177,
+       "visc_mrad_per_rad_s": 8.55,
+       "inertia_mrad_per_rad_s2": -0.095,
+       "r2": 0.885
+      },
+      "torque": {
+       "const_nm": -0.011,
+       "sgn_nm": -0.181,
+       "visc_nm_s_per_rad": 0.075,
+       "inertia_nm_s2_per_rad": -0.0031,
+       "r2": 0.909
+      },
+      "vif_sgn": 8.6,
+      "confounded": false,
+      "implied_coulomb_nm": 0.119,
+      "implied_coulomb_up_down_nm": [
+       0.137,
+       0.105
+      ],
+      "corr_with_j3": -0.01,
+      "coherence_with_j3": {
+       "coherence": 0.12,
+       "at_hz": 3.32,
+       "n_segments": 7,
+       "zero_coherence_95": 0.39,
+       "band_rms_mrad": 0.48,
+       "shared_band_rms_mrad": 0.17,
+       "own_band_rms_mrad": 0.45
+      }
+     },
+     "2": {
+      "n": 1692,
+      "v_ref_max": 0.0,
+      "a_ref_max": 0.0,
+      "mean_err_mrad": 1.01,
+      "rms_err_mrad": 0.14,
+      "static": true
+     }
+    }
+   }
+  }
+ },
+ "traj_heart_20261025T214843Z.csv.gz": {
+  "joints": {
+   "j1": {
+    "mean_err_mrad": 2.1,
+    "rms_err_mrad": 2.2,
+    "max_err_mrad": 8.5,
+    "ripple_mrad": 0.36,
+    "ripple_hz": 3.6,
+    "torque_minus_ff_mean_nm": 0.15,
+    "peak_torque_nm": 1.4,
+    "peak_ff_nm": 1.0,
+    "hold_flips": 0,
+    "by_segment_rms_mrad": {
+     "0": 2.3,
+     "1": 1.7,
+     "2": 2.3
+    }
+   },
+   "j2": {
+    "mean_err_mrad": -2.8,
+    "rms_err_mrad": 8.6,
+    "max_err_mrad": 24.6,
+    "ripple_mrad": 0.89,
+    "ripple_hz": 3.1,
+    "torque_minus_ff_mean_nm": -0.34,
+    "peak_torque_nm": 4.1,
+    "peak_ff_nm": 2.5,
+    "hold_flips": 0,
+    "by_segment_rms_mrad": {
+     "0": 7.2,
+     "1": 3.7,
+     "2": 10.0
+    }
+   },
+   "j3": {
+    "mean_err_mrad": -5.3,
+    "rms_err_mrad": 6.8,
+    "max_err_mrad": 21.9,
+    "ripple_mrad": 1.04,
+    "ripple_hz": 2.8,
+    "torque_minus_ff_mean_nm": -0.48,
+    "peak_torque_nm": 10.5,
+    "peak_ff_nm": 9.5,
+    "hold_flips": 0,
+    "by_segment_rms_mrad": {
+     "0": 7.6,
+     "1": 4.1,
+     "2": 9.2
+    }
+   },
+   "j4": {
+    "mean_err_mrad": -2.4,
+    "rms_err_mrad": 7.6,
+    "max_err_mrad": 16.6,
+    "ripple_mrad": 1.37,
+    "ripple_hz": 3.1,
+    "torque_minus_ff_mean_nm": -0.12,
+    "peak_torque_nm": 2.4,
+    "peak_ff_nm": 2.4,
+    "hold_flips": 0,
+    "by_segment_rms_mrad": {
+     "0": 5.5,
+     "1": 7.4,
+     "2": 3.0
+    }
+   },
+   "j5": {
+    "mean_err_mrad": 0.1,
+    "rms_err_mrad": 2.8,
+    "max_err_mrad": 8.0,
+    "ripple_mrad": 0.45,
+    "ripple_hz": 3.7,
+    "torque_minus_ff_mean_nm": -0.02,
+    "peak_torque_nm": 0.3,
+    "peak_ff_nm": 0.3,
+    "hold_flips": 0,
+    "by_segment_rms_mrad": {
+     "0": 1.1,
+     "1": 3.2,
+     "2": 0.1
+    }
+   }
+  },
+  "params_from": "run summary",
+  "friction_fit": {
+   "j1": {
+    "kp": 100.0,
+    "runner_friction_nm": 1.0,
+    "segments": {
+     "0": {
+      "n": 1686,
+      "v_ref_max": 0.01,
+      "a_ref_max": 1.0,
+      "mean_err_mrad": 3.04,
+      "rms_err_mrad": 2.29,
+      "static": true
+     },
+     "1": {
+      "n": 4158,
+      "v_ref_max": 0.21,
+      "a_ref_max": 10.0,
+      "mean_err_mrad": 1.31,
+      "rms_err_mrad": 1.68,
+      "error": {
+       "const_mrad": 1.33,
+       "sgn_mrad": 0.5,
+       "sgn_nm_at_kp": 0.05,
+       "visc_mrad_per_rad_s": -7.4,
+       "inertia_mrad_per_rad_s2": -0.061,
+       "r2": 0.056
+      },
+      "torque": {
+       "const_nm": 0.073,
+       "sgn_nm": 0.057,
+       "visc_nm_s_per_rad": -1.126,
+       "inertia_nm_s2_per_rad": -0.0039,
+       "r2": 0.151
+      },
+      "vif_sgn": 8.6,
+      "confounded": false,
+      "implied_coulomb_nm": 1.057,
+      "implied_coulomb_up_down_nm": [
+       0.54,
+       1.485
+      ],
+      "corr_with_j3": -0.22,
+      "coherence_with_j3": {
+       "coherence": 0.56,
+       "at_hz": 3.32,
+       "n_segments": 7,
+       "zero_coherence_95": 0.39,
+       "band_rms_mrad": 0.36,
+       "shared_band_rms_mrad": 0.15,
+       "own_band_rms_mrad": 0.33
+      }
+     },
+     "2": {
+      "n": 1681,
+      "v_ref_max": 0.01,
+      "a_ref_max": 1.0,
+      "mean_err_mrad": 3.03,
+      "rms_err_mrad": 2.29,
+      "static": true
+     }
+    }
+   },
+   "j2": {
+    "kp": 100.0,
+    "runner_friction_nm": 1.0,
+    "segments": {
+     "0": {
+      "n": 1686,
+      "v_ref_max": 0.2,
+      "a_ref_max": 7.0,
+      "mean_err_mrad": -6.87,
+      "rms_err_mrad": 7.18,
+      "error": {
+       "const_mrad": 1.8,
+       "sgn_mrad": 4.92,
+       "sgn_nm_at_kp": 0.492,
+       "visc_mrad_per_rad_s": 42.86,
+       "inertia_mrad_per_rad_s2": 0.402,
+       "r2": 0.308
+      },
+      "torque": {
+       "const_nm": 0.107,
+       "sgn_nm": 0.533,
+       "visc_nm_s_per_rad": 3.336,
+       "inertia_nm_s2_per_rad": 0.0416,
+       "r2": 0.253
+      },
+      "vif_sgn": 1.8,
+      "confounded": false,
+      "implied_coulomb_nm": 1.533,
+      "corr_with_j3": 0.18,
+      "coherence_with_j3": {
+       "coherence": 0.97,
+       "at_hz": 2.73,
+       "n_segments": 2,
+       "zero_coherence_95": 0.95,
+       "band_rms_mrad": 0.66,
+       "shared_band_rms_mrad": 0.51,
+       "own_band_rms_mrad": 0.43
+      }
+     },
+     "1": {
+      "n": 4158,
+      "v_ref_max": 0.1,
+      "a_ref_max": 5.0,
+      "mean_err_mrad": 2.14,
+      "rms_err_mrad": 3.69,
+      "error": {
+       "const_mrad": 2.14,
+       "sgn_mrad": 1.63,
+       "sgn_nm_at_kp": 0.163,
+       "visc_mrad_per_rad_s": -21.34,
+       "inertia_mrad_per_rad_s2": 0.049,
+       "r2": 0.031
+      },
+      "torque": {
+       "const_nm": 0.152,
+       "sgn_nm": 0.176,
+       "visc_nm_s_per_rad": -2.983,
+       "inertia_nm_s2_per_rad": 0.0052,
+       "r2": 0.018
+      },
+      "vif_sgn": 18.3,
+      "confounded": true,
+      "implied_coulomb_nm": 1.176,
+      "implied_coulomb_up_down_nm": [
+       1.368,
+       0.981
+      ],
+      "corr_with_j3": -0.11,
+      "coherence_with_j3": {
+       "coherence": 0.91,
+       "at_hz": 3.12,
+       "n_segments": 7,
+       "zero_coherence_95": 0.39,
+       "band_rms_mrad": 0.96,
+       "shared_band_rms_mrad": 0.81,
+       "own_band_rms_mrad": 0.52
+      }
+     },
+     "2": {
+      "n": 1681,
+      "v_ref_max": 0.35,
+      "a_ref_max": 16.0,
+      "mean_err_mrad": -10.91,
+      "rms_err_mrad": 10.05,
+      "error": {
+       "const_mrad": 5.43,
+       "sgn_mrad": -10.26,
+       "sgn_nm_at_kp": -1.026,
+       "visc_mrad_per_rad_s": -72.17,
+       "inertia_mrad_per_rad_s2": 0.143,
+       "r2": 0.519
+      },
+      "torque": {
+       "const_nm": 0.515,
+       "sgn_nm": -1.059,
+       "visc_nm_s_per_rad": -7.608,
+       "inertia_nm_s2_per_rad": 0.0131,
+       "r2": 0.562
+      },
+      "vif_sgn": 1.8,
+      "confounded": false,
+      "implied_coulomb_nm": -0.059,
+      "corr_with_j3": 0.34,
+      "coherence_with_j3": {
+       "coherence": 0.88,
+       "at_hz": 3.32,
+       "n_segments": 2,
+       "zero_coherence_95": 0.95,
+       "band_rms_mrad": 0.77,
+       "shared_band_rms_mrad": 0.56,
+       "own_band_rms_mrad": 0.53
+      }
+     }
+    }
+   },
+   "j3": {
+    "kp": 80.0,
+    "runner_friction_nm": 2.0,
+    "segments": {
+     "0": {
+      "n": 1686,
+      "v_ref_max": 0.28,
+      "a_ref_max": 9.0,
+      "mean_err_mrad": -1.18,
+      "rms_err_mrad": 7.58,
+      "error": {
+       "const_mrad": 3.89,
+       "sgn_mrad": 5.04,
+       "sgn_nm_at_kp": 0.403,
+       "visc_mrad_per_rad_s": 4.12,
+       "inertia_mrad_per_rad_s2": -0.241,
+       "r2": 0.047
+      },
+      "torque": {
+       "const_nm": 0.242,
+       "sgn_nm": 0.439,
+       "visc_nm_s_per_rad": -0.449,
+       "inertia_nm_s2_per_rad": -0.0179,
+       "r2": 0.026
+      },
+      "vif_sgn": 1.6,
+      "confounded": false,
+      "implied_coulomb_nm": 2.439
+     },
+     "1": {
+      "n": 4158,
+      "v_ref_max": 0.16,
+      "a_ref_max": 7.0,
+      "mean_err_mrad": -7.08,
+      "rms_err_mrad": 4.12,
+      "error": {
+       "const_mrad": -7.08,
+       "sgn_mrad": -0.75,
+       "sgn_nm_at_kp": -0.06,
+       "visc_mrad_per_rad_s": -21.58,
+       "inertia_mrad_per_rad_s2": 0.023,
+       "r2": 0.393
+      },
+      "torque": {
+       "const_nm": -0.62,
+       "sgn_nm": -0.068,
+       "visc_nm_s_per_rad": -2.183,
+       "inertia_nm_s2_per_rad": -0.0092,
+       "r2": 0.43
+      },
+      "vif_sgn": 12.9,
+      "confounded": false,
+      "implied_coulomb_nm": 1.932,
+      "implied_coulomb_up_down_nm": [
+       2.169,
+       1.696
+      ]
+     },
+     "2": {
+      "n": 1681,
+      "v_ref_max": 0.49,
+      "a_ref_max": 23.0,
+      "mean_err_mrad": -4.94,
+      "rms_err_mrad": 9.23,
+      "error": {
+       "const_mrad": 12.51,
+       "sgn_mrad": -13.17,
+       "sgn_nm_at_kp": -1.053,
+       "visc_mrad_per_rad_s": -39.56,
+       "inertia_mrad_per_rad_s2": -0.048,
+       "r2": 0.506
+      },
+      "torque": {
+       "const_nm": 0.95,
+       "sgn_nm": -1.042,
+       "visc_nm_s_per_rad": -3.678,
+       "inertia_nm_s2_per_rad": -0.0049,
+       "r2": 0.507
+      },
+      "vif_sgn": 1.6,
+      "confounded": false,
+      "implied_coulomb_nm": 0.958
+     }
+    }
+   },
+   "j4": {
+    "kp": 40.0,
+    "runner_friction_nm": 0.5,
+    "segments": {
+     "0": {
+      "n": 1686,
+      "v_ref_max": 0.08,
+      "a_ref_max": 3.0,
+      "mean_err_mrad": -8.15,
+      "rms_err_mrad": 5.5,
+      "error": {
+       "const_mrad": 1.22,
+       "sgn_mrad": -11.44,
+       "sgn_nm_at_kp": -0.458,
+       "visc_mrad_per_rad_s": -12.43,
+       "inertia_mrad_per_rad_s2": -0.005,
+       "r2": 0.584
+      },
+      "torque": {
+       "const_nm": 0.023,
+       "sgn_nm": -0.461,
+       "visc_nm_s_per_rad": -0.767,
+       "inertia_nm_s2_per_rad": 0.0006,
+       "r2": 0.605
+      },
+      "vif_sgn": 3.5,
+      "confounded": false,
+      "implied_coulomb_nm": 0.039,
+      "corr_with_j3": 0.66,
+      "coherence_with_j3": {
+       "coherence": 0.93,
+       "at_hz": 3.12,
+       "n_segments": 2,
+       "zero_coherence_95": 0.95,
+       "band_rms_mrad": 1.32,
+       "shared_band_rms_mrad": 1.05,
+       "own_band_rms_mrad": 0.81
+      },
+      "what_if": {
+       "friction_nm": 0.18,
+       "kp": 40.0,
+       "sgn_mrad": -3.44,
+       "mean_err_mrad": -1.96,
+       "rms_err_mrad": 3.84,
+       "rms_about_zero_mrad": 4.31
+      }
+     },
+     "1": {
+      "n": 4158,
+      "v_ref_max": 0.1,
+      "a_ref_max": 4.0,
+      "mean_err_mrad": -3.0,
+      "rms_err_mrad": 7.39,
+      "error": {
+       "const_mrad": -2.99,
+       "sgn_mrad": -8.53,
+       "sgn_nm_at_kp": -0.341,
+       "visc_mrad_per_rad_s": 17.06,
+       "inertia_mrad_per_rad_s2": 0.03,
+       "r2": 0.907
+      },
+      "torque": {
+       "const_nm": -0.147,
+       "sgn_nm": -0.346,
+       "visc_nm_s_per_rad": 0.452,
+       "inertia_nm_s2_per_rad": -0.0009,
+       "r2": 0.909
+      },
+      "vif_sgn": 10.7,
+      "confounded": false,
+      "implied_coulomb_nm": 0.154,
+      "implied_coulomb_up_down_nm": [
+       0.153,
+       0.156
+      ],
+      "corr_with_j3": -0.55,
+      "coherence_with_j3": {
+       "coherence": 0.47,
+       "at_hz": 2.54,
+       "n_segments": 7,
+       "zero_coherence_95": 0.39,
+       "band_rms_mrad": 1.4,
+       "shared_band_rms_mrad": 0.92,
+       "own_band_rms_mrad": 1.05
+      },
+      "what_if": {
+       "friction_nm": 0.18,
+       "kp": 40.0,
+       "sgn_mrad": -0.53,
+       "mean_err_mrad": -2.99,
+       "rms_err_mrad": 2.3,
+       "rms_about_zero_mrad": 3.77
+      }
+     },
+     "2": {
+      "n": 1681,
+      "v_ref_max": 0.14,
+      "a_ref_max": 7.0,
+      "mean_err_mrad": 4.81,
+      "rms_err_mrad": 2.96,
+      "error": {
+       "const_mrad": 2.72,
+       "sgn_mrad": -3.45,
+       "sgn_nm_at_kp": -0.138,
+       "visc_mrad_per_rad_s": 13.66,
+       "inertia_mrad_per_rad_s2": -0.032,
+       "r2": 0.089
+      },
+      "torque": {
+       "const_nm": 0.081,
+       "sgn_nm": -0.141,
+       "visc_nm_s_per_rad": 0.287,
+       "inertia_nm_s2_per_rad": -0.0,
+       "r2": 0.119
+      },
+      "vif_sgn": 3.3,
+      "confounded": false,
+      "implied_coulomb_nm": 0.359,
+      "corr_with_j3": 0.21,
+      "coherence_with_j3": {
+       "coherence": 0.93,
+       "at_hz": 3.32,
+       "n_segments": 2,
+       "zero_coherence_95": 0.95,
+       "band_rms_mrad": 1.34,
+       "shared_band_rms_mrad": 1.07,
+       "own_band_rms_mrad": 0.81
+      },
+      "what_if": {
+       "friction_nm": 0.18,
+       "kp": 40.0,
+       "sgn_mrad": 4.55,
+       "mean_err_mrad": -1.37,
+       "rms_err_mrad": 3.39,
+       "rms_about_zero_mrad": 3.66
+      }
+     }
+    }
+   },
+   "j5": {
+    "kp": 40.0,
+    "runner_friction_nm": 0.3,
+    "segments": {
+     "0": {
+      "n": 1686,
+      "v_ref_max": 0.0,
+      "a_ref_max": 0.0,
+      "mean_err_mrad": -2.3,
+      "rms_err_mrad": 1.14,
+      "static": true
+     },
+     "1": {
+      "n": 4158,
+      "v_ref_max": 0.21,
+      "a_ref_max": 10.0,
+      "mean_err_mrad": 0.74,
+      "rms_err_mrad": 3.24,
+      "error": {
+       "const_mrad": 0.57,
+       "sgn_mrad": -4.17,
+       "sgn_nm_at_kp": -0.167,
+       "visc_mrad_per_rad_s": 8.7,
+       "inertia_mrad_per_rad_s2": -0.069,
+       "r2": 0.886
+      },
+      "torque": {
+       "const_nm": -0.005,
+       "sgn_nm": -0.168,
+       "visc_nm_s_per_rad": 0.065,
+       "inertia_nm_s2_per_rad": -0.0018,
+       "r2": 0.908
+      },
+      "vif_sgn": 8.6,
+      "confounded": false,
+      "implied_coulomb_nm": 0.132,
+      "implied_coulomb_up_down_nm": [
+       0.161,
+       0.107
+      ],
+      "corr_with_j3": 0.01,
+      "coherence_with_j3": {
+       "coherence": 0.23,
+       "at_hz": 2.54,
+       "n_segments": 7,
+       "zero_coherence_95": 0.39,
+       "band_rms_mrad": 0.47,
+       "shared_band_rms_mrad": 0.16,
+       "own_band_rms_mrad": 0.44
+      }
+     },
+     "2": {
+      "n": 1681,
+      "v_ref_max": 0.0,
+      "a_ref_max": 0.0,
+      "mean_err_mrad": 0.91,
+      "rms_err_mrad": 0.11,
+      "static": true
+     }
+    }
+   }
+  }
+ },
+ "traj_figure8_20261023T204854Z.csv.gz": {
+  "joints": {
+   "j1": {
+    "mean_err_mrad": 1.0,
+    "rms_err_mrad": 2.2,
+    "max_err_mrad": 6.6,
+    "ripple_mrad": 0.49,
+    "ripple_hz": 3.7,
+    "torque_minus_ff_mean_nm": 0.03,
+    "peak_torque_nm": 1.4,
+    "peak_ff_nm": 1.0,
+    "hold_flips": 0,
+    "by_segment_rms_mrad": {
+     "0": 2.2,
+     "1": 1.2,
+     "2": 2.1
+    }
+   },
+   "j2": {
+    "mean_err_mrad": 12.1,
+    "rms_err_mrad": 10.1,
+    "max_err_mrad": 29.5,
+    "ripple_mrad": 0.91,
+    "ripple_hz": 2.9,
+    "torque_minus_ff_mean_nm": 1.14,
+    "peak_torque_nm": 4.1,
+    "peak_ff_nm": 1.7,
+    "hold_flips": 0,
+    "by_segment_rms_mrad": {
+     "0": 8.0,
+     "1": 4.8,
+     "2": 8.8
+    }
+   },
+   "j3": {
+    "mean_err_mrad": -9.5,
+    "rms_err_mrad": 6.9,
+    "max_err_mrad": 19.7,
+    "ripple_mrad": 1.02,
+    "ripple_hz": 2.9,
+    "torque_minus_ff_mean_nm": -0.81,
+    "peak_torque_nm": 10.3,
+    "peak_ff_nm": 9.0,
+    "hold_flips": 0,
+    "by_segment_rms_mrad": {
+     "0": 8.5,
+     "1": 3.6,
+     "2": 9.9
+    }
+   },
+   "j4": {
+    "mean_err_mrad": -6.5,
+    "rms_err_mrad": 8.1,
+    "max_err_mrad": 19.8,
+    "ripple_mrad": 1.59,
+    "ripple_hz": 3.2,
+    "torque_minus_ff_mean_nm": -0.29,
+    "peak_torque_nm": 2.4,
+    "peak_ff_nm": 2.2,
+    "hold_flips": 0,
+    "by_segment_rms_mrad": {
+     "0": 6.1,
+     "1": 7.7,
+     "2": 4.8
+    }
+   },
+   "j5": {
+    "mean_err_mrad": -0.0,
+    "rms_err_mrad": 2.5,
+    "max_err_mrad": 7.7,
+    "ripple_mrad": 0.42,
+    "ripple_hz": 10.9,
+    "torque_minus_ff_mean_nm": -0.03,
+    "peak_torque_nm": 0.3,
+    "peak_ff_nm": 0.3,
+    "hold_flips": 0,
+    "by_segment_rms_mrad": {
+     "0": 0.5,
+     "1": 2.9,
+     "2": 0.1
+    }
+   }
+  },
+  "params_from": "run summary",
+  "friction_fit": {
+   "j1": {
+    "kp": 100.0,
+    "runner_friction_nm": 1.0,
+    "segments": {
+     "0": {
+      "n": 764,
+      "v_ref_max": 0.01,
+      "a_ref_max": 1.0,
+      "mean_err_mrad": 2.94,
+      "rms_err_mrad": 2.21,
+      "static": true
+     },
+     "1": {
+      "n": 2367,
+      "v_ref_max": 0.3,
+      "a_ref_max": 2.0,
+      "mean_err_mrad": 1.18,
+      "rms_err_mrad": 1.19,
+      "error": {
+       "const_mrad": 1.22,
+       "sgn_mrad": -0.92,
+       "sgn_nm_at_kp": -0.092,
+       "visc_mrad_per_rad_s": 5.16,
+       "inertia_mrad_per_rad_s2": -0.049,
+       "r2": 0.182
+      },
+      "torque": {
+       "const_nm": 0.059,
+       "sgn_nm": -0.101,
+       "visc_nm_s_per_rad": 0.155,
+       "inertia_nm_s2_per_rad": -0.0096,
+       "r2": 0.248
+      },
+      "vif_sgn": 7.5,
+      "confounded": false,
+      "implied_coulomb_nm": 0.899,
+      "implied_coulomb_up_down_nm": [
+       0.774,
+       1.024
+      ],
+      "corr_with_j3": -0.01,
+      "coherence_with_j3": {
+       "coherence": 0.47,
+       "at_hz": 3.32,
+       "n_segments": 3,
+       "zero_coherence_95": 0.78,
+       "band_rms_mrad": 0.49,
+       "shared_band_rms_mrad": 0.3,
+       "own_band_rms_mrad": 0.39
+      }
+     },
+     "2": {
+      "n": 765,
+      "v_ref_max": 0.01,
+      "a_ref_max": 1.0,
+      "mean_err_mrad": -1.73,
+      "rms_err_mrad": 2.15,
+      "static": true
+     }
+    }
+   },
+   "j2": {
+    "kp": 100.0,
+    "runner_friction_nm": 1.0,
+    "segments": {
+     "0": {
+      "n": 764,
+      "v_ref_max": 0.41,
+      "a_ref_max": 5.0,
+      "mean_err_mrad": 4.1,
+      "rms_err_mrad": 8.01,
+      "error": {
+       "const_mrad": 1.5,
+       "sgn_mrad": -6.66,
+       "sgn_nm_at_kp": -0.666,
+       "visc_mrad_per_rad_s": 16.04,
+       "inertia_mrad_per_rad_s2": 2.407,
+       "r2": 0.118
+      },
+      "torque": {
+       "const_nm": 0.087,
+       "sgn_nm": -0.666,
+       "visc_nm_s_per_rad": 0.972,
+       "inertia_nm_s2_per_rad": 0.2428,
+       "r2": 0.103
+      },
+      "vif_sgn": 1.4,
+      "confounded": false,
+      "implied_coulomb_nm": 0.334,
+      "corr_with_j3": -0.39,
+      "coherence_with_j3": {
+       "coherence": 1.0,
+       "at_hz": 2.88,
+       "n_segments": 1,
+       "zero_coherence_95": 1.0,
+       "band_rms_mrad": 0.68,
+       "shared_band_rms_mrad": 0.68,
+       "own_band_rms_mrad": 0.0
+      }
+     },
+     "1": {
+      "n": 2367,
+      "v_ref_max": 0.13,
+      "a_ref_max": 2.0,
+      "mean_err_mrad": 18.27,
+      "rms_err_mrad": 4.82,
+      "error": {
+       "const_mrad": 18.26,
+       "sgn_mrad": -0.1,
+       "sgn_nm_at_kp": -0.01,
+       "visc_mrad_per_rad_s": 41.13,
+       "inertia_mrad_per_rad_s2": 0.503,
+       "r2": 0.341
+      },
+      "torque": {
+       "const_nm": 1.758,
+       "sgn_nm": -0.038,
+       "visc_nm_s_per_rad": 3.66,
+       "inertia_nm_s2_per_rad": 0.0522,
+       "r2": 0.257
+      },
+      "vif_sgn": 8.3,
+      "confounded": false,
+      "implied_coulomb_nm": 0.962,
+      "implied_coulomb_up_down_nm": [
+       1.521,
+       0.424
+      ],
+      "corr_with_j3": -0.55,
+      "coherence_with_j3": {
+       "coherence": 0.98,
+       "at_hz": 3.13,
+       "n_segments": 3,
+       "zero_coherence_95": 0.78,
+       "band_rms_mrad": 0.85,
+       "shared_band_rms_mrad": 0.77,
+       "own_band_rms_mrad": 0.36
+      }
+     },
+     "2": {
+      "n": 765,
+      "v_ref_max": 0.41,
+      "a_ref_max": 2.0,
+      "mean_err_mrad": 0.88,
+      "rms_err_mrad": 8.79,
+      "error": {
+       "const_mrad": 3.98,
+       "sgn_mrad": -0.08,
+       "sgn_nm_at_kp": -0.008,
+       "visc_mrad_per_rad_s": -14.09,
+       "inertia_mrad_per_rad_s2": 3.301,
+       "r2": 0.129
+      },
+      "torque": {
+       "const_nm": 0.335,
+       "sgn_nm": -0.0,
+       "visc_nm_s_per_rad": -2.117,
+       "inertia_nm_s2_per_rad": 0.3145,
+       "r2": 0.189
+      },
+      "vif_sgn": 1.4,
+      "confounded": false,
+      "implied_coulomb_nm": 1.0,
+      "corr_with_j3": -0.34,
+      "coherence_with_j3": {
+       "coherence": 1.0,
+       "at_hz": 3.4,
+       "n_segments": 1,
+       "zero_coherence_95": 1.0,
+       "band_rms_mrad": 0.72,
+       "shared_band_rms_mrad": 0.72,
+       "own_band_rms_mrad": 0.0
+      }
+     }
+    }
+   },
+   "j3": {
+    "kp": 80.0,
+    "runner_friction_nm": 2.0,
+    "segments": {
+     "0": {
+      "n": 764,
+      "v_ref_max": 0.55,
+      "a_ref_max": 5.0,
+      "mean_err_mrad": -4.39,
+      "rms_err_mrad": 8.52,
+      "error": {
+       "const_mrad": 6.17,
+       "sgn_mrad": 6.49,
+       "sgn_nm_at_kp": 0.519,
+       "visc_mrad_per_rad_s": 15.84,
+       "inertia_mrad_per_rad_s2": -0.549,
+       "r2": 0.218
+      },
+      "torque": {
+       "const_nm": 0.425,
+       "sgn_nm": 0.601,
+       "visc_nm_s_per_rad": 0.477,
+       "inertia_nm_s2_per_rad": -0.0448,
+       "r2": 0.092
+      },
+      "vif_sgn": 1.3,
+      "confounded": false,
+      "implied_coulomb_nm": 2.601
+     },
+     "1": {
+      "n": 2367,
+      "v_ref_max": 0.25,
+      "a_ref_max": 2.0,
+      "mean_err_mrad": -11.1,
+      "rms_err_mrad": 3.59,
+      "error": {
+       "const_mrad": -11.66,
+       "sgn_mrad": -2.53,
+       "sgn_nm_at_kp": -0.203,
+       "visc_mrad_per_rad_s": -0.93,
+       "inertia_mrad_per_rad_s2": 0.445,
+       "r2": 0.5
+      },
+      "torque": {
+       "const_nm": -1.006,
+       "sgn_nm": -0.286,
+       "visc_nm_s_per_rad": -0.182,
+       "inertia_nm_s2_per_rad": 0.0053,
+       "r2": 0.624
+      },
+      "vif_sgn": 9.1,
+      "confounded": false,
+      "implied_coulomb_nm": 1.714,
+      "implied_coulomb_up_down_nm": [
+       1.68,
+       1.743
+      ]
+     },
+     "2": {
+      "n": 765,
+      "v_ref_max": 0.54,
+      "a_ref_max": 4.0,
+      "mean_err_mrad": -9.51,
+      "rms_err_mrad": 9.86,
+      "error": {
+       "const_mrad": 5.01,
+       "sgn_mrad": -7.9,
+       "sgn_nm_at_kp": -0.632,
+       "visc_mrad_per_rad_s": -25.11,
+       "inertia_mrad_per_rad_s2": -1.076,
+       "r2": 0.366
+      },
+      "torque": {
+       "const_nm": 0.338,
+       "sgn_nm": -0.529,
+       "visc_nm_s_per_rad": -2.777,
+       "inertia_nm_s2_per_rad": -0.1084,
+       "r2": 0.424
+      },
+      "vif_sgn": 1.3,
+      "confounded": false,
+      "implied_coulomb_nm": 1.471
+     }
+    }
+   },
+   "j4": {
+    "kp": 40.0,
+    "runner_friction_nm": 0.5,
+    "segments": {
+     "0": {
+      "n": 764,
+      "v_ref_max": 0.14,
+      "a_ref_max": 2.0,
+      "mean_err_mrad": -10.96,
+      "rms_err_mrad": 6.13,
+      "error": {
+       "const_mrad": -0.38,
+       "sgn_mrad": -10.74,
+       "sgn_nm_at_kp": -0.43,
+       "visc_mrad_per_rad_s": -21.76,
+       "inertia_mrad_per_rad_s2": 0.154,
+       "r2": 0.462
+      },
+      "torque": {
+       "const_nm": -0.037,
+       "sgn_nm": -0.447,
+       "visc_nm_s_per_rad": -1.069,
+       "inertia_nm_s2_per_rad": 0.0059,
+       "r2": 0.521
+      },
+      "vif_sgn": 2.1,
+      "confounded": false,
+      "implied_coulomb_nm": 0.053,
+      "corr_with_j3": 0.92,
+      "coherence_with_j3": {
+       "coherence": 1.0,
+       "at_hz": 2.62,
+       "n_segments": 1,
+       "zero_coherence_95": 1.0,
+       "band_rms_mrad": 1.56,
+       "shared_band_rms_mrad": 1.56,
+       "own_band_rms_mrad": 0.0
+      },
+      "what_if": {
+       "friction_nm": 0.18,
+       "kp": 40.0,
+       "sgn_mrad": -2.74,
+       "mean_err_mrad": -4.27,
+       "rms_err_mrad": 4.84,
+       "rms_about_zero_mrad": 6.45
+      }
+     },
+     "1": {
+      "n": 2367,
+      "v_ref_max": 0.18,
+      "a_ref_max": 2.0,
+      "mean_err_mrad": -7.73,
+      "rms_err_mrad": 7.68,
+      "error": {
+       "const_mrad": -6.12,
+       "sgn_mrad": -7.56,
+       "sgn_nm_at_kp": -0.302,
+       "visc_mrad_per_rad_s": -3.1,
+       "inertia_mrad_per_rad_s2": -0.155,
+       "r2": 0.906
+      },
+      "torque": {
+       "const_nm": -0.268,
+       "sgn_nm": -0.32,
+       "visc_nm_s_per_rad": -0.273,
+       "inertia_nm_s2_per_rad": -0.0116,
+       "r2": 0.912
+      },
+      "vif_sgn": 8.8,
+      "confounded": false,
+      "implied_coulomb_nm": 0.18,
+      "implied_coulomb_up_down_nm": [
+       0.23,
+       0.121
+      ],
+      "corr_with_j3": -0.35,
+      "coherence_with_j3": {
+       "coherence": 0.91,
+       "at_hz": 2.73,
+       "n_segments": 3,
+       "zero_coherence_95": 0.78,
+       "band_rms_mrad": 1.7,
+       "shared_band_rms_mrad": 1.44,
+       "own_band_rms_mrad": 0.9
+      },
+      "what_if": {
+       "friction_nm": 0.18,
+       "kp": 40.0,
+       "sgn_mrad": 0.44,
+       "mean_err_mrad": -6.03,
+       "rms_err_mrad": 2.36,
+       "rms_about_zero_mrad": 6.48
+      }
+     },
+     "2": {
+      "n": 765,
+      "v_ref_max": 0.14,
+      "a_ref_max": 1.0,
+      "mean_err_mrad": 1.9,
+      "rms_err_mrad": 4.83,
+      "error": {
+       "const_mrad": 2.11,
+       "sgn_mrad": -2.38,
+       "sgn_nm_at_kp": -0.095,
+       "visc_mrad_per_rad_s": 30.04,
+       "inertia_mrad_per_rad_s2": 0.139,
+       "r2": 0.047
+      },
+      "torque": {
+       "const_nm": 0.057,
+       "sgn_nm": -0.107,
+       "visc_nm_s_per_rad": 0.992,
+       "inertia_nm_s2_per_rad": 0.0066,
+       "r2": 0.032
+      },
+      "vif_sgn": 2.1,
+      "confounded": false,
+      "implied_coulomb_nm": 0.393,
+      "corr_with_j3": 0.76,
+      "coherence_with_j3": {
+       "coherence": 1.0,
+       "at_hz": 3.14,
+       "n_segments": 1,
+       "zero_coherence_95": 1.0,
+       "band_rms_mrad": 1.46,
+       "shared_band_rms_mrad": 1.46,
+       "own_band_rms_mrad": 0.0
+      },
+      "what_if": {
+       "friction_nm": 0.18,
+       "kp": 40.0,
+       "sgn_mrad": 5.62,
+       "mean_err_mrad": -4.79,
+       "rms_err_mrad": 5.58,
+       "rms_about_zero_mrad": 7.35
+      }
+     }
+    }
+   },
+   "j5": {
+    "kp": 40.0,
+    "runner_friction_nm": 0.3,
+    "segments": {
+     "0": {
+      "n": 764,
+      "v_ref_max": 0.01,
+      "a_ref_max": 1.0,
+      "mean_err_mrad": -1.77,
+      "rms_err_mrad": 0.49,
+      "static": true
+     },
+     "1": {
+      "n": 2367,
+      "v_ref_max": 0.3,
+      "a_ref_max": 2.0,
+      "mean_err_mrad": 0.42,
+      "rms_err_mrad": 2.93,
+      "error": {
+       "const_mrad": 0.65,
+       "sgn_mrad": -4.91,
+       "sgn_nm_at_kp": -0.196,
+       "visc_mrad_per_rad_s": 10.44,
+       "inertia_mrad_per_rad_s2": -0.21,
+       "r2": 0.806
+      },
+      "torque": {
+       "const_nm": -0.001,
+       "sgn_nm": -0.204,
+       "visc_nm_s_per_rad": 0.154,
+       "inertia_nm_s2_per_rad": -0.01,
+       "r2": 0.905
+      },
+      "vif_sgn": 7.5,
+      "confounded": false,
+      "implied_coulomb_nm": 0.096,
+      "implied_coulomb_up_down_nm": [
+       0.127,
+       0.064
+      ],
+      "corr_with_j3": -0.09,
+      "coherence_with_j3": {
+       "coherence": 0.54,
+       "at_hz": 2.93,
+       "n_segments": 3,
+       "zero_coherence_95": 0.78,
+       "band_rms_mrad": 0.42,
+       "shared_band_rms_mrad": 0.25,
+       "own_band_rms_mrad": 0.34
+      }
+     },
+     "2": {
+      "n": 765,
+      "v_ref_max": 0.01,
+      "a_ref_max": 1.0,
+      "mean_err_mrad": 0.32,
+      "rms_err_mrad": 0.15,
+      "static": true
+     }
+    }
+   }
+  }
+ },
+ "traj_showreel_20261025T213800Z.csv.gz": {
+  "joints": {
+   "j1": {
+    "mean_err_mrad": 1.5,
+    "rms_err_mrad": 2.5,
+    "max_err_mrad": 6.5,
+    "ripple_mrad": 0.31,
+    "ripple_hz": 3.4,
+    "torque_minus_ff_mean_nm": 0.08,
+    "peak_torque_nm": 1.3,
+    "peak_ff_nm": 1.0,
+    "hold_flips": 0,
+    "by_segment_rms_mrad": {
+     "0": 0.2,
+     "1": 2.1,
+     "2": 0.2
+    }
+   },
+   "j2": {
+    "mean_err_mrad": 15.2,
+    "rms_err_mrad": 7.0,
+    "max_err_mrad": 31.9,
+    "ripple_mrad": 0.66,
+    "ripple_hz": 3.2,
+    "torque_minus_ff_mean_nm": 1.46,
+    "peak_torque_nm": 4.3,
+    "peak_ff_nm": 1.7,
+    "hold_flips": 0,
+    "by_segment_rms_mrad": {
+     "0": 6.7,
+     "1": 4.1,
+     "2": 10.2
+    }
+   },
+   "j3": {
+    "mean_err_mrad": -13.7,
+    "rms_err_mrad": 6.0,
+    "max_err_mrad": 25.6,
+    "ripple_mrad": 0.83,
+    "ripple_hz": 2.5,
+    "torque_minus_ff_mean_nm": -1.15,
+    "peak_torque_nm": 10.9,
+    "peak_ff_nm": 9.0,
+    "hold_flips": 1,
+    "by_segment_rms_mrad": {
+     "0": 9.1,
+     "1": 4.2,
+     "2": 11.3
+    }
+   },
+   "j4": {
+    "mean_err_mrad": -7.7,
+    "rms_err_mrad": 7.8,
+    "max_err_mrad": 22.1,
+    "ripple_mrad": 1.14,
+    "ripple_hz": 2.9,
+    "torque_minus_ff_mean_nm": -0.33,
+    "peak_torque_nm": 2.4,
+    "peak_ff_nm": 2.2,
+    "hold_flips": 0,
+    "by_segment_rms_mrad": {
+     "0": 7.6,
+     "1": 7.5,
+     "2": 3.5
+    }
+   },
+   "j5": {
+    "mean_err_mrad": 0.4,
+    "rms_err_mrad": 3.2,
+    "max_err_mrad": 7.7,
+    "ripple_mrad": 0.42,
+    "ripple_hz": 5.6,
+    "torque_minus_ff_mean_nm": -0.01,
+    "peak_torque_nm": 0.3,
+    "peak_ff_nm": 0.3,
+    "hold_flips": 0,
+    "by_segment_rms_mrad": {
+     "0": 1.1,
+     "1": 3.4,
+     "2": 0.2
+    }
+   }
+  },
+  "params_from": "run summary",
+  "friction_fit": {
+   "j1": {
+    "kp": 100.0,
+    "runner_friction_nm": 1.0,
+    "segments": {
+     "0": {
+      "n": 1528,
+      "v_ref_max": 0.01,
+      "a_ref_max": 1.0,
+      "mean_err_mrad": -0.3,
+      "rms_err_mrad": 0.23,
+      "static": true
+     },
+     "1": {
+      "n": 16365,
+      "v_ref_max": 0.27,
+      "a_ref_max": 12.0,
+      "mean_err_mrad": 1.13,
+      "rms_err_mrad": 2.12,
+      "error": {
+       "const_mrad": 1.09,
+       "sgn_mrad": -0.56,
+       "sgn_nm_at_kp": -0.056,
+       "visc_mrad_per_rad_s": -0.08,
+       "inertia_mrad_per_rad_s2": -0.073,
+       "r2": 0.056
+      },
+      "torque": {
+       "const_nm": 0.047,
+       "sgn_nm": -0.047,
+       "visc_nm_s_per_rad": -0.421,
+       "inertia_nm_s2_per_rad": -0.0063,
+       "r2": 0.13
+      },
+      "vif_sgn": 6.6,
+      "confounded": false,
+      "implied_coulomb_nm": 0.953,
+      "implied_coulomb_up_down_nm": [
+       0.919,
+       0.982
+      ],
+      "corr_with_j3": 0.06,
+      "coherence_with_j3": {
+       "coherence": 0.11,
+       "at_hz": 2.93,
+       "n_segments": 30,
+       "zero_coherence_95": 0.1,
+       "band_rms_mrad": 0.32,
+       "shared_band_rms_mrad": 0.06,
+       "own_band_rms_mrad": 0.31
+      }
+     },
+     "2": {
+      "n": 1667,
+      "v_ref_max": 0.01,
+      "a_ref_max": 1.0,
+      "mean_err_mrad": 6.29,
+      "rms_err_mrad": 0.16,
+      "static": true
+     }
+    }
+   },
+   "j2": {
+    "kp": 100.0,
+    "runner_friction_nm": 1.0,
+    "segments": {
+     "0": {
+      "n": 1528,
+      "v_ref_max": 0.21,
+      "a_ref_max": 9.0,
+      "mean_err_mrad": 5.54,
+      "rms_err_mrad": 6.68,
+      "error": {
+       "const_mrad": 7.14,
+       "sgn_mrad": -0.95,
+       "sgn_nm_at_kp": -0.095,
+       "visc_mrad_per_rad_s": 22.6,
+       "inertia_mrad_per_rad_s2": 0.536,
+       "r2": 0.05
+      },
+      "torque": {
+       "const_nm": 0.648,
+       "sgn_nm": -0.088,
+       "visc_nm_s_per_rad": 1.597,
+       "inertia_nm_s2_per_rad": 0.0542,
+       "r2": 0.027
+      },
+      "vif_sgn": 1.8,
+      "confounded": false,
+      "implied_coulomb_nm": 0.912,
+      "corr_with_j3": -0.41,
+      "coherence_with_j3": {
+       "coherence": 1.0,
+       "at_hz": 2.93,
+       "n_segments": 1,
+       "zero_coherence_95": 1.0,
+       "band_rms_mrad": 0.62,
+       "shared_band_rms_mrad": 0.62,
+       "own_band_rms_mrad": 0.0
+      }
+     },
+     "1": {
+      "n": 16365,
+      "v_ref_max": 0.11,
+      "a_ref_max": 6.0,
+      "mean_err_mrad": 17.35,
+      "rms_err_mrad": 4.09,
+      "error": {
+       "const_mrad": 17.39,
+       "sgn_mrad": 0.46,
+       "sgn_nm_at_kp": 0.046,
+       "visc_mrad_per_rad_s": 37.85,
+       "inertia_mrad_per_rad_s2": -0.033,
+       "r2": 0.161
+      },
+      "torque": {
+       "const_nm": 1.678,
+       "sgn_nm": 0.082,
+       "visc_nm_s_per_rad": 2.41,
+       "inertia_nm_s2_per_rad": -0.0006,
+       "r2": 0.126
+      },
+      "vif_sgn": 16.2,
+      "confounded": true,
+      "implied_coulomb_nm": 1.082,
+      "implied_coulomb_up_down_nm": [
+       1.284,
+       0.892
+      ],
+      "corr_with_j3": 0.04,
+      "coherence_with_j3": {
+       "coherence": 0.81,
+       "at_hz": 3.32,
+       "n_segments": 30,
+       "zero_coherence_95": 0.1,
+       "band_rms_mrad": 0.74,
+       "shared_band_rms_mrad": 0.6,
+       "own_band_rms_mrad": 0.43
+      }
+     },
+     "2": {
+      "n": 1667,
+      "v_ref_max": 0.25,
+      "a_ref_max": 12.0,
+      "mean_err_mrad": 3.33,
+      "rms_err_mrad": 10.24,
+      "error": {
+       "const_mrad": 15.64,
+       "sgn_mrad": -7.82,
+       "sgn_nm_at_kp": -0.782,
+       "visc_mrad_per_rad_s": -53.71,
+       "inertia_mrad_per_rad_s2": 0.316,
+       "r2": 0.283
+      },
+      "torque": {
+       "const_nm": 1.511,
+       "sgn_nm": -0.788,
+       "visc_nm_s_per_rad": -6.029,
+       "inertia_nm_s2_per_rad": 0.0332,
+       "r2": 0.323
+      },
+      "vif_sgn": 1.8,
+      "confounded": false,
+      "implied_coulomb_nm": 0.212,
+      "corr_with_j3": 0.01,
+      "coherence_with_j3": {
+       "coherence": 0.82,
+       "at_hz": 3.32,
+       "n_segments": 2,
+       "zero_coherence_95": 0.95,
+       "band_rms_mrad": 0.86,
+       "shared_band_rms_mrad": 0.69,
+       "own_band_rms_mrad": 0.5
+      }
+     }
+    }
+   },
+   "j3": {
+    "kp": 80.0,
+    "runner_friction_nm": 2.0,
+    "segments": {
+     "0": {
+      "n": 1528,
+      "v_ref_max": 0.29,
+      "a_ref_max": 13.0,
+      "mean_err_mrad": -7.22,
+      "rms_err_mrad": 9.13,
+      "error": {
+       "const_mrad": 1.61,
+       "sgn_mrad": 6.25,
+       "sgn_nm_at_kp": 0.5,
+       "visc_mrad_per_rad_s": 22.76,
+       "inertia_mrad_per_rad_s2": -0.276,
+       "r2": 0.144
+      },
+      "torque": {
+       "const_nm": 0.07,
+       "sgn_nm": 0.546,
+       "visc_nm_s_per_rad": 1.043,
+       "inertia_nm_s2_per_rad": -0.0253,
+       "r2": 0.095
+      },
+      "vif_sgn": 1.6,
+      "confounded": false,
+      "implied_coulomb_nm": 2.546
+     },
+     "1": {
+      "n": 16365,
+      "v_ref_max": 0.24,
+      "a_ref_max": 10.0,
+      "mean_err_mrad": -14.57,
+      "rms_err_mrad": 4.16,
+      "error": {
+       "const_mrad": -14.56,
+       "sgn_mrad": 0.69,
+       "sgn_nm_at_kp": 0.055,
+       "visc_mrad_per_rad_s": -29.36,
+       "inertia_mrad_per_rad_s2": -0.036,
+       "r2": 0.18
+      },
+      "torque": {
+       "const_nm": -1.219,
+       "sgn_nm": 0.067,
+       "visc_nm_s_per_rad": -3.008,
+       "inertia_nm_s2_per_rad": -0.0063,
+       "r2": 0.232
+      },
+      "vif_sgn": 8.6,
+      "confounded": false,
+      "implied_coulomb_nm": 2.067,
+      "implied_coulomb_up_down_nm": [
+       2.185,
+       1.963
+      ]
+     },
+     "2": {
+      "n": 1667,
+      "v_ref_max": 0.35,
+      "a_ref_max": 16.0,
+      "mean_err_mrad": -10.65,
+      "rms_err_mrad": 11.28,
+      "error": {
+       "const_mrad": 10.02,
+       "sgn_mrad": -14.76,
+       "sgn_nm_at_kp": -1.181,
+       "visc_mrad_per_rad_s": -52.29,
+       "inertia_mrad_per_rad_s2": -0.14,
+       "r2": 0.507
+      },
+      "torque": {
+       "const_nm": 0.753,
+       "sgn_nm": -1.151,
+       "visc_nm_s_per_rad": -4.873,
+       "inertia_nm_s2_per_rad": -0.0126,
+       "r2": 0.513
+      },
+      "vif_sgn": 1.6,
+      "confounded": false,
+      "implied_coulomb_nm": 0.849
+     }
+    }
+   },
+   "j4": {
+    "kp": 40.0,
+    "runner_friction_nm": 0.5,
+    "segments": {
+     "0": {
+      "n": 1528,
+      "v_ref_max": 0.07,
+      "a_ref_max": 3.0,
+      "mean_err_mrad": -11.57,
+      "rms_err_mrad": 7.64,
+      "error": {
+       "const_mrad": 0.3,
+       "sgn_mrad": -14.43,
+       "sgn_nm_at_kp": -0.577,
+       "visc_mrad_per_rad_s": -27.55,
+       "inertia_mrad_per_rad_s2": 0.044,
+       "r2": 0.539
+      },
+      "torque": {
+       "const_nm": -0.016,
+       "sgn_nm": -0.587,
+       "visc_nm_s_per_rad": -1.169,
+       "inertia_nm_s2_per_rad": 0.0034,
+       "r2": 0.56
+      },
+      "vif_sgn": 4.0,
+      "confounded": false,
+      "implied_coulomb_nm": -0.087,
+      "corr_with_j3": 0.85,
+      "coherence_with_j3": {
+       "coherence": 1.0,
+       "at_hz": 2.54,
+       "n_segments": 1,
+       "zero_coherence_95": 1.0,
+       "band_rms_mrad": 1.37,
+       "shared_band_rms_mrad": 1.37,
+       "own_band_rms_mrad": 0.0
+      },
+      "what_if": {
+       "friction_nm": 0.18,
+       "kp": 40.0,
+       "sgn_mrad": -6.43,
+       "mean_err_mrad": -5.55,
+       "rms_err_mrad": 5.91,
+       "rms_about_zero_mrad": 8.11
+      }
+     },
+     "1": {
+      "n": 16365,
+      "v_ref_max": 0.15,
+      "a_ref_max": 8.0,
+      "mean_err_mrad": -8.15,
+      "rms_err_mrad": 7.52,
+      "error": {
+       "const_mrad": -7.67,
+       "sgn_mrad": -8.41,
+       "sgn_nm_at_kp": -0.336,
+       "visc_mrad_per_rad_s": 3.23,
+       "inertia_mrad_per_rad_s2": -0.002,
+       "r2": 0.903
+      },
+      "torque": {
+       "const_nm": -0.334,
+       "sgn_nm": -0.338,
+       "visc_nm_s_per_rad": -0.152,
+       "inertia_nm_s2_per_rad": 0.0001,
+       "r2": 0.906
+      },
+      "vif_sgn": 9.2,
+      "confounded": false,
+      "implied_coulomb_nm": 0.162,
+      "implied_coulomb_up_down_nm": [
+       0.165,
+       0.159
+      ],
+      "corr_with_j3": -0.35,
+      "coherence_with_j3": {
+       "coherence": 0.12,
+       "at_hz": 2.54,
+       "n_segments": 30,
+       "zero_coherence_95": 0.1,
+       "band_rms_mrad": 1.21,
+       "shared_band_rms_mrad": 0.61,
+       "own_band_rms_mrad": 1.05
+      },
+      "what_if": {
+       "friction_nm": 0.18,
+       "kp": 40.0,
+       "sgn_mrad": -0.41,
+       "mean_err_mrad": -7.7,
+       "rms_err_mrad": 2.36,
+       "rms_about_zero_mrad": 8.05
+      }
+     },
+     "2": {
+      "n": 1667,
+      "v_ref_max": 0.1,
+      "a_ref_max": 5.0,
+      "mean_err_mrad": 0.73,
+      "rms_err_mrad": 3.51,
+      "error": {
+       "const_mrad": 1.64,
+       "sgn_mrad": 0.47,
+       "sgn_nm_at_kp": 0.019,
+       "visc_mrad_per_rad_s": 13.06,
+       "inertia_mrad_per_rad_s2": -0.004,
+       "r2": 0.02
+      },
+      "torque": {
+       "const_nm": 0.04,
+       "sgn_nm": 0.018,
+       "visc_nm_s_per_rad": 0.251,
+       "inertia_nm_s2_per_rad": 0.0009,
+       "r2": 0.008
+      },
+      "vif_sgn": 3.5,
+      "confounded": false,
+      "implied_coulomb_nm": 0.518,
+      "corr_with_j3": 0.63,
+      "coherence_with_j3": {
+       "coherence": 0.97,
+       "at_hz": 3.13,
+       "n_segments": 2,
+       "zero_coherence_95": 0.95,
+       "band_rms_mrad": 1.37,
+       "shared_band_rms_mrad": 1.08,
+       "own_band_rms_mrad": 0.85
+      },
+      "what_if": {
+       "friction_nm": 0.18,
+       "kp": 40.0,
+       "sgn_mrad": 8.47,
+       "mean_err_mrad": -5.43,
+       "rms_err_mrad": 4.73,
+       "rms_about_zero_mrad": 7.2
+      }
+     }
+    }
+   },
+   "j5": {
+    "kp": 40.0,
+    "runner_friction_nm": 0.3,
+    "segments": {
+     "0": {
+      "n": 1528,
+      "v_ref_max": 0.01,
+      "a_ref_max": 1.0,
+      "mean_err_mrad": -2.6,
+      "rms_err_mrad": 1.09,
+      "static": true
+     },
+     "1": {
+      "n": 16365,
+      "v_ref_max": 0.27,
+      "a_ref_max": 13.0,
+      "mean_err_mrad": 0.6,
+      "rms_err_mrad": 3.36,
+      "error": {
+       "const_mrad": 0.31,
+       "sgn_mrad": -4.56,
+       "sgn_nm_at_kp": -0.182,
+       "visc_mrad_per_rad_s": 9.39,
+       "inertia_mrad_per_rad_s2": -0.085,
+       "r2": 0.884
+      },
+      "torque": {
+       "const_nm": -0.015,
+       "sgn_nm": -0.181,
+       "visc_nm_s_per_rad": 0.07,
+       "inertia_nm_s2_per_rad": -0.0025,
+       "r2": 0.908
+      },
+      "vif_sgn": 6.6,
+      "confounded": false,
+      "implied_coulomb_nm": 0.119,
+      "implied_coulomb_up_down_nm": [
+       0.123,
+       0.115
+      ],
+      "corr_with_j3": -0.05,
+      "coherence_with_j3": {
+       "coherence": 0.04,
+       "at_hz": 3.13,
+       "n_segments": 30,
+       "zero_coherence_95": 0.1,
+       "band_rms_mrad": 0.42,
+       "shared_band_rms_mrad": 0.08,
+       "own_band_rms_mrad": 0.41
+      }
+     },
+     "2": {
+      "n": 1667,
+      "v_ref_max": 0.0,
+      "a_ref_max": 0.0,
+      "mean_err_mrad": 0.8,
+      "rms_err_mrad": 0.24,
+      "static": true
+     }
+    }
+   }
+  }
+ },
+ "traj_box_20261025T215102Z.csv.gz": {
+  "joints": {
+   "j1": {
+    "mean_err_mrad": 0.6,
+    "rms_err_mrad": 3.7,
+    "max_err_mrad": 10.3,
+    "ripple_mrad": 0.25,
+    "ripple_hz": 3.9,
+    "torque_minus_ff_mean_nm": 0.0,
+    "peak_torque_nm": 1.3,
+    "peak_ff_nm": 1.0,
+    "hold_flips": 0,
+    "by_segment_rms_mrad": {
+     "0": 2.3,
+     "1": 4.0,
+     "2": 3.5
+    }
+   },
+   "j2": {
+    "mean_err_mrad": -5.5,
+    "rms_err_mrad": 6.0,
+    "max_err_mrad": 23.8,
+    "ripple_mrad": 0.59,
+    "ripple_hz": 2.7,
+    "torque_minus_ff_mean_nm": -0.61,
+    "peak_torque_nm": 2.5,
+    "peak_ff_nm": 2.3,
+    "hold_flips": 0,
+    "by_segment_rms_mrad": {
+     "0": 6.3,
+     "1": 3.1,
+     "2": 7.9
+    }
+   },
+   "j3": {
+    "mean_err_mrad": -6.9,
+    "rms_err_mrad": 9.5,
+    "max_err_mrad": 25.6,
+    "ripple_mrad": 0.58,
+    "ripple_hz": 2.7,
+    "torque_minus_ff_mean_nm": -0.6,
+    "peak_torque_nm": 10.2,
+    "peak_ff_nm": 9.5,
+    "hold_flips": 0,
+    "by_segment_rms_mrad": {
+     "0": 7.5,
+     "1": 9.2,
+     "2": 9.0
+    }
+   },
+   "j4": {
+    "mean_err_mrad": -3.3,
+    "rms_err_mrad": 5.3,
+    "max_err_mrad": 15.5,
+    "ripple_mrad": 0.66,
+    "ripple_hz": 3.5,
+    "torque_minus_ff_mean_nm": -0.16,
+    "peak_torque_nm": 2.3,
+    "peak_ff_nm": 2.3,
+    "hold_flips": 0,
+    "by_segment_rms_mrad": {
+     "0": 5.4,
+     "1": 4.8,
+     "2": 3.3
+    }
+   },
+   "j5": {
+    "mean_err_mrad": 0.7,
+    "rms_err_mrad": 1.3,
+    "max_err_mrad": 4.8,
+    "ripple_mrad": 0.04,
+    "ripple_hz": 3.2,
+    "torque_minus_ff_mean_nm": 0.0,
+    "peak_torque_nm": 0.2,
+    "peak_ff_nm": 0.0,
+    "hold_flips": 0,
+    "by_segment_rms_mrad": {
+     "0": 1.9,
+     "1": 0.3,
+     "2": 0.5
+    }
+   }
+  },
+  "params_from": "run summary",
+  "friction_fit": {
+   "j1": {
+    "kp": 100.0,
+    "runner_friction_nm": 1.0,
+    "segments": {
+     "0": {
+      "n": 1205,
+      "v_ref_max": 0.13,
+      "a_ref_max": 6.0,
+      "mean_err_mrad": -0.15,
+      "rms_err_mrad": 2.28,
+      "error": {
+       "const_mrad": -3.61,
+       "sgn_mrad": -3.11,
+       "sgn_nm_at_kp": -0.311,
+       "visc_mrad_per_rad_s": -27.25,
+       "inertia_mrad_per_rad_s2": -0.05,
+       "r2": 0.571
+      },
+      "torque": {
+       "const_nm": -0.433,
+       "sgn_nm": -0.309,
+       "visc_nm_s_per_rad": -3.256,
+       "inertia_nm_s2_per_rad": -0.0009,
+       "r2": 0.529
+      },
+      "vif_sgn": 3.5,
+      "confounded": false,
+      "implied_coulomb_nm": 0.691,
+      "corr_with_j3": 0.2,
+      "coherence_with_j3": {
+       "coherence": 1.0,
+       "at_hz": 2.54,
+       "n_segments": 1,
+       "zero_coherence_95": 1.0,
+       "band_rms_mrad": 0.43,
+       "shared_band_rms_mrad": 0.43,
+       "own_band_rms_mrad": 0.0
+      }
+     },
+     "1": {
+      "n": 4793,
+      "v_ref_max": 0.19,
+      "a_ref_max": 4.0,
+      "mean_err_mrad": 0.59,
+      "rms_err_mrad": 3.98,
+      "error": {
+       "const_mrad": 0.59,
+       "sgn_mrad": -0.89,
+       "sgn_nm_at_kp": -0.089,
+       "visc_mrad_per_rad_s": 3.9,
+       "inertia_mrad_per_rad_s2": -0.098,
+       "r2": 0.007
+      },
+      "torque": {
+       "const_nm": 0.001,
+       "sgn_nm": -0.074,
+       "visc_nm_s_per_rad": -0.08,
+       "inertia_nm_s2_per_rad": -0.0077,
+       "r2": 0.016
+      },
+      "vif_sgn": 6.2,
+      "confounded": false,
+      "implied_coulomb_nm": 0.926,
+      "implied_coulomb_up_down_nm": [
+       0.936,
+       0.916
+      ],
+      "corr_with_j3": 0.04,
+      "coherence_with_j3": {
+       "coherence": 0.0,
+       "at_hz": 2.54,
+       "n_segments": 8,
+       "zero_coherence_95": 0.35,
+       "band_rms_mrad": 0.25,
+       "shared_band_rms_mrad": 0.02,
+       "own_band_rms_mrad": 0.25
+      }
+     },
+     "2": {
+      "n": 1194,
+      "v_ref_max": 0.13,
+      "a_ref_max": 5.0,
+      "mean_err_mrad": 1.47,
+      "rms_err_mrad": 3.53,
+      "error": {
+       "const_mrad": 3.09,
+       "sgn_mrad": -1.24,
+       "sgn_nm_at_kp": -0.124,
+       "visc_mrad_per_rad_s": -16.69,
+       "inertia_mrad_per_rad_s2": -0.088,
+       "r2": 0.056
+      },
+      "torque": {
+       "const_nm": 0.257,
+       "sgn_nm": -0.107,
+       "visc_nm_s_per_rad": -2.415,
+       "inertia_nm_s2_per_rad": -0.0069,
+       "r2": 0.069
+      },
+      "vif_sgn": 3.5,
+      "confounded": false,
+      "implied_coulomb_nm": 0.893,
+      "corr_with_j3": 0.74,
+      "coherence_with_j3": {
+       "coherence": 1.0,
+       "at_hz": 2.93,
+       "n_segments": 1,
+       "zero_coherence_95": 1.0,
+       "band_rms_mrad": 0.45,
+       "shared_band_rms_mrad": 0.45,
+       "own_band_rms_mrad": 0.0
+      }
+     }
+    }
+   },
+   "j2": {
+    "kp": 100.0,
+    "runner_friction_nm": 1.0,
+    "segments": {
+     "0": {
+      "n": 1205,
+      "v_ref_max": 0.37,
+      "a_ref_max": 16.0,
+      "mean_err_mrad": -7.8,
+      "rms_err_mrad": 6.34,
+      "error": {
+       "const_mrad": 0.19,
+       "sgn_mrad": 3.37,
+       "sgn_nm_at_kp": 0.337,
+       "visc_mrad_per_rad_s": 43.39,
+       "inertia_mrad_per_rad_s2": 0.239,
+       "r2": 0.402
+      },
+      "torque": {
+       "const_nm": -0.076,
+       "sgn_nm": 0.354,
+       "visc_nm_s_per_rad": 3.435,
+       "inertia_nm_s2_per_rad": 0.0259,
+       "r2": 0.315
+      },
+      "vif_sgn": 1.7,
+      "confounded": false,
+      "implied_coulomb_nm": 1.354,
+      "corr_with_j3": 0.36,
+      "coherence_with_j3": {
+       "coherence": 1.0,
+       "at_hz": 2.93,
+       "n_segments": 1,
+       "zero_coherence_95": 1.0,
+       "band_rms_mrad": 0.62,
+       "shared_band_rms_mrad": 0.62,
+       "own_band_rms_mrad": 0.0
+      }
+     },
+     "1": {
+      "n": 4793,
+      "v_ref_max": 0.1,
+      "a_ref_max": 5.0,
+      "mean_err_mrad": -3.2,
+      "rms_err_mrad": 3.07,
+      "error": {
+       "const_mrad": -3.2,
+       "sgn_mrad": 2.8,
+       "sgn_nm_at_kp": 0.28,
+       "visc_mrad_per_rad_s": -91.91,
+       "inertia_mrad_per_rad_s2": -0.016,
+       "r2": 0.138
+      },
+      "torque": {
+       "const_nm": -0.382,
+       "sgn_nm": 0.297,
+       "visc_nm_s_per_rad": -10.11,
+       "inertia_nm_s2_per_rad": 0.002,
+       "r2": 0.165
+      },
+      "vif_sgn": 7.9,
+      "confounded": false,
+      "implied_coulomb_nm": 1.297,
+      "implied_coulomb_up_down_nm": [
+       1.608,
+       0.984
+      ],
+      "corr_with_j3": 0.02,
+      "coherence_with_j3": {
+       "coherence": 0.81,
+       "at_hz": 2.73,
+       "n_segments": 8,
+       "zero_coherence_95": 0.35,
+       "band_rms_mrad": 0.6,
+       "shared_band_rms_mrad": 0.51,
+       "own_band_rms_mrad": 0.32
+      }
+     },
+     "2": {
+      "n": 1194,
+      "v_ref_max": 0.4,
+      "a_ref_max": 18.0,
+      "mean_err_mrad": -12.46,
+      "rms_err_mrad": 7.88,
+      "error": {
+       "const_mrad": 1.49,
+       "sgn_mrad": -8.09,
+       "sgn_nm_at_kp": -0.809,
+       "visc_mrad_per_rad_s": -58.65,
+       "inertia_mrad_per_rad_s2": 0.181,
+       "r2": 0.625
+      },
+      "torque": {
+       "const_nm": 0.101,
+       "sgn_nm": -0.773,
+       "visc_nm_s_per_rad": -6.778,
+       "inertia_nm_s2_per_rad": 0.0186,
+       "r2": 0.682
+      },
+      "vif_sgn": 1.7,
+      "confounded": false,
+      "implied_coulomb_nm": 0.227,
+      "corr_with_j3": 0.56,
+      "coherence_with_j3": {
+       "coherence": 1.0,
+       "at_hz": 2.73,
+       "n_segments": 1,
+       "zero_coherence_95": 1.0,
+       "band_rms_mrad": 0.99,
+       "shared_band_rms_mrad": 0.99,
+       "own_band_rms_mrad": 0.0
+      }
+     }
+    }
+   },
+   "j3": {
+    "kp": 80.0,
+    "runner_friction_nm": 2.0,
+    "segments": {
+     "0": {
+      "n": 1205,
+      "v_ref_max": 0.47,
+      "a_ref_max": 21.0,
+      "mean_err_mrad": -0.68,
+      "rms_err_mrad": 7.46,
+      "error": {
+       "const_mrad": 5.64,
+       "sgn_mrad": 4.87,
+       "sgn_nm_at_kp": 0.389,
+       "visc_mrad_per_rad_s": 13.89,
+       "inertia_mrad_per_rad_s2": -0.152,
+       "r2": 0.102
+      },
+      "torque": {
+       "const_nm": 0.399,
+       "sgn_nm": 0.45,
+       "visc_nm_s_per_rad": 0.272,
+       "inertia_nm_s2_per_rad": -0.0132,
+       "r2": 0.053
+      },
+      "vif_sgn": 1.6,
+      "confounded": false,
+      "implied_coulomb_nm": 2.45
+     },
+     "1": {
+      "n": 4793,
+      "v_ref_max": 0.15,
+      "a_ref_max": 7.0,
+      "mean_err_mrad": -9.21,
+      "rms_err_mrad": 9.17,
+      "error": {
+       "const_mrad": -9.21,
+       "sgn_mrad": 1.34,
+       "sgn_nm_at_kp": 0.107,
+       "visc_mrad_per_rad_s": -39.91,
+       "inertia_mrad_per_rad_s2": -0.131,
+       "r2": 0.016
+      },
+      "torque": {
+       "const_nm": -0.788,
+       "sgn_nm": 0.174,
+       "visc_nm_s_per_rad": -4.509,
+       "inertia_nm_s2_per_rad": -0.0088,
+       "r2": 0.025
+      },
+      "vif_sgn": 5.5,
+      "confounded": false,
+      "implied_coulomb_nm": 2.174,
+      "implied_coulomb_up_down_nm": [
+       2.503,
+       1.853
+      ]
+     },
+     "2": {
+      "n": 1194,
+      "v_ref_max": 0.5,
+      "a_ref_max": 24.0,
+      "mean_err_mrad": -3.67,
+      "rms_err_mrad": 9.02,
+      "error": {
+       "const_mrad": 12.93,
+       "sgn_mrad": -11.92,
+       "sgn_nm_at_kp": -0.954,
+       "visc_mrad_per_rad_s": -41.52,
+       "inertia_mrad_per_rad_s2": -0.13,
+       "r2": 0.504
+      },
+      "torque": {
+       "const_nm": 0.977,
+       "sgn_nm": -0.91,
+       "visc_nm_s_per_rad": -4.06,
+       "inertia_nm_s2_per_rad": -0.0124,
+       "r2": 0.509
+      },
+      "vif_sgn": 1.6,
+      "confounded": false,
+      "implied_coulomb_nm": 1.09
+     }
+    }
+   },
+   "j4": {
+    "kp": 40.0,
+    "runner_friction_nm": 0.5,
+    "segments": {
+     "0": {
+      "n": 1205,
+      "v_ref_max": 0.05,
+      "a_ref_max": 3.0,
+      "mean_err_mrad": -6.28,
+      "rms_err_mrad": 5.4,
+      "error": {
+       "const_mrad": 0.71,
+       "sgn_mrad": -16.1,
+       "sgn_nm_at_kp": -0.644,
+       "visc_mrad_per_rad_s": 90.76,
+       "inertia_mrad_per_rad_s2": -0.021,
+       "r2": 0.651
+      },
+      "torque": {
+       "const_nm": 0.002,
+       "sgn_nm": -0.656,
+       "visc_nm_s_per_rad": 3.823,
+       "inertia_nm_s2_per_rad": 0.0,
+       "r2": 0.655
+      },
+      "vif_sgn": 17.8,
+      "confounded": true,
+      "implied_coulomb_nm": -0.156,
+      "corr_with_j3": 0.6,
+      "coherence_with_j3": {
+       "coherence": 1.0,
+       "at_hz": 2.93,
+       "n_segments": 1,
+       "zero_coherence_95": 1.0,
+       "band_rms_mrad": 1.04,
+       "shared_band_rms_mrad": 1.04,
+       "own_band_rms_mrad": 0.0
+      },
+      "what_if": {
+       "friction_nm": 0.18,
+       "kp": 40.0,
+       "sgn_mrad": -8.1,
+       "mean_err_mrad": -2.19,
+       "rms_err_mrad": 3.65,
+       "rms_about_zero_mrad": 4.26
+      }
+     },
+     "1": {
+      "n": 4793,
+      "v_ref_max": 0.08,
+      "a_ref_max": 4.0,
+      "mean_err_mrad": -3.84,
+      "rms_err_mrad": 4.77,
+      "error": {
+       "const_mrad": -3.96,
+       "sgn_mrad": -4.74,
+       "sgn_nm_at_kp": -0.19,
+       "visc_mrad_per_rad_s": -48.73,
+       "inertia_mrad_per_rad_s2": -0.042,
+       "r2": 0.78
+      },
+      "torque": {
+       "const_nm": -0.186,
+       "sgn_nm": -0.19,
+       "visc_nm_s_per_rad": -2.204,
+       "inertia_nm_s2_per_rad": -0.0006,
+       "r2": 0.787
+      },
+      "vif_sgn": 9.9,
+      "confounded": false,
+      "implied_coulomb_nm": 0.31,
+      "implied_coulomb_up_down_nm": [
+       0.331,
+       0.288
+      ],
+      "corr_with_j3": 0.36,
+      "coherence_with_j3": {
+       "coherence": 0.53,
+       "at_hz": 3.32,
+       "n_segments": 8,
+       "zero_coherence_95": 0.35,
+       "band_rms_mrad": 0.67,
+       "shared_band_rms_mrad": 0.47,
+       "own_band_rms_mrad": 0.48
+      },
+      "what_if": {
+       "friction_nm": 0.18,
+       "kp": 40.0,
+       "sgn_mrad": 3.26,
+       "mean_err_mrad": -4.0,
+       "rms_err_mrad": 2.39,
+       "rms_about_zero_mrad": 4.66
+      }
+     },
+     "2": {
+      "n": 1194,
+      "v_ref_max": 0.04,
+      "a_ref_max": 2.0,
+      "mean_err_mrad": 1.87,
+      "rms_err_mrad": 3.32,
+      "error": {
+       "const_mrad": 0.81,
+       "sgn_mrad": 0.71,
+       "sgn_nm_at_kp": 0.028,
+       "visc_mrad_per_rad_s": -118.38,
+       "inertia_mrad_per_rad_s2": -0.011,
+       "r2": 0.058
+      },
+      "torque": {
+       "const_nm": 0.007,
+       "sgn_nm": 0.041,
+       "visc_nm_s_per_rad": -5.558,
+       "inertia_nm_s2_per_rad": 0.0014,
+       "r2": 0.071
+      },
+      "vif_sgn": 28.7,
+      "confounded": true,
+      "implied_coulomb_nm": 0.541,
+      "corr_with_j3": 0.38,
+      "coherence_with_j3": {
+       "coherence": 1.0,
+       "at_hz": 2.73,
+       "n_segments": 1,
+       "zero_coherence_95": 1.0,
+       "band_rms_mrad": 0.88,
+       "shared_band_rms_mrad": 0.88,
+       "own_band_rms_mrad": 0.0
+      },
+      "what_if": {
+       "friction_nm": 0.18,
+       "kp": 40.0,
+       "sgn_mrad": 8.71,
+       "mean_err_mrad": -1.86,
+       "rms_err_mrad": 3.65,
+       "rms_about_zero_mrad": 4.1
+      }
+     }
+    }
+   },
+   "j5": {
+    "kp": 40.0,
+    "runner_friction_nm": 0.3,
+    "segments": {
+     "0": {
+      "n": 1205,
+      "v_ref_max": 0.0,
+      "a_ref_max": 0.0,
+      "mean_err_mrad": -1.41,
+      "rms_err_mrad": 1.94,
+      "static": true
+     },
+     "1": {
+      "n": 4793,
+      "v_ref_max": 0.0,
+      "a_ref_max": 0.0,
+      "mean_err_mrad": 1.23,
+      "rms_err_mrad": 0.25,
+      "static": true
+     },
+     "2": {
+      "n": 1194,
+      "v_ref_max": 0.0,
+      "a_ref_max": 0.0,
+      "mean_err_mrad": 0.9,
+      "rms_err_mrad": 0.48,
+      "static": true
+     }
+    }
+   }
+  }
+ },
+ "traj_figure8_20261023T204705Z.csv.gz": {
+  "joints": {
+   "j1": {
+    "mean_err_mrad": 1.9,
+    "rms_err_mrad": 2.5,
+    "max_err_mrad": 9.4,
+    "ripple_mrad": 0.29,
+    "ripple_hz": 2.5,
+    "torque_minus_ff_mean_nm": 0.12,
+    "peak_torque_nm": 1.3,
+    "peak_ff_nm": 1.0,
+    "hold_flips": 0,
+    "by_segment_rms_mrad": {
+     "0": 0.1,
+     "1": 1.9,
+     "2": 0.2
+    }
+   },
+   "j2": {
+    "mean_err_mrad": 11.8,
+    "rms_err_mrad": 9.9,
+    "max_err_mrad": 33.6,
+    "ripple_mrad": 0.9,
+    "ripple_hz": 2.6,
+    "torque_minus_ff_mean_nm": 1.12,
+    "peak_torque_nm": 4.6,
+    "peak_ff_nm": 1.7,
+    "hold_flips": 0,
+    "by_segment_rms_mrad": {
+     "0": 6.8,
+     "1": 5.3,
+     "2": 8.0
+    }
+   },
+   "j3": {
+    "mean_err_mrad": -10.5,
+    "rms_err_mrad": 7.3,
+    "max_err_mrad": 23.4,
+    "ripple_mrad": 1.07,
+    "ripple_hz": 2.7,
+    "torque_minus_ff_mean_nm": -0.89,
+    "peak_torque_nm": 10.4,
+    "peak_ff_nm": 9.0,
+    "hold_flips": 0,
+    "by_segment_rms_mrad": {
+     "0": 9.2,
+     "1": 3.7,
+     "2": 10.6
+    }
+   },
+   "j4": {
+    "mean_err_mrad": -6.2,
+    "rms_err_mrad": 7.9,
+    "max_err_mrad": 19.7,
+    "ripple_mrad": 1.11,
+    "ripple_hz": 2.9,
+    "torque_minus_ff_mean_nm": -0.28,
+    "peak_torque_nm": 2.4,
+    "peak_ff_nm": 2.2,
+    "hold_flips": 0,
+    "by_segment_rms_mrad": {
+     "0": 6.6,
+     "1": 7.7,
+     "2": 3.8
+    }
+   },
+   "j5": {
+    "mean_err_mrad": -0.0,
+    "rms_err_mrad": 2.9,
+    "max_err_mrad": 7.9,
+    "ripple_mrad": 0.44,
+    "ripple_hz": 5.5,
+    "torque_minus_ff_mean_nm": -0.03,
+    "peak_torque_nm": 0.3,
+    "peak_ff_nm": 0.3,
+    "hold_flips": 0,
+    "by_segment_rms_mrad": {
+     "0": 1.2,
+     "1": 3.4,
+     "2": 0.1
+    }
+   }
+  },
+  "params_from": "run summary",
+  "friction_fit": {
+   "j1": {
+    "kp": 100.0,
+    "runner_friction_nm": 1.0,
+    "segments": {
+     "0": {
+      "n": 1527,
+      "v_ref_max": 0.01,
+      "a_ref_max": 1.0,
+      "mean_err_mrad": -0.11,
+      "rms_err_mrad": 0.09,
+      "static": true
+     },
+     "1": {
+      "n": 4723,
+      "v_ref_max": 0.27,
+      "a_ref_max": 13.0,
+      "mean_err_mrad": 1.25,
+      "rms_err_mrad": 1.89,
+      "error": {
+       "const_mrad": 1.27,
+       "sgn_mrad": -0.42,
+       "sgn_nm_at_kp": -0.042,
+       "visc_mrad_per_rad_s": 1.52,
+       "inertia_mrad_per_rad_s2": -0.06,
+       "r2": 0.016
+      },
+      "torque": {
+       "const_nm": 0.066,
+       "sgn_nm": -0.023,
+       "visc_nm_s_per_rad": -0.375,
+       "inertia_nm_s2_per_rad": -0.0047,
+       "r2": 0.097
+      },
+      "vif_sgn": 9.6,
+      "confounded": false,
+      "implied_coulomb_nm": 0.977,
+      "implied_coulomb_up_down_nm": [
+       0.813,
+       1.138
+      ],
+      "corr_with_j3": -0.06,
+      "coherence_with_j3": {
+       "coherence": 0.12,
+       "at_hz": 2.54,
+       "n_segments": 8,
+       "zero_coherence_95": 0.35,
+       "band_rms_mrad": 0.31,
+       "shared_band_rms_mrad": 0.1,
+       "own_band_rms_mrad": 0.29
+      }
+     },
+     "2": {
+      "n": 1529,
+      "v_ref_max": 0.01,
+      "a_ref_max": 1.0,
+      "mean_err_mrad": 5.9,
+      "rms_err_mrad": 0.16,
+      "static": true
+     }
+    }
+   },
+   "j2": {
+    "kp": 100.0,
+    "runner_friction_nm": 1.0,
+    "segments": {
+     "0": {
+      "n": 1527,
+      "v_ref_max": 0.32,
+      "a_ref_max": 14.0,
+      "mean_err_mrad": 4.48,
+      "rms_err_mrad": 6.83,
+      "error": {
+       "const_mrad": 4.24,
+       "sgn_mrad": -2.81,
+       "sgn_nm_at_kp": -0.281,
+       "visc_mrad_per_rad_s": 20.51,
+       "inertia_mrad_per_rad_s2": 0.329,
+       "r2": 0.029
+      },
+      "torque": {
+       "const_nm": 0.369,
+       "sgn_nm": -0.264,
+       "visc_nm_s_per_rad": 1.345,
+       "inertia_nm_s2_per_rad": 0.0362,
+       "r2": 0.015
+      },
+      "vif_sgn": 1.8,
+      "confounded": false,
+      "implied_coulomb_nm": 0.736,
+      "corr_with_j3": -0.51,
+      "coherence_with_j3": {
+       "coherence": 1.0,
+       "at_hz": 3.12,
+       "n_segments": 1,
+       "zero_coherence_95": 1.0,
+       "band_rms_mrad": 0.75,
+       "shared_band_rms_mrad": 0.75,
+       "own_band_rms_mrad": 0.0
+      }
+     },
+     "1": {
+      "n": 4723,
+      "v_ref_max": 0.09,
+      "a_ref_max": 5.0,
+      "mean_err_mrad": 17.96,
+      "rms_err_mrad": 5.3,
+      "error": {
+       "const_mrad": 18.18,
+       "sgn_mrad": 3.79,
+       "sgn_nm_at_kp": 0.379,
+       "visc_mrad_per_rad_s": 10.44,
+       "inertia_mrad_per_rad_s2": 0.052,
+       "r2": 0.43
+      },
+      "torque": {
+       "const_nm": 1.758,
+       "sgn_nm": 0.409,
+       "visc_nm_s_per_rad": -0.335,
+       "inertia_nm_s2_per_rad": 0.0068,
+       "r2": 0.39
+      },
+      "vif_sgn": 16.1,
+      "confounded": true,
+      "implied_coulomb_nm": 1.409,
+      "implied_coulomb_up_down_nm": [
+       2.093,
+       0.842
+      ],
+      "corr_with_j3": -0.09,
+      "coherence_with_j3": {
+       "coherence": 0.87,
+       "at_hz": 2.93,
+       "n_segments": 8,
+       "zero_coherence_95": 0.35,
+       "band_rms_mrad": 0.91,
+       "shared_band_rms_mrad": 0.78,
+       "own_band_rms_mrad": 0.46
+      }
+     },
+     "2": {
+      "n": 1529,
+      "v_ref_max": 0.21,
+      "a_ref_max": 2.0,
+      "mean_err_mrad": 0.29,
+      "rms_err_mrad": 8.04,
+      "error": {
+       "const_mrad": 4.14,
+       "sgn_mrad": 0.77,
+       "sgn_nm_at_kp": 0.077,
+       "visc_mrad_per_rad_s": -42.04,
+       "inertia_mrad_per_rad_s2": 0.834,
+       "r2": 0.128
+      },
+      "torque": {
+       "const_nm": 0.365,
+       "sgn_nm": 0.07,
+       "visc_nm_s_per_rad": -4.931,
+       "inertia_nm_s2_per_rad": 0.0817,
+       "r2": 0.174
+      },
+      "vif_sgn": 1.8,
+      "confounded": false,
+      "implied_coulomb_nm": 1.07,
+      "corr_with_j3": -0.28,
+      "coherence_with_j3": {
+       "coherence": 1.0,
+       "at_hz": 2.54,
+       "n_segments": 1,
+       "zero_coherence_95": 1.0,
+       "band_rms_mrad": 0.94,
+       "shared_band_rms_mrad": 0.94,
+       "own_band_rms_mrad": 0.0
+      }
+     }
+    }
+   },
+   "j3": {
+    "kp": 80.0,
+    "runner_friction_nm": 2.0,
+    "segments": {
+     "0": {
+      "n": 1527,
+      "v_ref_max": 0.43,
+      "a_ref_max": 19.0,
+      "mean_err_mrad": -6.09,
+      "rms_err_mrad": 9.23,
+      "error": {
+       "const_mrad": 1.3,
+       "sgn_mrad": 4.99,
+       "sgn_nm_at_kp": 0.399,
+       "visc_mrad_per_rad_s": 20.58,
+       "inertia_mrad_per_rad_s2": -0.195,
+       "r2": 0.104
+      },
+      "torque": {
+       "const_nm": 0.039,
+       "sgn_nm": 0.447,
+       "visc_nm_s_per_rad": 0.827,
+       "inertia_nm_s2_per_rad": -0.0123,
+       "r2": 0.059
+      },
+      "vif_sgn": 1.6,
+      "confounded": false,
+      "implied_coulomb_nm": 2.447
+     },
+     "1": {
+      "n": 4723,
+      "v_ref_max": 0.24,
+      "a_ref_max": 12.0,
+      "mean_err_mrad": -12.35,
+      "rms_err_mrad": 3.66,
+      "error": {
+       "const_mrad": -12.39,
+       "sgn_mrad": -0.24,
+       "sgn_nm_at_kp": -0.019,
+       "visc_mrad_per_rad_s": -7.98,
+       "inertia_mrad_per_rad_s2": 0.011,
+       "r2": 0.049
+      },
+      "torque": {
+       "const_nm": -1.046,
+       "sgn_nm": -0.026,
+       "visc_nm_s_per_rad": -1.104,
+       "inertia_nm_s2_per_rad": 0.0021,
+       "r2": 0.101
+      },
+      "vif_sgn": 12.0,
+      "confounded": false,
+      "implied_coulomb_nm": 1.974,
+      "implied_coulomb_up_down_nm": [
+       2.24,
+       1.77
+      ]
+     },
+     "2": {
+      "n": 1529,
+      "v_ref_max": 0.27,
+      "a_ref_max": 2.0,
+      "mean_err_mrad": -9.26,
+      "rms_err_mrad": 10.58,
+      "error": {
+       "const_mrad": 3.38,
+       "sgn_mrad": -6.91,
+       "sgn_nm_at_kp": -0.553,
+       "visc_mrad_per_rad_s": -45.17,
+       "inertia_mrad_per_rad_s2": -0.614,
+       "r2": 0.282
+      },
+      "torque": {
+       "const_nm": 0.226,
+       "sgn_nm": -0.502,
+       "visc_nm_s_per_rad": -4.438,
+       "inertia_nm_s2_per_rad": -0.0505,
+       "r2": 0.316
+      },
+      "vif_sgn": 1.6,
+      "confounded": false,
+      "implied_coulomb_nm": 1.498
+     }
+    }
+   },
+   "j4": {
+    "kp": 40.0,
+    "runner_friction_nm": 0.5,
+    "segments": {
+     "0": {
+      "n": 1527,
+      "v_ref_max": 0.11,
+      "a_ref_max": 5.0,
+      "mean_err_mrad": -10.32,
+      "rms_err_mrad": 6.59,
+      "error": {
+       "const_mrad": 0.7,
+       "sgn_mrad": -13.2,
+       "sgn_nm_at_kp": -0.528,
+       "visc_mrad_per_rad_s": -29.76,
+       "inertia_mrad_per_rad_s2": 0.02,
+       "r2": 0.631
+      },
+      "torque": {
+       "const_nm": 0.001,
+       "sgn_nm": -0.535,
+       "visc_nm_s_per_rad": -1.343,
+       "inertia_nm_s2_per_rad": 0.0022,
+       "r2": 0.647
+      },
+      "vif_sgn": 3.9,
+      "confounded": false,
+      "implied_coulomb_nm": -0.035,
+      "corr_with_j3": 0.74,
+      "coherence_with_j3": {
+       "coherence": 1.0,
+       "at_hz": 2.54,
+       "n_segments": 1,
+       "zero_coherence_95": 1.0,
+       "band_rms_mrad": 1.32,
+       "shared_band_rms_mrad": 1.32,
+       "own_band_rms_mrad": 0.0
+      },
+      "what_if": {
+       "friction_nm": 0.18,
+       "kp": 40.0,
+       "sgn_mrad": -5.2,
+       "mean_err_mrad": -4.3,
+       "rms_err_mrad": 4.7,
+       "rms_about_zero_mrad": 6.37
+      }
+     },
+     "1": {
+      "n": 4723,
+      "v_ref_max": 0.18,
+      "a_ref_max": 9.0,
+      "mean_err_mrad": -7.32,
+      "rms_err_mrad": 7.66,
+      "error": {
+       "const_mrad": -5.9,
+       "sgn_mrad": -7.9,
+       "sgn_nm_at_kp": -0.316,
+       "visc_mrad_per_rad_s": -7.88,
+       "inertia_mrad_per_rad_s2": -0.032,
+       "r2": 0.918
+      },
+      "torque": {
+       "const_nm": -0.262,
+       "sgn_nm": -0.318,
+       "visc_nm_s_per_rad": -0.555,
+       "inertia_nm_s2_per_rad": -0.0006,
+       "r2": 0.915
+      },
+      "vif_sgn": 12.9,
+      "confounded": false,
+      "implied_coulomb_nm": 0.182,
+      "implied_coulomb_up_down_nm": [
+       0.134,
+       0.25
+      ],
+      "corr_with_j3": -0.13,
+      "coherence_with_j3": {
+       "coherence": 0.22,
+       "at_hz": 2.93,
+       "n_segments": 8,
+       "zero_coherence_95": 0.35,
+       "band_rms_mrad": 1.12,
+       "shared_band_rms_mrad": 0.61,
+       "own_band_rms_mrad": 0.94
+      },
+      "what_if": {
+       "friction_nm": 0.18,
+       "kp": 40.0,
+       "sgn_mrad": 0.1,
+       "mean_err_mrad": -5.88,
+       "rms_err_mrad": 2.21,
+       "rms_about_zero_mrad": 6.28
+      }
+     },
+     "2": {
+      "n": 1529,
+      "v_ref_max": 0.07,
+      "a_ref_max": 1.0,
+      "mean_err_mrad": 1.27,
+      "rms_err_mrad": 3.81,
+      "error": {
+       "const_mrad": 0.55,
+       "sgn_mrad": -1.05,
+       "sgn_nm_at_kp": -0.042,
+       "visc_mrad_per_rad_s": 1.71,
+       "inertia_mrad_per_rad_s2": -0.002,
+       "r2": 0.007
+      },
+      "torque": {
+       "const_nm": -0.006,
+       "sgn_nm": -0.052,
+       "visc_nm_s_per_rad": -0.045,
+       "inertia_nm_s2_per_rad": 0.0014,
+       "r2": 0.016
+      },
+      "vif_sgn": 4.0,
+      "confounded": false,
+      "implied_coulomb_nm": 0.448,
+      "corr_with_j3": 0.66,
+      "coherence_with_j3": {
+       "coherence": 1.0,
+       "at_hz": 2.73,
+       "n_segments": 1,
+       "zero_coherence_95": 1.0,
+       "band_rms_mrad": 1.09,
+       "shared_band_rms_mrad": 1.09,
+       "own_band_rms_mrad": 0.0
+      },
+      "what_if": {
+       "friction_nm": 0.18,
+       "kp": 40.0,
+       "sgn_mrad": 6.95,
+       "mean_err_mrad": -4.75,
+       "rms_err_mrad": 4.52,
+       "rms_about_zero_mrad": 6.56
+      }
+     }
+    }
+   },
+   "j5": {
+    "kp": 40.0,
+    "runner_friction_nm": 0.3,
+    "segments": {
+     "0": {
+      "n": 1527,
+      "v_ref_max": 0.01,
+      "a_ref_max": 1.0,
+      "mean_err_mrad": -2.27,
+      "rms_err_mrad": 1.19,
+      "static": true
+     },
+     "1": {
+      "n": 4723,
+      "v_ref_max": 0.27,
+      "a_ref_max": 13.0,
+      "mean_err_mrad": 0.43,
+      "rms_err_mrad": 3.44,
+      "error": {
+       "const_mrad": 0.63,
+       "sgn_mrad": -4.77,
+       "sgn_nm_at_kp": -0.191,
+       "visc_mrad_per_rad_s": 12.23,
+       "inertia_mrad_per_rad_s2": -0.063,
+       "r2": 0.857
+      },
+      "torque": {
+       "const_nm": -0.002,
+       "sgn_nm": -0.192,
+       "visc_nm_s_per_rad": 0.213,
+       "inertia_nm_s2_per_rad": -0.0013,
+       "r2": 0.89
+      },
+      "vif_sgn": 9.6,
+      "confounded": false,
+      "implied_coulomb_nm": 0.108,
+      "implied_coulomb_up_down_nm": [
+       0.128,
+       0.088
+      ],
+      "corr_with_j3": 0.05,
+      "coherence_with_j3": {
+       "coherence": 0.13,
+       "at_hz": 2.73,
+       "n_segments": 8,
+       "zero_coherence_95": 0.35,
+       "band_rms_mrad": 0.46,
+       "shared_band_rms_mrad": 0.15,
+       "own_band_rms_mrad": 0.44
+      }
+     },
+     "2": {
+      "n": 1529,
+      "v_ref_max": 0.01,
+      "a_ref_max": 1.0,
+      "mean_err_mrad": 0.7,
+      "rms_err_mrad": 0.15,
+      "static": true
+     }
+    }
+   }
+  }
+ },
+ "across_runs_segment_1": {
+  "j1": {
+   "n_runs": 7,
+   "implied_coulomb_mean_nm": 0.986,
+   "implied_coulomb_sd_nm": 0.065,
+   "implied_coulomb_min_nm": 0.899,
+   "implied_coulomb_max_nm": 1.067,
+   "sgn_mean_mrad": -0.23
+  },
+  "j2": {
+   "n_runs": 7,
+   "implied_coulomb_mean_nm": 1.159,
+   "implied_coulomb_sd_nm": 0.152,
+   "implied_coulomb_min_nm": 0.962,
+   "implied_coulomb_max_nm": 1.409,
+   "sgn_mean_mrad": 1.41
+  },
+  "j3": {
+   "n_runs": 7,
+   "implied_coulomb_mean_nm": 1.99,
+   "implied_coulomb_sd_nm": 0.144,
+   "implied_coulomb_min_nm": 1.714,
+   "implied_coulomb_max_nm": 2.174,
+   "sgn_mean_mrad": -0.09
+  },
+  "j4": {
+   "n_runs": 7,
+   "implied_coulomb_mean_nm": 0.192,
+   "implied_coulomb_sd_nm": 0.053,
+   "implied_coulomb_min_nm": 0.154,
+   "implied_coulomb_max_nm": 0.31,
+   "sgn_mean_mrad": -7.59
+  },
+  "j5": {
+   "n_runs": 6,
+   "implied_coulomb_mean_nm": 0.116,
+   "implied_coulomb_sd_nm": 0.013,
+   "implied_coulomb_min_nm": 0.096,
+   "implied_coulomb_max_nm": 0.132,
+   "sgn_mean_mrad": -4.54
+  }
+ }
+}

@@ -420,6 +420,12 @@ removed. Worth investigating (bus timing after the previous run's disable), not 
   operator's request; watch the base cable harness. Multi-turn position after a power cycle with J1 turned has not
   been verified — return J1 near 0 before powering off.
 - **Gravity scales are local** (identified near the fold) and stand in for missing masses (§6.4).
+  **2026-10-29: a fitted, pose-dependent model replaces them per run** (extra point masses on link3…gripper + the
+  camera, fitted on the logged runs; `~/rebot_setup/demo_move.py --gravity-model config/robot/gravity_model.yaml`,
+  default off): leave-one-run-out on the show runs the steady sag drops to 1-2 mrad per joint, but the crack workspace
+  is still extrapolated and needs the survey on the arm first. Method, numbers, the survey and the operator's steps:
+  **[GRAVITY_MODEL.md](GRAVITY_MODEL.md)**.
+- **J4's 0.5 Nm Coulomb feed-forward over-compensates** (logs: 0.19 ± 0.05 Nm): **[J4_TUNING.md](J4_TUNING.md)** (2026-10-29).
 - **Gains are for 0.1 rad test moves and the two demos**; crack-tracing speeds and contact forces were not tested.
 - **kp/kd units** are taken as Nm/rad, Nm·s/rad per the Damiao MIT convention; not independently verified.
 - **Missed register reads** before enable (§11) are unexplained.

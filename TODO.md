@@ -83,6 +83,12 @@ Open, each on the operator's go for the arm:
    3 Hz ripple about 25 %; **J4 (kp 40 / kd 1) has the largest ripple** and a speed-correlated lag, so try J4 kd 3-4.
    A constant feed-forward bias halved the steady sag (J2 +10.6 -> -2.8 mrad, J3 -10.0 -> -5.3, J4 -5.4 -> -2.4) but not
    the rms: the approach and return dominate, so fit a pose-dependent gravity correction from these logs.
+   **Built 2026-10-29 (workstation only): [docs/motion/GRAVITY_MODEL.md](docs/motion/GRAVITY_MODEL.md)** — fitted
+   model `config/robot/gravity_model.yaml`, runner flag `demo_move.py --gravity-model` (per run, default unchanged),
+   survey `~/rebot_setup/trajectories/gravity_survey.json` (rehearsed x1/x2). Next, on the operator's go: run the survey
+   (x2 then x1), refit, A/B the heart with and without the flag. **Before the crack trace:** if the model extrapolates
+   right, today's feed-forward lets J2 sag up to ~77 mrad toward the table at the far crack poses.
+   **J4 (2026-10-29): [docs/motion/J4_TUNING.md](docs/motion/J4_TUNING.md)** — `--friction j4=0.18`, `j4_tune.json`, A/B runs A-E on the operator's go.
    Still needed from the operator: which part oscillates, how fast, and when (the encoders cannot see link flex).
 2. Run the search and the crack pipeline: follow **[docs/motion/FIRST_CRACK_RUN.md](docs/motion/FIRST_CRACK_RUN.md)**
    (`crack_pipeline.sh preflight`, `bench`, `session CASE`, `archive CASE`). The D405 is on USB 3 and preflight is GO
