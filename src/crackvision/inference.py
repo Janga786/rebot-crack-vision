@@ -101,6 +101,7 @@ def build_predict_command(
     nps: int,
     skip_existing: bool,
     use_dataset_id: bool,
+    save_probabilities: bool = False,
 ) -> list[str]:
     """Build the nnU-Net CLI invocation as a list (never a shell string) — docs/INTERFACES.md §3.2.
 
@@ -146,6 +147,8 @@ def build_predict_command(
         command.append("--not_on_device")
     if skip_existing:
         command.append("--continue_prediction")
+    if save_probabilities:      # {case}.npz + {case}.pkl beside the PNG; the PNG itself is unchanged (crack_filter)
+        command.append("--save_probabilities")
     return command
 
 
@@ -178,6 +181,7 @@ def run_inference(
     input_dir: Path | None = None,
     output_dir: Path | None = None,
     use_dataset_id: bool = False,
+    save_probabilities: bool = False,
 ) -> dict[str, Any]:
     """Run one batch inference pass. Importable: also used by scripts/smoke_test.py (TC-006/TC-008).
 
@@ -202,6 +206,7 @@ def run_inference(
         nps=nps,
         skip_existing=skip_existing,
         use_dataset_id=use_dataset_id,
+        save_probabilities=save_probabilities,
     )
     log.info("nnU-Net command: %s", " ".join(command))
 
@@ -360,6 +365,14 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="use nnUNetv2_predict -d 501 -c 2d instead of -m (adr/006 fallback)",
     )
+    parser.add_argument(
+        "--save-probabilities",
+        dest="save_probabilities",
+        action="store_true",
+        default=None,
+        help="also write data/predictions/{case}.npz (softmax) for skeleton --crack-filter "
+        "(default: config crack_filter.batch, false)",
+    )
     return parser
 
 
@@ -383,6 +396,11 @@ def main(argv: list[str] | None = None) -> int:
     nps = cfg.inference["nps"] if args.nps is None else args.nps
     input_dir = args.input_dir or cfg.paths["nnunet_input"]
     output_dir = args.output_dir or cfg.paths["predictions"]
+    save_probabilities = (
+        bool((cfg.raw.get("crack_filter") or {}).get("batch", False))
+        if args.save_probabilities is None
+        else args.save_probabilities
+    )
 
     result = run_inference(
         cfg,
@@ -398,6 +416,7 @@ def main(argv: list[str] | None = None) -> int:
         input_dir=input_dir,
         output_dir=output_dir,
         use_dataset_id=args.use_dataset_id,
+        save_probabilities=save_probabilities,
     )
 
     if args.dry_run:

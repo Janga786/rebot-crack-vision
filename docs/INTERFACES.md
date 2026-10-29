@@ -197,8 +197,14 @@ A consumer that cannot find `case_map.json` exits **3** with
 ```
 ./env.sh python -m crackvision.inference [--input-dir DIR] [--output-dir DIR]
                                          [--device cuda|cpu] [--disable-tta] [--not-on-device]
-                                         [--step-size F] [--npp N] [--nps N] [common flags]
+                                         [--step-size F] [--npp N] [--nps N] [--save-probabilities]
+                                         [common flags]
 ```
+
+`--save-probabilities` (default: `crack_filter.batch` in §4, `false`) appends nnU-Net's
+`--save_probabilities`: `data/predictions/{case}.npz` (key `probabilities`, shape `(2, 1, H, W)`,
+class 1 = crack) and `{case}.pkl` are written beside the PNG, which is unchanged. Off, the command is
+exactly the one below. Only `skeleton --crack-filter` (§3.4, §3.15) reads the `.npz`.
 
 | | |
 |---|---|
@@ -303,7 +309,14 @@ skel    = skimage.morphology.skeletonize(cleaned)                       # defaul
    pruning, spur removal, polyline fitting, spline smoothing, `skan`. The endpoint of this phase is a
    one-pixel raster. (`adr/008`)
 5. Empty mask → all-zero skeleton, stats with zeros, status ok.
-
+6. **Opt-in amendment (2026-10-28), `--crack-filter` / `--no-crack-filter`** (default: `crack_filter.batch`,
+   `false`). With it, `remove_small_objects` is replaced by `crackvision.crack_filter` (§3.15) on the
+   softmax in `data/predictions/{case}.npz`; the skeleton is `skeletonize(accepted components)`. The
+   case fails (exit 1) when the `.npz` is missing. Extra outputs: `{case}_components.json`
+   (`crackvision.crack_components/1`) and `{case}_components.png` (uint16 component ids). The stats
+   gain `crack_filter` (the table's `summary`), `components_after` is the number of accepted components
+   and `min_component_size` is `0`. No depth exists on this path, so the depth gates are skipped and
+   listed in `gates_skipped`. Without the flag the outputs are byte-identical to before.
 ### 3.5 `scripts/check_env.py` (TC-003) — Level 1
 
 ```
@@ -654,6 +667,81 @@ source: `.session_info`, `len(...)`, and iteration yielding the same `CaptureFra
 order, on every pass — so code written against a live D405 stream can consume a recorded session
 with no branch.
 
+### 3.15 `crackvision.crack_filter` (2026-10-28)
+
+Pure library: which connected components of the model's mask count as a crack, decided **before**
+skeletonising. Spec and measurements: `docs/perception/CRACK_SELECTION_RESEARCH.md`. Thresholds are
+§4 `crack_filter:`.
+
+```
+analyse(prob, params, *, gray=None, depth_u16=None, depth_scale=None, intrinsics=None, vote_mask=None)
+    -> FilterResult(labels, candidate, accepted_mask, components, summary)
+```
+
+- `prob`: crack-class softmax `(H, W)` in `[0, 1]` (`LivePredictor.predict_probs`, or the `.npz` of
+  §3.2). `candidate = hysteresis(prob, seed_p, grow_p) & vote_mask`; `labels` are its 8-connected
+  components, ids `1..N` in raster order. All arrays stay in the image's (row, col) frame (§0.5).
+- A gate whose input is absent is **skipped and listed** in `summary.gates_skipped`, never passed
+  silently: no depth map → `working_range`, `surface_depth`, `depth_step`, `length_mm`, `width_mm`; no
+  grey image → `ridge`. With a depth map, a component without `min_annulus_px` valid ring pixels is
+  rejected `no_surface_depth` (unless `require_surface_depth: false`).
+- `LivePredictor.predict_with_probs(rgb) -> (mask, prob)` and `predict_probs(rgb) -> prob` use the same
+  network pass; `predict(rgb)` is unchanged.
+- `burst_probabilities(predictor, rgbs, sharpness, params)`: the model on the `burst_vote_frames`
+  sharpest frames (ties: the earlier frame); `vote_mask` = pixels with `p > grow_p` in at least
+  `burst_vote_min` of them; scoring uses the sharpest frame's probability.
+
+**`crackvision.crack_components/1`** (`{case}_components.json`):
+
+| Field | Meaning |
+|---|---|
+| `schema`, `case_id`, `params` | the thresholds used (§4 `crack_filter:` after defaults) |
+| `summary` | `argmax_px`, `argmax_components` (the raw mask), `candidate_px`, `candidate_components`, `accepted_components`, `accepted_px`, `depth` / `gray` (`used`/`missing`), `vote` (bool), `gates_skipped`, `best_id` |
+| `best_id` | highest-`score` accepted component, or `null` |
+| `components[]` | one row per candidate component, below |
+| `burst`, `source`, `frame_index` | optional provenance (live path) |
+
+`components[]` row: `id`, `area_px`, `centroid_px` `[u, v]`, `bbox_rc` `[r0, c0, r1, c1]`,
+`skeleton_length_px` (4-links 1, diagonal links √2), `main_path_px` (geodesic diameter of the
+skeleton), `width_px` (area / skeleton length), `mean_p`, `max_p`, `core_px` (p > seed_p),
+`elongation` (inertia major/minor axis, minor ≥ 1 px), `tortuosity` (main path / end-to-end distance;
+`null` under 1 px chord), `width_cv` (std/mean of the local width 2·EDT−1 along the skeleton),
+`touches_border` (within `border_px`); with depth: `depth_m` (median ring depth, ring
+`annulus_inner_px` < taxicab distance ≤ `annulus_outer_px`, outside every mask pixel), `mm_per_px`,
+`length_mm`, `width_mm`, `annulus_px`, `plane_rms_mm` (ring plane residual, worst 5 % trimmed),
+`surface_tilt_deg` (ring plane vs optical axis), `interior_offset_mm` (median of the component's valid
+depth from that plane; + = farther than the surface), `depth_step`; with a grey image:
+`ridge_fraction` (skeleton pixels whose 3×3-max black-hat response ≥ `ridge_min_contrast`; ellipse
+kernel `clip(2·⌈width_px⌉+5, 7, 41)`), `ridge_contrast` (median response), `flank_asymmetry`
+(median |left − right flank| / median(mean flank − centre), sampled `width_px/2 + 3` px across);
+`flags` (`touches_border`, `joint_like` = tortuosity ≤ `joint_max_tortuosity`, width_cv ≤
+`joint_max_width_cv` and width_px ≥ `joint_min_width_px`); `reject_reasons` (vocabulary: `low_confidence`, `too_short_px`,
+`too_short_mm`, `too_wide_mm`, `out_of_working_range`, `no_surface_depth`, `depth_step`,
+`not_a_dark_ridge`, `one_sided_edge` (only with `max_flank_asymmetry` set), `joint_like` (only with
+`joint_reject`)); `accepted` (no reason); `score` = `mean_p × length_mm` (`score_units`
+`mean_p*mm`), or `mean_p × skeleton_length_px` without depth (`mean_p*px`).
+
+**Live-path case files** (crack_trace `capture`, `camera.py snap --filter`), in
+`data/camera/{case}/`: `{case}_components.json`, `{case}_components.png` (uint16 ids),
+`{case}_crack_prob.png` (uint16, `p × 65535`, the sharpest frame) and `{case}_argmax.png` (`{0,255}`,
+`p > 0.5`, the raw mask). On this path `data/predictions/{case}.png` holds the **accepted** components
+only (values `{0,1}`); the `segment` run-state entry is marked done with that file and the note
+`live_predictor + crack_filter`, and `scripts/operator_segment_paths.py --stage paths
+--min-component-size 0` follows (the passthrough flag is forwarded to `skeleton`; absent, nothing
+changes). `crack_filter.find_case_table(root, case)` looks in `data/camera/{case}/`, then
+`data/skeletons/`.
+
+**crack_trace additions.** `search-capture` writes `stop_NN_components.json` per stop; each
+`results[].located` gains `component`, `score`, `length_mm`, `width_mm`, `mean_p`, `results[]` gains
+`crack_filter` (the summary); `search_result.json` gains `crack_filter` (bool) and, when true, the best
+stop's `component`, `score`, `length_mm`, `width_mm`, `mean_p`. Stops are ranked by
+`(not touches_border, score)` (before: pixel count). `locate_crack(..., component=None,
+valid_range_m=None)`: with `component` only that component is lifted and `min_px` does not apply.
+`plan` writes `selection` into `{case}_trace_plan.json` and the trajectory's `crack_trace` block:
+`{mode: best_crack | longest_segment | all_paths, max_segments, paths_component, filter_component,
+score, score_units, length_mm, width_mm, mean_p}`. `--no-filter` on `capture`/`search-capture`
+restores the previous behaviour exactly.
+
 ---
 
 ## 4. `config/project.yaml`
@@ -700,7 +788,40 @@ realsense:
   depth: {width: 848, height: 480, fps: 30, format: z16}
   align_to: color
   warmup_frames: 30
+crack_filter:                 # §3.15; read via crack_filter.FilterParams.from_config (defaults = these)
+  crack_trace: true           # crack_trace capture / search-capture / plan
+  camera: false               # camera.py snap / live (opt-in: --filter)
+  batch: false                # inference --save-probabilities + skeleton --crack-filter
+  tta: false
+  seed_p: 0.9
+  grow_p: 0.5
+  min_mean_p: 0.8
+  min_length_px: 15
+  min_length_mm: 10.0
+  max_width_mm: 10.0
+  working_range_m: [0.07, 0.50]
+  require_surface_depth: true
+  annulus_inner_px: 4
+  annulus_outer_px: 14
+  min_annulus_px: 50
+  min_interior_px: 20
+  max_plane_rms_mm: 3.0
+  max_step_mm: 5.0
+  max_surface_tilt_deg: 60.0
+  ridge_min_contrast: 8.0
+  min_ridge_fraction: 0.5
+  max_flank_asymmetry: null
+  joint_max_tortuosity: 1.08
+  joint_max_width_cv: 0.30
+  joint_min_width_px: 2.0
+  joint_reject: false
+  border_px: 24
+  burst_vote_frames: 3
+  burst_vote_min: 2
 ```
+
+`crack_filter` is not a `Config` dataclass field: it lives in `cfg.raw` and is optional (absent =
+the defaults above).
 
 `crackvision.config` loads this, applies defaults for anything missing, resolves every path against
 the project root, and raises a clear error (exit **2**) on a malformed file. **CLI flags always win

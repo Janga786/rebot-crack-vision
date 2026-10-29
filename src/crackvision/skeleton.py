@@ -1,7 +1,10 @@
 """crackvision.skeleton — binary mask cleanup and one-pixel skeletonization. Built by TC-010.
 
 Algorithm is exactly `remove_small_objects` then `skimage.morphology.skeletonize` — nothing more
-(`adr/008`). Any further analysis of the skeleton's shape or connectivity is deliberately out of
+(`adr/008`). Opt-in only (`--crack-filter` or config `crack_filter.batch: true`, default off): the
+`remove_small_objects` step is replaced by `crackvision.crack_filter` on the softmax that
+`inference --save-probabilities` wrote (`data/predictions/{case}.npz`); the per-component table goes
+to `{case}_components.json`. Off, the outputs are byte-identical to before. Any further analysis of the skeleton's shape or connectivity is deliberately out of
 scope: the one-pixel raster is this phase's perception endpoint, and its statistics are the
 evidence base for a later, separate design of that analysis.
 """
@@ -93,6 +96,7 @@ def skeletonize_case(
     write_overlay: bool = True,
     skip_existing: bool = False,
     logger: logging.Logger | None = None,
+    crack_filter_params: Any = None,
 ) -> dict[str, Any]:
     """Clean, skeletonize and score one case. Returns a result dict with at least `status`."""
     log = logger or logging.getLogger("crackvision.skeleton")
@@ -127,7 +131,23 @@ def skeletonize_case(
     binary = binarize(prediction)
     height, width = binary.shape[:2]
 
-    _cleaned, skeleton, components_before, components_after = clean_and_skeletonize(binary, min_component_size)
+    filter_summary = None
+    if crack_filter_params is not None:
+        try:
+            filtered = _crack_filter_case(predictions_dir, skeletons_dir, case_id, source_path, binary.shape,
+                                          crack_filter_params)
+        except (OSError, ValueError, KeyError) as exc:
+            msg = f"crack filter: {exc}"
+            log.error("case %s: %s", case_id, msg)
+            return {"case_id": case_id, "status": "failed", "error": msg}
+        filter_summary = filtered.summary
+        components_before = int(label(binary, connectivity=2).max())
+        skeleton = skeletonize(filtered.accepted_mask)
+        components_after = len(filtered.accepted)
+        min_component_size = 0
+        expected_outputs.append(skeletons_dir / f"{case_id}_components.json")
+    else:
+        _cleaned, skeleton, components_before, components_after = clean_and_skeletonize(binary, min_component_size)
 
     mask_pixels = int(binary.sum())
     total_pixels = int(binary.size)
@@ -174,6 +194,8 @@ def skeletonize_case(
         "skeleton_pixels": skeleton_pixels,
         "skeleton_fraction": skeleton_fraction,
     }
+    if filter_summary is not None:
+        stats["crack_filter"] = filter_summary
     stats_out.write_text(json.dumps(stats, indent=2) + "\n", encoding="utf-8")
 
     log.info(
@@ -193,6 +215,34 @@ def skeletonize_case(
         "stats_path": stats_out,
         **stats,
     }
+
+
+def _crack_filter_case(predictions_dir: Path, skeletons_dir: Path, case_id: str, source_path: Path,
+                       shape: tuple[int, ...], params: Any):
+    """crack_filter on the case's softmax (data/predictions/{case}.npz); the grey original feeds the ridge check.
+    No depth on this path: the depth gates are skipped and recorded in the table."""
+    from crackvision import crack_filter as cf
+
+    npz = predictions_dir / f"{case_id}.npz"
+    if not npz.is_file():
+        raise ValueError(f"{npz} missing: run inference with --save-probabilities (or crack_filter.batch: true)")
+    with np.load(npz) as data:
+        probs = np.asarray(data["probabilities"])
+    prob = np.squeeze(probs[1]).astype(np.float32)
+    if prob.shape != tuple(shape[:2]):
+        raise ValueError(f"probabilities {prob.shape} != prediction {tuple(shape[:2])} (§0.5)")
+    gray = None
+    if source_path.is_file():
+        with Image.open(source_path) as img:
+            rgb = np.array(img.convert("RGB"))
+        if rgb.shape[:2] == prob.shape:
+            gray = cf.to_gray(rgb)
+    result = cf.analyse(prob, params, gray=gray)
+    skeletons_dir.mkdir(parents=True, exist_ok=True)
+    doc = cf.to_doc(result, params, case_id=case_id, extra={"source": "batch", "probabilities": npz.name})
+    (skeletons_dir / f"{case_id}_components.json").write_text(json.dumps(doc, indent=1) + "\n", encoding="utf-8")
+    cf._write_u16(result.labels.astype(np.uint16), skeletons_dir / f"{case_id}_components.png")
+    return result
 
 
 def _parse_color(text: str) -> tuple[int, int, int]:
@@ -232,6 +282,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--dilate", type=int, default=0, metavar="N", help="thicken the skeleton in the overlay only, for viewing"
     )
     parser.add_argument("--no-overlay", action="store_true", help="skip writing the *_skeleton_overlay.png file")
+    parser.add_argument(
+        "--crack-filter",
+        dest="crack_filter",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="replace remove_small_objects with crackvision.crack_filter on data/predictions/{case}.npz "
+        "(default: config crack_filter.batch, false)",
+    )
     return parser
 
 
@@ -248,6 +306,14 @@ def main(argv: list[str] | None = None) -> int:
         cfg.skeleton["min_component_size"] if args.min_component_size is None else args.min_component_size
     )
     color = tuple(cfg.visualization["skeleton_color"])
+    use_filter = (
+        bool((cfg.raw.get("crack_filter") or {}).get("batch", False)) if args.crack_filter is None else args.crack_filter
+    )
+    filter_params = None
+    if use_filter:
+        from crackvision.crack_filter import FilterParams
+
+        filter_params = FilterParams.from_config(cfg)
 
     logger = setup_logging("skeleton", cfg, verbose=args.verbose, quiet=args.quiet)
     summary = RunSummary()
@@ -302,6 +368,7 @@ def main(argv: list[str] | None = None) -> int:
             write_overlay=write_overlay,
             skip_existing=args.skip_existing,
             logger=logger,
+            crack_filter_params=filter_params,
         )
         status = result["status"]
         if status == "failed":

@@ -38,6 +38,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--force", action="store_true", help="re-run the requested stage(s) even if recorded fresh"
     )
+    parser.add_argument(
+        "--min-component-size", type=int, default=None, metavar="N",
+        help="passed to skeleton (the live crack_filter path uses 0: its mask is already filtered)",
+    )
     return parser
 
 
@@ -131,7 +135,8 @@ def run_paths(cfg: Config, args: argparse.Namespace, logger) -> int:
     cases_argv = ["--cases", case_id]
 
     logger.info("paths: skeleton for case %s", case_id)
-    rc = skeleton.main([*common, *cases_argv])
+    extra = [] if args.min_component_size is None else ["--min-component-size", str(args.min_component_size)]
+    rc = skeleton.main([*common, *cases_argv, *extra])
     if rc != 0:
         logger.error("paths: skeleton failed (exit %d)", rc)
         operator_state.mark_stage(case_id, "paths", "failed", [], root, notes=f"skeleton exit {rc}")

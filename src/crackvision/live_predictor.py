@@ -110,3 +110,18 @@ class LivePredictor:
         image = rgb.transpose(2, 0, 1)[:, None].astype(np.float32)      # as NaturalImage2DIO.read_images
         seg: Any = self.predictor.predict_single_npy_array(image, {"spacing": (999, 1, 1)}, None, None, False)
         return np.asarray(seg).reshape(rgb.shape[:2]).astype(np.uint8)
+
+    def predict_with_probs(self, rgb: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        """uint8 RGB (H, W, 3) -> (uint8 {0, 1} mask exactly as predict() returns it, float32 (H, W) crack-class
+        softmax in [0, 1]). Same network pass; nnU-Net's save_or_return_probabilities path."""
+        if rgb.dtype != np.uint8 or rgb.ndim != 3 or rgb.shape[2] != 3:
+            raise ValueError(f"expected uint8 (H, W, 3) RGB, got {rgb.dtype} {rgb.shape}")
+        image = rgb.transpose(2, 0, 1)[:, None].astype(np.float32)
+        seg, probs = self.predictor.predict_single_npy_array(image, {"spacing": (999, 1, 1)}, None, None, True)
+        probs = np.asarray(probs)                       # (C, 1, H, W): class 1 = crack
+        crack = probs[1].reshape(rgb.shape[:2]).astype(np.float32)
+        return np.asarray(seg).reshape(rgb.shape[:2]).astype(np.uint8), crack
+
+    def predict_probs(self, rgb: np.ndarray) -> np.ndarray:
+        """uint8 RGB (H, W, 3) -> float32 (H, W) crack-class softmax; predict() is unchanged."""
+        return self.predict_with_probs(rgb)[1]

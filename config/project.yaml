@@ -39,3 +39,37 @@ realsense:
   depth: {width: 848, height: 480, fps: 30, format: z16}
   align_to: color
   warmup_frames: 30
+# Which components of the model's mask count as a crack (crackvision.crack_filter, docs/perception/
+# CRACK_SELECTION_RESEARCH.md). Measured 2026-10-28: real cracks mean p 0.87-0.97, noise blobs 0.58-0.75; the
+# crack-free desk frame's false positive sits at 1.9 m, 34 mm wide, on a 22 mm plane residual.
+crack_filter:
+  crack_trace: true           # crack_trace capture / search-capture / plan: on (--no-filter = before)
+  camera: false               # scripts/camera.py snap / live: opt-in (--filter); its tests pin the old default
+  batch: false                # Phase-1 batch path: off = byte-identical to before (inference saves probabilities
+                              # and skeleton filters only when this, or their CLI flag, is on)
+  tta: false                  # live paths: mirroring TTA (124 ms vs 56 ms a frame); thresholds measured without
+  seed_p: 0.9                 # hysteresis: a component needs pixels above seed_p ...
+  grow_p: 0.5                 # ... and grows into pixels above grow_p (= the argmax boundary)
+  min_mean_p: 0.8             # cracks 0.87-0.97, blobs 0.58-0.75
+  min_length_px: 15           # always applied (skeleton length)
+  min_length_mm: 10.0         # with depth; = crack_trace plan --min-length-m
+  max_width_mm: 10.0          # with depth; widest accepted print crack 7.7 mm (05 at 40 cm), the desk blob 34 mm
+  working_range_m: [0.07, 0.50]   # D405 sweet spot; surface depth from a ring around the component
+  require_surface_depth: true # depth map present but no valid ring depth -> rejected (not skipped)
+  annulus_inner_px: 4
+  annulus_outer_px: 14
+  min_annulus_px: 50
+  min_interior_px: 20
+  max_plane_rms_mm: 3.0       # ring plane residual above this = the ring straddles a depth step
+  max_step_mm: 5.0            # |median interior offset from the ring plane| above this = raised object / step
+  max_surface_tilt_deg: 60.0  # ring plane seen almost edge-on = two parallel surfaces (a straight step)
+  ridge_min_contrast: 8.0     # black-hat grey levels for a skeleton pixel to sit on a dark ridge
+  min_ridge_fraction: 0.5
+  max_flank_asymmetry: null   # measured and reported; null = no gate (desk lamp frame 1.15, print cracks <= 0.84)
+  joint_max_tortuosity: 1.08  # straight ... (best print cracks 1.067-9.3; paving joints 1.04-1.09)
+  joint_max_width_cv: 0.30    # ... and even width (joints 0.15-0.32) -> flagged joint_like
+  joint_min_width_px: 2.0     # width CV means nothing on 1 px wide pieces
+  joint_reject: false         # flag only until the D405 negative block measures the threshold (ADR-010)
+  border_px: 24
+  burst_vote_frames: 3        # capture / search-capture: model on the 3 sharpest frames of the burst
+  burst_vote_min: 2           # pixel kept when above grow_p in at least 2 of them

@@ -16,6 +16,13 @@ pipeline (`scripts/operator_segment_paths.py --stage both`: prepare_inputs, nnU-
 skeleton, paths, overlays). With depth it also reports the working distance and the image scale
 (mm per pixel), so crack path lengths come out in millimetres.
 
+With `--filter` (or config `crack_filter.camera: true`; default off here, on in crack_trace) `snap` runs the model in-process on the burst's sharpest
+frames (`crackvision.live_predictor`, burst vote), keeps only the components `crackvision.crack_filter`
+accepts (confidence, size in mm, working distance, depth step, dark ridge), writes that mask as the
+case's prediction and runs the paths stage on it. The per-component table is
+data/camera/<case>/<case>_components.json. Without it, the batch segment stage runs as before. `live
+--filter` shows accepted components in red and rejected ones in yellow.
+
 `live` keeps the network loaded (`crackvision.live_predictor`) and streams the camera with the crack
 mask overlaid as MJPEG on http://127.0.0.1:8090 (this env's OpenCV is headless, so the browser is the
 display). /snapshot saves the current frame; run `snap --image` on it for the full pipeline.
@@ -434,6 +441,10 @@ def _image_frame(path: Path) -> tuple[CaptureFrame, dict[str, Any]]:
                    "depth_scale_m_per_unit": None}
 
 
+def _filter_flag(cfg: Config, key: str, default: bool) -> bool:
+    return bool((cfg.raw.get("crack_filter") or {}).get(key, default))
+
+
 def summarize_case(cfg: Config, case_id: str, frame: CaptureFrame, info: dict[str, Any]) -> dict[str, Any]:
     """Crack pixels, paths and (with depth) distance and scale for a finished case."""
     out: dict[str, Any] = {"case_id": case_id}
@@ -469,8 +480,69 @@ def summarize_case(cfg: Config, case_id: str, frame: CaptureFrame, info: dict[st
         "overlay": naming.overlay_path(case_id), "comparison": naming.comparison_path(case_id),
         "skeleton_overlay": naming.skeleton_overlay_path(case_id),
         "paths_overlay": Path("data/paths") / f"{case_id}_paths_overlay.png",
-        "prediction": naming.prediction_path(case_id)}.items() if (cfg.root / p).is_file()}
+        "prediction": naming.prediction_path(case_id),
+        "components": Path("data/camera") / case_id / f"{case_id}_components.json"}.items()
+        if (cfg.root / p).is_file()}
     return out
+
+
+def frame_depth(frame: CaptureFrame, info: dict[str, Any]) -> tuple[np.ndarray | None, float | None, dict | None]:
+    """(depth_u16, scale, intrinsics) when the frame carries aligned depth, else (None, None, None)."""
+    scale, intr = info.get("depth_scale_m_per_unit"), info.get("color_intrinsics")
+    if scale and intr and frame.depth_u16 is not None and frame.depth_u16.any():
+        return frame.depth_u16, float(scale), intr
+    return None, None, None
+
+
+def filter_burst(predictor, frames: list[CaptureFrame], scores: list[float], info: dict[str, Any], params):
+    """crack_filter on a burst: the model on the sharpest params.burst_vote_frames frames, the vote, then the
+    table on the sharpest frame's probability, grey image and depth. Returns (index of that frame, prob, result,
+    burst info)."""
+    from crackvision import crack_filter as cf
+    k, prob, vm, binfo = cf.burst_probabilities(predictor, [f.color_rgb for f in frames], scores, params)
+    d, scale, intr = frame_depth(frames[k], info)
+    res = cf.analyse(prob, params, gray=cf.to_gray(frames[k].color_rgb), depth_u16=d, depth_scale=scale,
+                     intrinsics=intr, vote_mask=vm)
+    return k, prob, res, binfo
+
+
+def filtered_perception(cfg: Config, case_id: str, src: Path, result, prob: np.ndarray, params,
+                        extra: dict[str, Any] | None = None, quiet: bool = True) -> int:
+    """The live replacement of the batch `segment` stage: the table and rasters next to the case
+    (crack_filter.save_case_files), prepare_inputs for the case_map entry, the ACCEPTED mask written as
+    data/predictions/<case>.png, then the accepted `paths` stage (min component size 0: the mask is already
+    filtered) and the visualize renders."""
+    from crackvision import crack_filter as cf
+    from crackvision import operator_state, prepare_inputs, visualize
+    q = ["-q"] if quiet else []
+    cf.save_case_files(src.parent.parent, case_id, result, prob, params, extra)
+    rc = prepare_inputs.main(["--root", str(cfg.root), "--input-dir", str(src.parent), *q])
+    if rc != EXIT_OK:
+        return rc
+    pred = cfg.root / naming.prediction_path(case_id)
+    pred.parent.mkdir(parents=True, exist_ok=True)
+    Image.fromarray(result.accepted_mask.astype(np.uint8), mode="L").save(pred)
+    operator_state.mark_stage(case_id, "segment", "done", [pred], cfg.root,
+                              notes="live_predictor + crack_filter (accepted components only)")
+    osp = _load_script("operator_segment_paths")
+    rc = osp.main(["--root", str(cfg.root), "--case-id", case_id, "--source", str(src), "--stage", "paths",
+                   "--force", "--min-component-size", "0", *q])
+    if rc == EXIT_OK:
+        rc = visualize.main(["--root", str(cfg.root), "--cases", case_id, *q])
+    return rc
+
+
+def print_components(result, indent: str = "      ") -> None:
+    from crackvision import crack_filter as cf
+    s = result.summary
+    print(f"{indent}crack filter: {s['accepted_components']} of {s['candidate_components']} component(s) accepted "
+          f"({s['argmax_components']} in the raw mask); depth {s['depth']}"
+          + (f"; skipped: {', '.join(s['gates_skipped'])}" if s["gates_skipped"] else ""))
+    rows = sorted(result.components, key=lambda c: (not c["accepted"], -c["score"]))
+    for c in rows[:8]:
+        print(f"{indent}  {cf.describe(c)}")
+    if len(rows) > 8:
+        print(f"{indent}  ... {len(rows) - 8} more (see the components table)")
 
 
 def cmd_snap(cfg: Config, args: argparse.Namespace, logger: logging.Logger) -> int:
@@ -480,9 +552,11 @@ def cmd_snap(cfg: Config, args: argparse.Namespace, logger: logging.Logger) -> i
         print(f"{case_dir} already exists; pick another --name or pass --force")
         return EXIT_USAGE
     scores: list[float] = []
+    burst: list[CaptureFrame] = []
     if args.image:
         frame, info = _image_frame(Path(args.image))
         scores = [sharpness(frame.color_rgb)]
+        burst = [frame]
     else:
         try:
             with open_camera(cfg, args, logger) as cam:
@@ -511,7 +585,25 @@ def cmd_snap(cfg: Config, args: argparse.Namespace, logger: logging.Logger) -> i
               "image": _rel(src, cfg.root)}
 
     rc = EXIT_OK
-    if not args.no_model:
+    use_filter = (args.filter or _filter_flag(cfg, "camera", False)) and not args.no_filter
+    result = None
+    if not args.no_model and use_filter:
+        from crackvision import crack_filter as cf
+        from crackvision.live_predictor import LivePredictor
+        t0 = time.monotonic()
+        params = cf.FilterParams.from_config(cfg)
+        predictor = LivePredictor(cfg, tta=args.tta or _filter_flag(cfg, "tta", False))
+        chosen = int(np.argmax(scores))
+        k, prob, result, binfo = filter_burst(predictor, burst, scores, info, params)
+        if k != chosen:                                    # cannot happen: both pick the first sharpest frame
+            raise RuntimeError(f"burst vote picked frame {k}, the case image is frame {chosen}")
+        record["crack_filter"] = {"burst": binfo, "summary": result.summary}
+        rc = filtered_perception(cfg, case_id, src, result, prob, params,
+                                 extra={"source": record["source"], "burst": binfo}, quiet=args.quiet)
+        record["pipeline"] = {"exit_code": rc, "seconds": round(time.monotonic() - t0, 1),
+                              "mode": "live_predictor+crack_filter"}
+        record["result"] = summarize_case(cfg, case_id, frame, info)
+    elif not args.no_model:
         osp = _load_script("operator_segment_paths")
         t0 = time.monotonic()
         q = ["-q"] if args.quiet else []
@@ -538,6 +630,8 @@ def cmd_snap(cfg: Config, args: argparse.Namespace, logger: logging.Logger) -> i
         if res.get("path_lengths_mm"):
             line += f"; lengths {res['path_lengths_mm']} mm"
         print(line)
+        if result is not None:
+            print_components(result)
         for k, v in res.get("files", {}).items():
             print(f"      {k:<16} {v}")
     print(f"      record: {_rel(case_dir / 'snap.json', cfg.root)}")
@@ -566,6 +660,7 @@ class _LiveState:
         self.jpeg: bytes = b""
         self.frame: CaptureFrame | None = None
         self.mask: np.ndarray | None = None
+        self.result: Any = None
         self.stats: dict[str, Any] = {}
         self.seq = 0
 
@@ -590,7 +685,7 @@ def _make_handler(state: _LiveState, cfg: Config, info: dict[str, Any]):
                     return self._send(200, "application/json", json.dumps(state.stats).encode())
             if self.path == "/snapshot":
                 with state.lock:
-                    frame, mask = state.frame, state.mask
+                    frame, mask, result = state.frame, state.mask, state.result
                 if frame is None:
                     return self._send(503, "application/json", b'{"error": "no frame yet"}')
                 d = cfg.root / "data" / "camera" / f"live_{utc_stamp()}"
@@ -600,6 +695,10 @@ def _make_handler(state: _LiveState, cfg: Config, info: dict[str, Any]):
                 if frame.depth_u16.any():
                     _write_depth_png(frame.depth_u16, d / "depth.png")
                 (d / "info.json").write_text(json.dumps({"session_info": info, "extra": frame.extra}, indent=2, default=str))
+                if result is not None:
+                    from crackvision import crack_filter as cf
+                    (d / "components.json").write_text(json.dumps(
+                        cf.to_doc(result, cf.FilterParams.from_config(cfg)), indent=1, default=str))
                 body = {"saved": _rel(d, cfg.root),
                         "full_pipeline": f"./env.sh python scripts/camera.py snap --image {_rel(d / 'color.png', cfg.root)}"}
                 return self._send(200, "application/json", json.dumps(body).encode())
@@ -650,8 +749,11 @@ def cmd_live(cfg: Config, args: argparse.Namespace, logger: logging.Logger) -> i
     import cv2
     from crackvision.live_predictor import LivePredictor
 
+    from crackvision import crack_filter as cf
     print("loading the OpenCrack nnU-Net into memory ...", flush=True)
     predictor = LivePredictor(cfg, tta=args.tta)
+    use_filter = (args.filter or _filter_flag(cfg, "camera", False)) and not args.no_filter
+    params = cf.FilterParams.from_config(cfg)
     vis = cfg.visualization
     color, alpha = tuple(vis.get("crack_color", (255, 0, 0))), float(vis.get("overlay_alpha", 0.5))
     state = _LiveState()
@@ -673,13 +775,21 @@ def cmd_live(cfg: Config, args: argparse.Namespace, logger: logging.Logger) -> i
 
     def run_model(frame: CaptureFrame) -> None:
         t0 = time.monotonic()
-        mask = predictor.predict(frame.color_rgb)
+        result = None
+        if use_filter:     # accepted components (red) and rejected ones (yellow); the mask is the accepted one
+            prob = predictor.predict_probs(frame.color_rgb)
+            d, scale, intr = frame_depth(frame, info)
+            result = cf.analyse(prob, params, gray=cf.to_gray(frame.color_rgb), depth_u16=d, depth_scale=scale,
+                                intrinsics=intr)
+            mask = result.accepted_mask.astype(np.uint8)
+        else:
+            mask = predictor.predict(frame.color_rgb)
         dt = time.monotonic() - t0
         with lock:
             model.update(frame=frame, mask=mask, ms=1000 * dt, fps=_ema(model["fps"], 1.0 / max(dt, 1e-3)),
-                         runs=model["runs"] + 1)
+                         runs=model["runs"] + 1, result=result)
         with state.lock:                                  # the snapshot pair: a frame and its own mask
-            state.frame, state.mask = frame, mask
+            state.frame, state.mask, state.result = frame, mask, result
 
     def model_loop() -> None:
         seen = -1
@@ -714,12 +824,17 @@ def cmd_live(cfg: Config, args: argparse.Namespace, logger: logging.Logger) -> i
                     newest["frame"], newest["seq"] = frame, newest["seq"] + 1
             with lock:
                 mask, mframe, ms, mfps = model["mask"], model["frame"], model["ms"], model["fps"]
+                mres = model.get("result")
             if mask is not None and mask.shape == frame.color_rgb.shape[:2]:
-                img = overlay(frame.color_rgb, mask, color, alpha)
+                img = cf.overlay(frame.color_rgb, mres, alpha=alpha) if mres is not None else overlay(
+                    frame.color_rgb, mask, color, alpha)
                 frac = float(mask.mean())
                 lag = (frame.host_monotonic_ns - mframe.host_monotonic_ns) / 1e6
                 text = (f"video {video_fps or 0:.0f} fps  model {ms:.0f} ms ({mfps or 0:.1f}/s)"
                         + ("" if args.sync else f"  mask lag {lag:.0f} ms") + f"  crack {100 * frac:.2f}%")
+                if mres is not None:
+                    text += (f"  accepted {mres.summary['accepted_components']}/"
+                             f"{mres.summary['candidate_components']}")
             else:
                 img, frac, lag = frame.color_rgb, 0.0, None
                 text = "video only: the model is warming up"
@@ -731,7 +846,12 @@ def cmd_live(cfg: Config, args: argparse.Namespace, logger: logging.Logger) -> i
                 state.stats = {"frames": n, "video_fps": round(video_fps or 0, 2), "model_ms": round(ms, 1) if mask is not None else None,
                                "model_fps": round(mfps or 0, 2), "model_runs": model["runs"],
                                "mask_lag_ms": None if lag is None else round(lag, 1), "crack_fraction": round(frac, 5),
-                               "tta": args.tta, "mode": "sync" if args.sync else "async"}
+                               "tta": args.tta, "mode": "sync" if args.sync else "async",
+                               "crack_filter": None if mres is None else {
+                                   "summary": mres.summary,
+                                   "accepted": [{k: c[k] for k in ("id", "length_mm", "width_mm", "mean_p",
+                                                                    "skeleton_length_px", "score")}
+                                                for c in mres.accepted]}}
             if replay_period:                             # a replay plays at its recorded rate
                 time.sleep(max(0.0, replay_period - (time.monotonic() - now)))
     except KeyboardInterrupt:
@@ -790,6 +910,12 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--name", default=None, help="case id (default d405_<UTC>)")
     s.add_argument("--no-model", action="store_true", help="capture and store only")
     s.add_argument("--force", action="store_true", help="overwrite an existing case")
+    s.add_argument("--filter", action="store_true", help="in-process model + burst vote + crack_filter, the "
+                                                          "accepted components become the prediction")
+    s.add_argument("--no-filter", action="store_true", help="force the batch segment stage on the raw argmax mask "
+                                                             "(overrides config crack_filter.camera)")
+    s.add_argument("--tta", action="store_true", help="mirroring TTA for the in-process model (default: config "
+                                                       "crack_filter.tta)")
 
     lv = sub.add_parser("live", help="model on every frame, MJPEG view in a browser")
     stream_opts(lv)
@@ -799,6 +925,9 @@ def build_parser() -> argparse.ArgumentParser:
     lv.add_argument("--host", default="127.0.0.1")
     lv.add_argument("--port", type=int, default=DEFAULT_PORT)
     lv.add_argument("--max-frames", type=int, default=None)
+    lv.add_argument("--filter", action="store_true", help="crack_filter on every model pass: accepted components red, "
+                                                           "rejected yellow")
+    lv.add_argument("--no-filter", action="store_true", help="raw argmax mask (overrides config crack_filter.camera)")
     return p
 
 

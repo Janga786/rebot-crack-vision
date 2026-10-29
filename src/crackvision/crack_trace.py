@@ -236,18 +236,26 @@ def cmd_search_plan(cfg: Config, args: argparse.Namespace, log: logging.Logger) 
 
 
 def locate_crack(mask: np.ndarray, depth_u16: np.ndarray, depth_scale: float, intr: dict, T_base_opt: np.ndarray,
-                 *, min_px: int = 150) -> dict | None:
-    """Where the crack in `mask` is, in base_link: its pixel centroid lifted with the surface depth around it
-    (valid depth in a ring 4-14 px outside the mask, median) and the measured pose. None if too small or no depth."""
+                 *, min_px: int = 150, component: np.ndarray | None = None,
+                 valid_range_m: tuple[float, float] | None = None) -> dict | None:
+    """Where the crack is, in base_link: its pixel centroid lifted with the surface depth around it (valid depth in
+    a ring 4-14 px outside it and outside the whole mask, median) and the measured pose. With `component` (the best
+    component crack_filter accepted) only that component is targeted and min_px does not apply (the filter's gates
+    did); without it, the whole mask (the pre-filter behaviour). None if too small, no depth, or the surface depth
+    is outside valid_range_m."""
     from scipy import ndimage
-    m = mask > 0
-    if m.sum() < min_px:
+    m = (mask > 0) if component is None else (np.asarray(component) > 0)
+    if component is None and m.sum() < min_px:
         return None
-    ring = ndimage.binary_dilation(m, iterations=14) & ~ndimage.binary_dilation(m, iterations=4)
+    if not m.any():
+        return None
+    ring = ndimage.binary_dilation(m, iterations=14) & ~ndimage.binary_dilation(m, iterations=4) & ~(mask > 0)
     d = depth_u16[ring & (depth_u16 > 0)].astype(float) * depth_scale
     if len(d) < 50:
         return None
     z = float(np.median(d))
+    if valid_range_m is not None and not valid_range_m[0] <= z <= valid_range_m[1]:
+        return None
     ys, xs = np.nonzero(m)
     u, v = xs.mean(), ys.mean()
     p_opt = np.array([(u - intr["ppx"]) / intr["fx"] * z, (v - intr["ppy"]) / intr["fy"] * z, z, 1.0])
@@ -291,7 +299,11 @@ def cmd_search_capture(cfg: Config, args: argparse.Namespace, log: logging.Logge
         except D405Error as exc:
             log.error("camera: %s", exc)
             return EXIT_PRECONDITION
-    predictor = LivePredictor(cfg, tta=args.tta)
+    from crackvision import crack_filter as cf
+    use_filter = filter_enabled(cfg, args)
+    params = cf.FilterParams.from_config(cfg)
+    predictor = LivePredictor(cfg, tta=args.tta or cf.config_flag(cfg, "tta", False))
+    warm_up(cfg, predictor, use_filter)
     out.mkdir(parents=True, exist_ok=True)
     ik = ArmIK()
     _, T_opt = camera_frames(kinematics.load_end_effector())
@@ -314,30 +326,64 @@ def cmd_search_capture(cfg: Config, args: argparse.Namespace, log: logging.Logge
                 log.error("stop %d skipped: the arm moved during the capture", st["index"])
                 continue
             tail = frames[len(frames) // 2:]
-            f = max(tail, key=lambda fr: sharpness(fr.color_rgb))
             info = cam.session_info if cam is not None else json.loads((Path(args.replay) / "stop_00" / "session.json").read_text())
-            mask = predictor.predict(f.color_rgb)
             T = ik.fk_frame(s1["positions_rad"], T_opt)
-            loc = locate_crack(mask, f.depth_u16, float(info["depth_scale_m_per_unit"]), info["color_intrinsics"], T,
-                               min_px=args.min_px)
             tag = f"stop_{st['index']:02d}"
+            ds, intr = float(info["depth_scale_m_per_unit"]), info["color_intrinsics"]
+            if use_filter:      # burst vote + crack_filter; target the best accepted component, not the whole mask
+                scores = [sharpness(fr.color_rgb) for fr in tail]
+                k, prob, vm, binfo = cf.burst_probabilities(predictor, [fr.color_rgb for fr in tail], scores, params)
+                f = tail[k]
+                res = cf.analyse(prob, params, gray=cf.to_gray(f.color_rgb), depth_u16=f.depth_u16, depth_scale=ds,
+                                 intrinsics=intr, vote_mask=vm)
+                mask = res.accepted_mask.astype(np.uint8)
+                best = res.best
+                loc = (locate_crack(mask, f.depth_u16, ds, intr, T, component=res.component_mask(best["id"]),
+                                    valid_range_m=params.working_range_m) if best else None)
+                if loc:
+                    loc |= {"component": best["id"], "score": best["score"], "length_mm": best["length_mm"],
+                            "width_mm": best["width_mm"], "mean_p": best["mean_p"],
+                            "touches_border": loc["touches_border"]}
+                (out / f"{tag}_components.json").write_text(json.dumps(
+                    cf.to_doc(res, params, case_id=f"{case}_{tag}", extra={"burst": binfo}), indent=1) + "\n")
+                ov = cf.overlay(f.color_rgb, res)
+                n_raw = res.summary["argmax_px"]
+            else:
+                f = max(tail, key=lambda fr: sharpness(fr.color_rgb))
+                mask = predictor.predict(f.color_rgb)
+                loc = locate_crack(mask, f.depth_u16, ds, intr, T, min_px=args.min_px)
+                ov = f.color_rgb.copy()
+                ov[mask > 0] = (255, 0, 0)
+                res, n_raw = None, int(mask.sum())
             Image.fromarray(f.color_rgb).save(out / f"{tag}_color.png")
             _write_depth_png(f.depth_u16, out / f"{tag}_depth.png")
-            ov = f.color_rgb.copy()
-            ov[mask > 0] = (255, 0, 0)
             Image.fromarray(ov).save(out / f"{tag}_overlay.png")
             r = {"stop": st["index"], "camera_m": st["camera_m"], "state": s1, "crack_px": int(mask.sum()),
                  "located": loc}
+            if res is not None:
+                r["crack_filter"] = res.summary
             results.append(r)
-            print(f"stop {st['index']}: camera {np.round(st['camera_m'], 3).tolist()}: "
-                  + (f"crack {loc['crack_px']} px at {loc['target_base_m']}"
-                     + (" (touches the image edge)" if loc["touches_border"] else "") if loc else
-                     f"no crack ({int(mask.sum())} px)"))
+            if loc and res is not None:
+                what = (f"crack #{loc['component']} ({loc['length_mm']:.0f} mm, p {loc['mean_p']:.2f}, score "
+                        f"{loc['score']:.0f}; {res.summary['accepted_components']}/"
+                        f"{res.summary['candidate_components']} accepted) at {loc['target_base_m']}")
+            elif loc:
+                what = f"crack {loc['crack_px']} px at {loc['target_base_m']}"
+            elif res is not None:
+                why = sorted({x for c in res.components for x in c["reject_reasons"]})
+                what = (f"no crack accepted ({res.summary['candidate_components']} candidate(s), {n_raw} raw px"
+                        + (f"; rejected: {', '.join(why)}" if why else "") + ")")
+            else:
+                what = f"no crack ({n_raw} px)"
+            print(f"stop {st['index']}: camera {np.round(st['camera_m'], 3).tolist()}: " + what
+                  + (" (touches the image edge)" if loc and loc["touches_border"] else ""))
     finally:
         if cam_ctx is not None:
             cam_ctx.__exit__(None, None, None)
     ok = [r for r in results if r["located"]]
-    best = max(ok, key=lambda r: (not r["located"]["touches_border"], r["located"]["crack_px"]), default=None)
+    rank = ((lambda r: (not r["located"]["touches_border"], r["located"]["score"])) if use_filter else
+            (lambda r: (not r["located"]["touches_border"], r["located"]["crack_px"])))
+    best = max(ok, key=rank, default=None)
     res = {"schema": SEARCH_SCHEMA, "case": case, "stops_planned": len(stops), "stops_done": len(results),
            "found": best is not None, "results": [{k: v for k, v in r.items() if k != "state"} for r in results]}
     if best:
@@ -345,8 +391,13 @@ def cmd_search_capture(cfg: Config, args: argparse.Namespace, log: logging.Logge
                 "normal_base": [0.0, 0.0, 1.0], "crack_px": best["located"]["crack_px"],
                 "extent_base_m": best["located"]["extent_base_m"],
                 "touches_border": best["located"]["touches_border"],
-                "note": "target = crack centroid lifted with the surface depth around it and the measured pose; the "
-                        "surface is assumed horizontal (table)"}
+                "crack_filter": use_filter,
+                **({k: best["located"][k] for k in ("component", "score", "length_mm", "width_mm", "mean_p")}
+                   if use_filter else {}),
+                "note": ("target = centroid of the best accepted crack component (crack_filter), lifted with the "
+                         "surface depth around it and the measured pose; stops ranked by that component's score"
+                         if use_filter else "target = crack centroid lifted with the surface depth around it and the "
+                         "measured pose") + "; the surface is assumed horizontal (table)"}
     (out / "search_result.json").write_text(json.dumps(res, indent=2) + "\n")
     if not best:
         print(f"search: no crack found at {len(results)}/{len(stops)} stops")
@@ -470,6 +521,14 @@ def cmd_capture(cfg: Config, args: argparse.Namespace, log: logging.Logger) -> i
         return EXIT_OK
     from crackvision import camera_pipeline as cp
     from crackvision.d405_live import D405Error
+    from crackvision import crack_filter as cf
+    use_filter = filter_enabled(cfg, args)
+    params = cf.FilterParams.from_config(cfg)
+    predictor = None
+    if use_filter:                         # load the network before the arm arrives
+        from crackvision.live_predictor import LivePredictor
+        predictor = LivePredictor(cfg, tta=args.tta or cf.config_flag(cfg, "tta", False))
+        warm_up(cfg, predictor, True)
     try:
         cam_ctx = cp.open_camera(cfg, args, log)
         cam = cam_ctx.__enter__()          # open (and warm up) the camera before the arm arrives
@@ -513,7 +572,14 @@ def cmd_capture(cfg: Config, args: argparse.Namespace, log: logging.Logger) -> i
                      str(args.replay) if replay else str(info.get("device", {}).get("serial", "d405")))
     print(f"captured case {case_id}: frame {int(np.argmax(scores)) + 1}/{len(frames)} (sharpest), arm at "
           f"{np.round(state['positions_rad'], 3).tolist()} (scan pose {np.round(q_scan, 3).tolist()})")
-    rc = run_perception(cfg, case_id, src, quiet=args.quiet)
+    if use_filter:
+        k, prob, res, binfo = cp.filter_burst(predictor, frames, scores, info, params)
+        rc = cp.filtered_perception(cfg, case_id, src, res, prob, params, quiet=args.quiet,
+                                    extra={"source": "crack_trace capture", "burst": binfo,
+                                           "frame_index": int(frames[k].frame_index)})
+        cp.print_components(res, indent="")
+    else:
+        rc = run_perception(cfg, case_id, src, quiet=args.quiet)
     if rc != EXIT_OK:
         log.error("segment/paths failed for %s (exit %d)", case_id, rc)
         return rc
@@ -522,6 +588,50 @@ def cmd_capture(cfg: Config, args: argparse.Namespace, log: logging.Logger) -> i
     print(f"perception: {n} crack component(s); overlay data/paths/{case_id}_paths_overlay.png"
           + ("" if n else "\n  no crack found in the view: nothing to trace"))
     return EXIT_OK if n else EXIT_PRECONDITION
+
+
+# ---- crack selection -------------------------------------------------------------------------------------------
+
+def filter_enabled(cfg: Config, args: argparse.Namespace) -> bool:
+    """crack_filter on the crack_trace path: config crack_filter.crack_trace (default on) unless --no-filter."""
+    from crackvision.crack_filter import config_flag
+    return config_flag(cfg, "crack_trace", True) and not getattr(args, "no_filter", False)
+
+
+def warm_up(cfg: Config, predictor, probs: bool) -> None:
+    """One pass on a blank frame of the configured size while the arm is still on its way: the first CUDA pass
+    costs about 1.3 s, later ones 55 ms."""
+    c = cfg.realsense.get("color", {})
+    blank = np.zeros((int(c.get("height", 480)), int(c.get("width", 848)), 3), np.uint8)
+    (predictor.predict_probs if probs else predictor.predict)(blank)
+
+
+def select_crack(root: Path, case_id: str) -> dict | None:
+    """The best accepted crack of a case, matched to its paths.json component: {paths_component, filter_component,
+    score, ...}; None when the case has no crack_filter table (pre-filter cases, synthetic cases)."""
+    from crackvision import crack_filter as cf
+    table, labels = cf.find_case_table(root, case_id)
+    pj = Path(root) / "data" / "paths" / f"{case_id}_paths.json"
+    if table is None or labels is None or not pj.is_file():
+        return None
+    rows = {c["id"]: c for c in table.get("components", [])}
+    best = None
+    for comp in json.loads(pj.read_text()).get("components", []):
+        pts = comp["main_path"]["dense"]
+        ids = [int(labels[p["row"], p["col"]]) for p in pts]
+        ids = [i for i in ids if i > 0]
+        if not ids:
+            continue
+        fid = max(set(ids), key=ids.count)
+        row = rows.get(fid)
+        if row is None or not row.get("accepted"):
+            continue
+        cand = {"paths_component": comp["component_id"], "filter_component": fid, "score": row["score"],
+                "score_units": row.get("score_units"), "length_mm": row.get("length_mm"),
+                "width_mm": row.get("width_mm"), "mean_p": row["mean_p"]}
+        if best is None or cand["score"] > best["score"]:
+            best = cand
+    return best
 
 
 # ---- plan --------------------------------------------------------------------------------------------------------
@@ -546,10 +656,13 @@ def _smooth(p: np.ndarray, window: int) -> np.ndarray:
     return out
 
 
-def crack_segments(doc: dict, min_length_m: float, all_paths: bool) -> list[dict]:
-    """Trace segments from a paths3d document: surface points + normals of each segment's trace waypoints."""
+def crack_segments(doc: dict, min_length_m: float, all_paths: bool, component: int | None = None) -> list[dict]:
+    """Trace segments from a paths3d document: surface points + normals of each segment's trace waypoints (only
+    component `component` when given)."""
     out = []
     for comp in doc.get("components", []):
+        if component is not None and comp["component_id"] != component:
+            continue
         for pl in comp.get("polylines", []):
             if pl.get("kind") != "main" and not all_paths:
                 continue
@@ -582,8 +695,9 @@ def tilted(normal: np.ndarray, point: np.ndarray, tilt_deg: float) -> np.ndarray
 
 def plan_trace(doc: dict, *, hover_m: float, approach_m: float, trace_speed: float, transit_speed: float,
                max_tilt_deg: float, min_length_m: float, all_paths: bool, max_segments: int, smooth: int,
-               flat: bool, speed_fraction: float, log: logging.Logger) -> tuple[np.ndarray, np.ndarray, dict]:
-    segs = crack_segments(doc, min_length_m, all_paths)[:max_segments]
+               flat: bool, speed_fraction: float, log: logging.Logger,
+               component: int | None = None) -> tuple[np.ndarray, np.ndarray, dict]:
+    segs = crack_segments(doc, min_length_m, all_paths, component)[:max_segments]
     if not segs:
         raise IKError(f"no crack segment of at least {min_length_m * 1000:.0f} mm in the paths3d document")
     ik = ArmIK()
@@ -663,6 +777,12 @@ def write_preview(cfg: Config, case_id: str, record_doc: dict, planned: list[dic
         m = np.array(Image.open(mask_file)) > 0
         m = m.any(axis=-1) if m.ndim > 2 else m
         base[m] = (0.4 * base[m] + 0.6 * np.array([255, 0, 0])).astype(np.uint8)
+    from crackvision import crack_filter as cf
+    table, labels = cf.find_case_table(cfg.root, case_id)
+    rows = (table or {}).get("components", [])
+    if labels is not None and labels.shape == base.shape[:2]:
+        rej = np.isin(labels, [c["id"] for c in rows if not c["accepted"]])
+        base[rej] = (0.45 * base[rej] + 0.55 * np.array([255, 220, 0])).astype(np.uint8)
     img = Image.fromarray(base)
     d = ImageDraw.Draw(img)
     ik = ArmIK()
@@ -674,6 +794,18 @@ def write_preview(cfg: Config, case_id: str, record_doc: dict, planned: list[dic
         x, y = uv[0]
         d.ellipse([x - 5, y - 5, x + 5, y + 5], outline=(0, 200, 0), width=2)
     d.text((8, 8), f"{case_id}: red = crack mask, green = planned trace (circle = start)", fill=(255, 255, 0))
+    if table is not None:
+        s = table.get("summary", {})
+        acc = [c for c in rows if c["accepted"]]
+        d.text((8, 22), f"crack filter: {len(acc)} accepted (red, numbered), {len(rows) - len(acc)} rejected (yellow); "
+                        f"depth {s.get('depth')}", fill=(255, 255, 0))
+        for c in acc:
+            x, y = c["centroid_px"]
+            d.text((x + 6, y + 6), f"#{c['id']}", fill=(255, 255, 255), stroke_width=2, stroke_fill=(0, 0, 0))
+        h = base.shape[0]
+        for i, c in enumerate(sorted(acc, key=lambda c: -c["score"])[:6]):
+            d.text((8, h - 14 * (i + 1) - 4), cf.describe(c), fill=(255, 255, 255), stroke_width=2,
+                   stroke_fill=(0, 0, 0))
     img.save(out)
 
 
@@ -693,15 +825,22 @@ def cmd_plan(cfg: Config, args: argparse.Namespace, log: logging.Logger) -> int:
     if doc.get("status") == "failed" or "components" not in doc:
         log.error("path3d refused %s: %s", case_id, doc.get("reason") or doc.get("message"))
         return EXIT_PRECONDITION
+    max_segments = args.max_segments if args.max_segments is not None else (3 if args.all_paths else 1)
+    selection = None if args.all_paths else select_crack(cfg.root, case_id)
     try:
         t, q, plan = plan_trace(doc, hover_m=args.hover_m, approach_m=args.approach_m, trace_speed=args.speed,
                                 transit_speed=args.transit_speed, max_tilt_deg=args.max_tilt_deg,
                                 min_length_m=args.min_length_m, all_paths=args.all_paths,
-                                max_segments=args.max_segments, smooth=args.smooth, flat=not args.curved,
-                                speed_fraction=args.speed_fraction, log=log)
+                                max_segments=max_segments, smooth=args.smooth, flat=not args.curved,
+                                speed_fraction=args.speed_fraction, log=log,
+                                component=selection["paths_component"] if selection else None)
     except IKError as exc:
         log.error("no trace: %s", exc)
         return EXIT_PRECONDITION
+    plan["selection"] = ({"mode": "all_paths", "max_segments": max_segments} if args.all_paths else
+                         {"mode": "best_crack", "max_segments": max_segments, **selection} if selection else
+                         {"mode": "longest_segment", "max_segments": max_segments,
+                          "note": "no crack_filter table for this case, or no accepted component matched a path"})
     out_dir = trace_dir(cfg.root)
     out = args.out or out_dir / f"{case_id}_trace.json"
     reasons = doc.get("ineligible_reasons", [])
@@ -727,6 +866,10 @@ def cmd_plan(cfg: Config, args: argparse.Namespace, log: logging.Logger) -> int:
     prev = out_dir / f"{case_id}_trace_preview.png"
     write_preview(cfg, case_id, rec, plan["segments"], prev)
     r = plan["report"]
+    sel = plan["selection"]
+    if sel["mode"] == "best_crack":
+        print(f"crack selection: the best accepted crack, filter component #{sel['filter_component']} (score "
+              f"{sel['score']:.0f}, {sel['length_mm']} mm, p {sel['mean_p']:.2f}); --all-paths traces the others too")
     print(f"trace for {case_id}: {len(plan['segments'])} segment(s) ("
           + "; ".join(f"{s['length_m'] * 1000:.0f} mm, hover {s['hover_m'] * 100:.1f} cm, tilt {s['tilt_deg']:.0f} deg"
                       for s in plan["segments"])
@@ -859,7 +1002,9 @@ def build_parser() -> argparse.ArgumentParser:
     sc.add_argument("--state-file", required=True, type=Path)
     sc.add_argument("--timeout-s", type=float, default=300.0, help="per stop")
     sc.add_argument("--burst", type=int, default=8)
-    sc.add_argument("--min-px", type=int, default=150, help="smallest crack (pixels) that counts")
+    sc.add_argument("--min-px", type=int, default=150, help="smallest crack (pixels) that counts (only with --no-filter)")
+    sc.add_argument("--no-filter", action="store_true", help="raw argmax mask, whole-mask centroid, stops ranked by "
+                                                              "pixel count (the pre-2026-10-28 behaviour)")
     sc.add_argument("--tta", action="store_true", help="mirroring TTA (slower)")
     sc.add_argument("--replay", type=Path, default=None, help="dir of stop_NN recordings (make-replay --search)")
     sc.add_argument("--serial", default=None)
@@ -872,6 +1017,10 @@ def build_parser() -> argparse.ArgumentParser:
     cp.add_argument("--state-file", required=True, type=Path, help="demo_move.py --state-file")
     cp.add_argument("--timeout-s", type=float, default=600.0)
     cp.add_argument("--burst", type=int, default=10)
+    cp.add_argument("--no-filter", action="store_true", help="batch segment stage on the raw argmax mask (the "
+                                                              "pre-2026-10-28 behaviour)")
+    cp.add_argument("--tta", action="store_true", help="mirroring TTA for the in-process model (default: config "
+                                                        "crack_filter.tta)")
     cp.add_argument("--replay", type=Path, default=None, help="a recording instead of the live D405 (testing)")
     cp.add_argument("--serial", default=None)
     for a in ("--width", "--height", "--fps", "--warmup"):
@@ -885,8 +1034,10 @@ def build_parser() -> argparse.ArgumentParser:
     pp.add_argument("--transit-speed", type=float, default=0.04)
     pp.add_argument("--max-tilt-deg", type=float, default=30.0)
     pp.add_argument("--min-length-m", type=float, default=0.01)
-    pp.add_argument("--max-segments", type=int, default=3)
-    pp.add_argument("--all-paths", action="store_true", help="branches too, not only each crack's main path")
+    pp.add_argument("--max-segments", type=int, default=None,
+                    help="default 1 (the best crack's longest main-path segment); 3 with --all-paths")
+    pp.add_argument("--all-paths", action="store_true", help="every crack in the mask and its branches, not only the "
+                                                             "best crack's main path")
     pp.add_argument("--smooth", type=int, default=7, help="moving-average window over the 2 mm samples")
     pp.add_argument("--curved", action="store_true", help="follow the measured surface, no plane fit")
     pp.add_argument("--speed-fraction", type=float, default=0.6)
