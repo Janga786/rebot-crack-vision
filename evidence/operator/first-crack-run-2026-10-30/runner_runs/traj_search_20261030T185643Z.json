@@ -1,0 +1,331 @@
+{
+  "script": "demo_move.py",
+  "version": "2026-10-29.4",
+  "choreo": "trajectory",
+  "slow": 2.0,
+  "speed": 1.0,
+  "trajectory": {
+    "schema": "crackvision.joint_trajectory/1",
+    "created_utc": "2026-10-30T18:47:04Z",
+    "producer": "crackvision.crack_trace:search-plan",
+    "purpose": "test",
+    "planning_frame": "base_link",
+    "joint_names": [
+      "joint1",
+      "joint2",
+      "joint3",
+      "joint4",
+      "joint5",
+      "joint6"
+    ],
+    "notes": "search: the wrist camera looks straight down from 0.25 m and rests 3.0 s at each of 6 stops over the table; crack_trace search-capture runs the crack model at every stop",
+    "limits_file": {
+      "path": "config/robot/b601_dm_limits.yaml",
+      "sha256": null
+    },
+    "end_effector_config_sha256": null,
+    "scene_config_sha256": null,
+    "source": {
+      "paths3d": null
+    },
+    "search": {
+      "schema": "crackvision.crack_search/1",
+      "view_m": 0.25,
+      "dwell_s": 3.0,
+      "clearance": {
+        "min_body_z_m": 0.2089,
+        "lowest_box": "camera_mount_link",
+        "min_gripper_z_m": 0.1578
+      },
+      "stops": [
+        {
+          "index": 0,
+          "camera_m": [
+            0.26,
+            -0.15,
+            0.25
+          ],
+          "q_rad": [
+            -0.511237,
+            -1.283403,
+            -1.136504,
+            1.164541,
+            0.036302,
+            0.135978
+          ],
+          "t0_s": 0.0,
+          "t1_s": 3.0
+        },
+        {
+          "index": 1,
+          "camera_m": [
+            0.26,
+            0.0,
+            0.25
+          ],
+          "q_rad": [
+            -0.035818,
+            -1.126809,
+            -1.039494,
+            1.221683,
+            -0.000692,
+            -0.002561
+          ],
+          "t0_s": 6.3,
+          "t1_s": 9.3
+        },
+        {
+          "index": 2,
+          "camera_m": [
+            0.26,
+            0.15,
+            0.25
+          ],
+          "q_rad": [
+            0.462065,
+            -1.287882,
+            -1.139585,
+            1.162068,
+            -0.027062,
+            -0.101172
+          ],
+          "t0_s": 12.6,
+          "t1_s": 15.6
+        },
+        {
+          "index": 3,
+          "camera_m": [
+            0.36,
+            0.15,
+            0.25
+          ],
+          "q_rad": [
+            0.365095,
+            -1.626729,
+            -1.437717,
+            1.120085,
+            -0.007503,
+            -0.027987
+          ],
+          "t0_s": 18.067,
+          "t1_s": 21.067
+        },
+        {
+          "index": 4,
+          "camera_m": [
+            0.36,
+            0.0,
+            0.25
+          ],
+          "q_rad": [
+            -0.018871,
+            -1.511866,
+            -1.323039,
+            1.120241,
+            0.00618,
+            0.02308
+          ],
+          "t0_s": 24.367,
+          "t1_s": 27.367
+        },
+        {
+          "index": 5,
+          "camera_m": [
+            0.36,
+            -0.15,
+            0.25
+          ],
+          "q_rad": [
+            -0.399766,
+            -1.624932,
+            -1.435865,
+            1.120686,
+            0.020145,
+            0.07528
+          ],
+          "t0_s": 30.667,
+          "t1_s": 33.667
+        }
+      ]
+    },
+    "path": "/home/boosterk1/Projects/rebot_crack_vision/data/crack_trace/search.json",
+    "sha256": "984c7ff24fcc6293c9efa56cef05b3090fb9982b85bf44936f44ada4881b5ced",
+    "n_points": 675
+  },
+  "plan_cap": {
+    "4340P": 0.6,
+    "4310": 1.2
+  },
+  "vel_abort": {
+    "4340P": 1.0,
+    "4310": 1.6
+  },
+  "operator_go": "operator ran run-trajectory.sh",
+  "gains": {
+    "j1": [
+      100.0,
+      4.0
+    ],
+    "j2": [
+      100.0,
+      4.0
+    ],
+    "j3": [
+      80.0,
+      4.0
+    ],
+    "j4": [
+      40.0,
+      1.0
+    ],
+    "j5": [
+      40.0,
+      1.0
+    ],
+    "j6": [
+      40.0,
+      1.0
+    ],
+    "j7": [
+      40.0,
+      0.5
+    ]
+  },
+  "gains_override": {
+    "j2": [
+      100.0,
+      4.0
+    ],
+    "j3": [
+      80.0,
+      4.0
+    ]
+  },
+  "ff_bias": {},
+  "gravity_scale": {
+    "j1": 1.0,
+    "j2": 0.6,
+    "j3": 2.5,
+    "j4": 2.5,
+    "j5": 1.0,
+    "j6": 1.0,
+    "j7": 0.0
+  },
+  "gravity_model": null,
+  "friction": {
+    "j1": 1.0,
+    "j2": 1.0,
+    "j3": 2.0,
+    "j4": 0.5,
+    "j5": 0.3,
+    "j6": 0.1,
+    "j7": 0.0
+  },
+  "friction_override": {},
+  "simulated": false,
+  "start": {
+    "j1": 0.044442176818847656,
+    "j2": 0.00095367431640625,
+    "j3": -0.00629425048828125,
+    "j4": 0.00400543212890625,
+    "j5": 0.02422332763671875,
+    "j6": -0.052834510803222656,
+    "j7": -0.00133514404296875
+  },
+  "j1_offset": 0.00591278076171875,
+  "path_kinds": [
+    [
+      "approach",
+      8.9125
+    ],
+    [
+      "trajectory",
+      67.3333
+    ],
+    [
+      "return",
+      11.2842
+    ]
+  ],
+  "guard_preflight": {
+    "problems": [],
+    "warnings": [],
+    "offsets": {
+      "j1": 0.0,
+      "j2": 0.0,
+      "j3": 0.0,
+      "j4": 0.0,
+      "j5": 0.0,
+      "j6": 0.0,
+      "j7": 0.0
+    },
+    "n_ticks": 18508,
+    "min_keepout_m": 0.037782830248223764,
+    "gravity_margin_nm": {
+      "j1": 10.0,
+      "j2": 8.385,
+      "j3": 2.974,
+      "j4": 0.804,
+      "j5": 2.492,
+      "j6": 2.5,
+      "j7": 2.5
+    }
+  },
+  "planned_peak_rad_s": {
+    "j1": 0.115658840742676,
+    "j2": 0.26999995680028394,
+    "j3": 0.23909561603280485,
+    "j4": 0.2449939883981567,
+    "j5": 0.007836576065280485,
+    "j6": 0.029257705634800815,
+    "j7": 0.0
+  },
+  "second_go": "Enter (run-trajectory.sh)",
+  "outcome": "completed",
+  "trigger": null,
+  "stats": {
+    "n_cmd": 37067,
+    "max_err": {
+      "j1": 0.008079360175367024,
+      "j2": 0.08902140680036963,
+      "j3": 0.02117156982421875,
+      "j4": 0.01960837113536315,
+      "j5": 0.004174000512054101,
+      "j6": 0.0052607373701290625,
+      "j7": 0.00133514404296875
+    },
+    "max_gap_s": 0.017604794120416045,
+    "parked": false,
+    "wait_logged": true
+  },
+  "csv": "/home/boosterk1/rebot_setup/runs/traj_search_20261030T185643Z.csv",
+  "all_disabled_confirmed": true,
+  "guard": {
+    "simulated": false,
+    "config_sha256": "fbf08261c8df7e7e2e681fcad4cb2c4e95f5e4ae205fc76ee514ef8c94f5288b",
+    "latched_at_end": "",
+    "events": [
+      {
+        "t_wall": 1793386603.829062,
+        "kind": "bus",
+        "msg": "opened /dev/ttyACM0",
+        "pid": 4120648
+      },
+      {
+        "t_wall": 1793386615.6568468,
+        "kind": "startup",
+        "msg": "startup check passed",
+        "pid": 4120648,
+        "readings": {
+          "j1": 0.044442176818847656,
+          "j2": 0.00095367431640625,
+          "j3": -0.00629425048828125,
+          "j4": 0.00400543212890625,
+          "j5": 0.02422332763671875,
+          "j6": -0.052834510803222656,
+          "j7": -0.00133514404296875
+        }
+      }
+    ]
+  }
+}

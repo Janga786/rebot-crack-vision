@@ -1,0 +1,102 @@
+{
+ "schema": "crackvision.crack_components/1",
+ "case_id": "print01_stop_01",
+ "params": {
+  "seed_p": 0.9,
+  "grow_p": 0.5,
+  "min_mean_p": 0.8,
+  "min_length_px": 15,
+  "min_length_mm": 10.0,
+  "max_width_mm": 10.0,
+  "working_range_m": [
+   0.07,
+   0.5
+  ],
+  "require_surface_depth": true,
+  "annulus_inner_px": 4,
+  "annulus_outer_px": 14,
+  "min_annulus_px": 50,
+  "min_interior_px": 20,
+  "max_plane_rms_mm": 3.0,
+  "max_step_mm": 5.0,
+  "max_surface_tilt_deg": 60.0,
+  "ridge_min_contrast": 8.0,
+  "min_ridge_fraction": 0.5,
+  "max_flank_asymmetry": null,
+  "joint_max_tortuosity": 1.08,
+  "joint_max_width_cv": 0.3,
+  "joint_min_width_px": 2.0,
+  "joint_reject": false,
+  "border_px": 24,
+  "burst_vote_frames": 3,
+  "burst_vote_min": 2
+ },
+ "summary": {
+  "argmax_px": 3062,
+  "argmax_components": 5,
+  "candidate_px": 2818,
+  "candidate_components": 1,
+  "accepted_components": 1,
+  "accepted_px": 2818,
+  "depth": "used",
+  "gray": "used",
+  "vote": true,
+  "gates_skipped": [],
+  "best_id": 1
+ },
+ "best_id": 1,
+ "components": [
+  {
+   "id": 1,
+   "area_px": 2818,
+   "centroid_px": [
+    480.1,
+    149.8
+   ],
+   "bbox_rc": [
+    143,
+    346,
+    157,
+    604
+   ],
+   "skeleton_length_px": 255.9,
+   "main_path_px": 255.9,
+   "width_px": 11.01,
+   "mean_p": 0.898,
+   "max_p": 0.991,
+   "core_px": 1915,
+   "elongation": 21.6,
+   "tortuosity": 1.011,
+   "width_cv": 0.146,
+   "touches_border": false,
+   "depth_m": 0.2542,
+   "mm_per_px": 0.583,
+   "length_mm": 149.2,
+   "width_mm": 6.42,
+   "annulus_px": 5550,
+   "plane_rms_mm": 1.29,
+   "surface_tilt_deg": 18.1,
+   "interior_offset_mm": 0.24,
+   "depth_step": false,
+   "ridge_fraction": 0.965,
+   "ridge_contrast": 75.0,
+   "flank_asymmetry": 0.04,
+   "flags": [
+    "joint_like"
+   ],
+   "reject_reasons": [],
+   "accepted": true,
+   "score": 133.98,
+   "score_units": "mean_p*mm"
+  }
+ ],
+ "burst": {
+  "frames": [
+   2,
+   3,
+   0
+  ],
+  "min_votes": 2,
+  "model_s": 0.192
+ }
+}

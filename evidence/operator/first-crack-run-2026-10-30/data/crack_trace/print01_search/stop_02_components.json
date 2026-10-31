@@ -1,0 +1,146 @@
+{
+ "schema": "crackvision.crack_components/1",
+ "case_id": "print01_stop_02",
+ "params": {
+  "seed_p": 0.9,
+  "grow_p": 0.5,
+  "min_mean_p": 0.8,
+  "min_length_px": 15,
+  "min_length_mm": 10.0,
+  "max_width_mm": 10.0,
+  "working_range_m": [
+   0.07,
+   0.5
+  ],
+  "require_surface_depth": true,
+  "annulus_inner_px": 4,
+  "annulus_outer_px": 14,
+  "min_annulus_px": 50,
+  "min_interior_px": 20,
+  "max_plane_rms_mm": 3.0,
+  "max_step_mm": 5.0,
+  "max_surface_tilt_deg": 60.0,
+  "ridge_min_contrast": 8.0,
+  "min_ridge_fraction": 0.5,
+  "max_flank_asymmetry": null,
+  "joint_max_tortuosity": 1.08,
+  "joint_max_width_cv": 0.3,
+  "joint_min_width_px": 2.0,
+  "joint_reject": false,
+  "border_px": 24,
+  "burst_vote_frames": 3,
+  "burst_vote_min": 2
+ },
+ "summary": {
+  "argmax_px": 5228,
+  "argmax_components": 2,
+  "candidate_px": 5157,
+  "candidate_components": 2,
+  "accepted_components": 2,
+  "accepted_px": 5157,
+  "depth": "used",
+  "gray": "used",
+  "vote": true,
+  "gates_skipped": [],
+  "best_id": 2
+ },
+ "best_id": 2,
+ "components": [
+  {
+   "id": 1,
+   "area_px": 2383,
+   "centroid_px": [
+    757.6,
+    169.8
+   ],
+   "bbox_rc": [
+    115,
+    665,
+    217,
+    847
+   ],
+   "skeleton_length_px": 218.6,
+   "main_path_px": 218.6,
+   "width_px": 10.9,
+   "mean_p": 0.886,
+   "max_p": 0.982,
+   "core_px": 1525,
+   "elongation": 14.2,
+   "tortuosity": 1.076,
+   "width_cv": 0.151,
+   "touches_border": true,
+   "depth_m": 0.2426,
+   "mm_per_px": 0.5564,
+   "length_mm": 121.6,
+   "width_mm": 6.07,
+   "annulus_px": 3822,
+   "plane_rms_mm": 0.5,
+   "surface_tilt_deg": 19.2,
+   "interior_offset_mm": 0.11,
+   "depth_step": false,
+   "ridge_fraction": 1.0,
+   "ridge_contrast": 59.2,
+   "flank_asymmetry": 0.227,
+   "flags": [
+    "touches_border",
+    "joint_like"
+   ],
+   "reject_reasons": [],
+   "accepted": true,
+   "score": 107.74,
+   "score_units": "mean_p*mm"
+  },
+  {
+   "id": 2,
+   "area_px": 2774,
+   "centroid_px": [
+    654.5,
+    280.2
+   ],
+   "bbox_rc": [
+    214,
+    562,
+    343,
+    744
+   ],
+   "skeleton_length_px": 220.9,
+   "main_path_px": 220.9,
+   "width_px": 12.56,
+   "mean_p": 0.9,
+   "max_p": 0.983,
+   "core_px": 1900,
+   "elongation": 16.4,
+   "tortuosity": 1.059,
+   "width_cv": 0.09,
+   "touches_border": false,
+   "depth_m": 0.2644,
+   "mm_per_px": 0.6064,
+   "length_mm": 133.9,
+   "width_mm": 7.62,
+   "annulus_px": 4108,
+   "plane_rms_mm": 1.7,
+   "surface_tilt_deg": 22.9,
+   "interior_offset_mm": 0.23,
+   "depth_step": false,
+   "ridge_fraction": 1.0,
+   "ridge_contrast": 60.8,
+   "flank_asymmetry": 0.118,
+   "flags": [
+    "joint_like"
+   ],
+   "reject_reasons": [],
+   "accepted": true,
+   "score": 120.51,
+   "score_units": "mean_p*mm"
+  }
+ ],
+ "burst": {
+  "frames": [
+   1,
+   3,
+   2
+  ],
+  "min_votes": 2,
+  "model_s": 0.195
+ }
+}

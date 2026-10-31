@@ -1,0 +1,15 @@
+/home/boosterk1/miniconda3/envs/crackvision/lib/python3.11/site-packages/torch/jit/_script.py:1643: FutureWarning: `torch.jit.interface` is deprecated. Please use `torch.compile` instead.
+  warnings.warn(
+2026-10-30 18:59:49,739 ERROR   crack_trace: stop 4 skipped: the arm left the scan pose without settling there (now path/return)
+Trainer 'nnUNetTrainerSaveEvery10' not found in nnunetv2.training.nnUNetTrainer.
+Searching in external trainer paths from environment variable 'nnUNet_extTrainer'...
+Searching in: /home/boosterk1/Projects/rebot_crack_vision/logs/ext_trainer
+Searching for class nnUNetTrainerSaveEvery10 in folder /home/boosterk1/Projects/rebot_crack_vision/logs/ext_trainer with current module None
+  Inspecting module: nnUNetTrainerSaveEvery10
+Found class nnUNetTrainerSaveEvery10 in nnUNetTrainerSaveEvery10
+Using trainer 'nnUNetTrainerSaveEvery10' from: /home/boosterk1/Projects/rebot_crack_vision/logs/ext_trainer
+stop 0: camera [0.26, -0.15, 0.25]: crack #1 (138 mm, p 0.90, score 125; 2/3 accepted) at [0.3819, -0.1103, -0.01] (touches the image edge)
+stop 1: camera [0.26, 0.0, 0.25]: crack #1 (149 mm, p 0.90, score 134; 1/1 accepted) at [0.3167, -0.0407, -0.0108]
+stop 2: camera [0.26, 0.15, 0.25]: crack #2 (134 mm, p 0.90, score 121; 2/2 accepted) at [0.3124, 0.0112, -0.0269]
+stop 3: camera [0.36, 0.15, 0.25]: crack #3 (136 mm, p 0.89, score 121; 2/3 accepted) at [0.3187, 0.0062, -0.0479]
+search: crack found at stop 1, centre [0.3167, -0.0407, -0.0108] (extent 0.151 m); next: scan-plan --from-search print01

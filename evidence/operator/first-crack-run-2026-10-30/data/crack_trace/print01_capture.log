@@ -1,0 +1,10 @@
+/home/boosterk1/miniconda3/envs/crackvision/lib/python3.11/site-packages/torch/jit/_script.py:1643: FutureWarning: `torch.jit.interface` is deprecated. Please use `torch.compile` instead.
+  warnings.warn(
+2026-10-30 19:00:34,003 ERROR   crack_trace: camera: No RealSense device found. The D405 has a USB 3 Micro-B socket: use a USB-A to USB 3.0 Micro-B cable (2 m or shorter, ideally screw-locking; the camera-only kit ships without one) on a rear USB 3 port with no hub. Plug the camera end first, then push the host end in quickly and firmly (a slow insertion can enumerate as USB 2). Then `lsusb -d 8086:0b5b`: if it is listed but this still fails, the udev rule is missing (docs/host/DEVICE_ACCESS.md) or another process holds it.
+Trainer 'nnUNetTrainerSaveEvery10' not found in nnunetv2.training.nnUNetTrainer.
+Searching in external trainer paths from environment variable 'nnUNet_extTrainer'...
+Searching in: /home/boosterk1/Projects/rebot_crack_vision/logs/ext_trainer
+Searching for class nnUNetTrainerSaveEvery10 in folder /home/boosterk1/Projects/rebot_crack_vision/logs/ext_trainer with current module None
+  Inspecting module: nnUNetTrainerSaveEvery10
+Found class nnUNetTrainerSaveEvery10 in nnUNetTrainerSaveEvery10
+Using trainer 'nnUNetTrainerSaveEvery10' from: /home/boosterk1/Projects/rebot_crack_vision/logs/ext_trainer

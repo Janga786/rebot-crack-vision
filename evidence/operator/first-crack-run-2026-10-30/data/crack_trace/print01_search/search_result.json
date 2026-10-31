@@ -1,0 +1,198 @@
+{
+  "schema": "crackvision.crack_search/1",
+  "case": "print01",
+  "stops_planned": 6,
+  "stops_done": 4,
+  "found": true,
+  "results": [
+    {
+      "stop": 0,
+      "camera_m": [
+        0.26,
+        -0.15,
+        0.25
+      ],
+      "crack_px": 3989,
+      "located": {
+        "crack_px": 1465,
+        "centroid_px": [
+          228.9,
+          92.2
+        ],
+        "depth_m": 0.2401,
+        "target_base_m": [
+          0.3819,
+          -0.1103,
+          -0.01
+        ],
+        "touches_border": true,
+        "extent_base_m": 0.125,
+        "component": 1,
+        "score": 124.66,
+        "length_mm": 138.2,
+        "width_mm": 3.21,
+        "mean_p": 0.902
+      },
+      "crack_filter": {
+        "argmax_px": 6437,
+        "argmax_components": 6,
+        "candidate_px": 5424,
+        "candidate_components": 3,
+        "accepted_components": 2,
+        "accepted_px": 3989,
+        "depth": "used",
+        "gray": "used",
+        "vote": true,
+        "gates_skipped": [],
+        "best_id": 1
+      }
+    },
+    {
+      "stop": 1,
+      "camera_m": [
+        0.26,
+        0.0,
+        0.25
+      ],
+      "crack_px": 2818,
+      "located": {
+        "crack_px": 2818,
+        "centroid_px": [
+          480.1,
+          149.8
+        ],
+        "depth_m": 0.2542,
+        "target_base_m": [
+          0.3167,
+          -0.0407,
+          -0.0108
+        ],
+        "touches_border": false,
+        "extent_base_m": 0.151,
+        "component": 1,
+        "score": 133.98,
+        "length_mm": 149.2,
+        "width_mm": 6.42,
+        "mean_p": 0.898
+      },
+      "crack_filter": {
+        "argmax_px": 3062,
+        "argmax_components": 5,
+        "candidate_px": 2818,
+        "candidate_components": 1,
+        "accepted_components": 1,
+        "accepted_px": 2818,
+        "depth": "used",
+        "gray": "used",
+        "vote": true,
+        "gates_skipped": [],
+        "best_id": 1
+      }
+    },
+    {
+      "stop": 2,
+      "camera_m": [
+        0.26,
+        0.15,
+        0.25
+      ],
+      "crack_px": 5157,
+      "located": {
+        "crack_px": 2774,
+        "centroid_px": [
+          654.5,
+          280.2
+        ],
+        "depth_m": 0.2644,
+        "target_base_m": [
+          0.3124,
+          0.0112,
+          -0.0269
+        ],
+        "touches_border": false,
+        "extent_base_m": 0.135,
+        "component": 2,
+        "score": 120.51,
+        "length_mm": 133.9,
+        "width_mm": 7.62,
+        "mean_p": 0.9
+      },
+      "crack_filter": {
+        "argmax_px": 5228,
+        "argmax_components": 2,
+        "candidate_px": 5157,
+        "candidate_components": 2,
+        "accepted_components": 2,
+        "accepted_px": 5157,
+        "depth": "used",
+        "gray": "used",
+        "vote": true,
+        "gates_skipped": [],
+        "best_id": 2
+      }
+    },
+    {
+      "stop": 3,
+      "camera_m": [
+        0.36,
+        0.15,
+        0.25
+      ],
+      "crack_px": 3724,
+      "located": {
+        "crack_px": 2260,
+        "centroid_px": [
+          600.6,
+          372.3
+        ],
+        "depth_m": 0.2849,
+        "target_base_m": [
+          0.3187,
+          0.0062,
+          -0.0479
+        ],
+        "touches_border": false,
+        "extent_base_m": 0.131,
+        "component": 3,
+        "score": 120.82,
+        "length_mm": 135.6,
+        "width_mm": 7.12,
+        "mean_p": 0.891
+      },
+      "crack_filter": {
+        "argmax_px": 5100,
+        "argmax_components": 6,
+        "candidate_px": 4870,
+        "candidate_components": 3,
+        "accepted_components": 2,
+        "accepted_px": 3724,
+        "depth": "used",
+        "gray": "used",
+        "vote": true,
+        "gates_skipped": [],
+        "best_id": 3
+      }
+    }
+  ],
+  "best_stop": 1,
+  "target_base_m": [
+    0.3167,
+    -0.0407,
+    -0.0108
+  ],
+  "normal_base": [
+    0.0,
+    0.0,
+    1.0
+  ],
+  "crack_px": 2818,
+  "extent_base_m": 0.151,
+  "touches_border": false,
+  "crack_filter": true,
+  "component": 1,
+  "score": 133.98,
+  "length_mm": 149.2,
+  "width_mm": 6.42,
+  "mean_p": 0.898,
+  "note": "target = centroid of the best accepted crack component (crack_filter), lifted with the surface depth around it and the measured pose; stops ranked by that component's score; the surface is assumed horizontal (table)"
+}

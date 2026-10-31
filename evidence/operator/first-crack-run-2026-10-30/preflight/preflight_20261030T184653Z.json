@@ -1,0 +1,218 @@
+{
+ "schema": "crackvision.first_run_preflight/1",
+ "created_utc": "2026-10-30T18:48:19Z",
+ "stamp": "20261030T184653Z",
+ "verdict": "GO",
+ "fails": [],
+ "warns": [],
+ "root": "/home/boosterk1/Projects/rebot_crack_vision",
+ "runner": "/home/boosterk1/rebot_setup",
+ "camera_checked": true,
+ "rehearsed": true,
+ "checks": [
+  {
+   "name": "env",
+   "status": "PASS",
+   "reason": "17 checks pass (python 3.11.16, torch 2.14.0+cu126, NVIDIA GeForce RTX 3090)",
+   "fix": "",
+   "data": {}
+  },
+  {
+   "name": "model",
+   "status": "PASS",
+   "reason": "255.7 MB checkpoint + plans/dataset",
+   "fix": "",
+   "data": {}
+  },
+  {
+   "name": "guard approval",
+   "status": "PASS",
+   "reason": "approved by Janga786 at 2026-10-29T21:01:59+00:00",
+   "fix": "",
+   "data": {
+    "approval": {
+     "config_sha256": "fbf08261c8df7e7e2e681fcad4cb2c4e95f5e4ae205fc76ee514ef8c94f5288b",
+     "urdf_sha256": "697012de95acb99bda4a257d327c955a174a5b528dbefd2e9a9aafc1851e5c5b",
+     "approved_by": "Janga786",
+     "approved_at": "2026-10-29T21:01:59+00:00",
+     "note": "2026-10-29 reviewed and approved by the operator in chat: config sha fbf08261 unchanged since 2026-10-21, used by all 19 guarded powered runs 2026-10-22..25 with no fault; box/circle/smoke_raise/first_guarded_run/gravity_survey/j4_tune and gains j2=100/4 j3=80/4 j4<=50/3, friction and gravity ff all inside the caps. Unmeasured: URDF joint ranges (MOT-09), keep-out geometry (MOT-10)."
+    }
+   }
+  },
+  {
+   "name": "guard hooks",
+   "status": "PASS",
+   "reason": "rebot OK, lerobot OK (motorbridge patched, config loads)",
+   "fix": "",
+   "data": {
+    "hook_status": {
+     "rebot": "OK",
+     "lerobot": "OK"
+    }
+   }
+  },
+  {
+   "name": "runner files",
+   "status": "PASS",
+   "reason": "demo_move.py 2026-10-29.4; sha256 run-trajectory.sh 699a2d69f798, demo_move.py 5352950a792d (all in the JSON)",
+   "fix": "",
+   "data": {
+    "sha256": {
+     "run-trajectory.sh": "699a2d69f7985f5a5e81aa3115e335231c5797c865b2f50245dd1f1198039d9a",
+     "demo_move.py": "5352950a792d4681845beba5b61bf823cda1bfd74609511c207bb8894b7195f0",
+     "first_move_j1.py": "5f66524a832e1c751ec57d58a9095c9cea8fbe81e7a5921b358295f377d48498",
+     "gravity.py": "8400f5b45283738e82b105b5fcf6491fe03a32a12d3bec4ed94910049ec6801f",
+     "fakebus.py": "43e54371e0c3e719edb091c072655ce9fc84226fd0541e27bc5db0ddd6773e42"
+    },
+    "demo_move_version": "2026-10-29.4",
+    "runner_dir": "/home/boosterk1/rebot_setup"
+   }
+  },
+  {
+   "name": "arm idle",
+   "status": "PASS",
+   "reason": "no runner, demo, LeRobot or motor tool running; USB2CAN connected (/dev/ttyACM0; not opened here)",
+   "fix": "",
+   "data": {
+    "tty_acm": [
+     "/dev/ttyACM0"
+    ]
+   }
+  },
+  {
+   "name": "stale files",
+   "status": "PASS",
+   "reason": "no stale capture.pid or arm_state.json",
+   "fix": "",
+   "data": {
+    "removed": []
+   }
+  },
+  {
+   "name": "disk",
+   "status": "PASS",
+   "reason": "89 GB free",
+   "fix": "",
+   "data": {
+    "free_gb": 88.6
+   }
+  },
+  {
+   "name": "camera free",
+   "status": "PASS",
+   "reason": "no other process has the D405 open (7 device nodes checked)",
+   "fix": "",
+   "data": {}
+  },
+  {
+   "name": "D405",
+   "status": "PASS",
+   "reason": "serial 260522273107, USB 3.2, firmware 5.15.1.55 (5.17 not needed for this run)",
+   "fix": "",
+   "data": {
+    "device": {
+     "name": "RealSense D405",
+     "serial": "260522273107",
+     "firmware": "5.15.1.55",
+     "recommended_firmware": "unknown",
+     "product_line": "D400",
+     "product_id": "0B5B",
+     "usb_type": "3.2"
+    },
+    "lsusb": true
+   }
+  },
+  {
+   "name": "D405 capture",
+   "status": "PASS",
+   "reason": "30 frames 848x480@30, 30.0 fps, validate_recording PASS; scene at 79 cm",
+   "fix": "",
+   "data": {
+    "frames": 30,
+    "seconds": 0.97,
+    "fps": 29.99,
+    "resolution": "848x480@30",
+    "validation": "PASS",
+    "validation_problems": [],
+    "median_depth_m": 0.786,
+    "valid_depth_fraction": 0.897,
+    "recording": "/home/boosterk1/Projects/rebot_crack_vision/data/recordings/preflight_20261030T184653Z"
+   }
+  },
+  {
+   "name": "search.json",
+   "status": "PASS",
+   "reason": "regenerated; rehearsed x1 and x2: completed, no guard fault, keep-out >= 38 mm",
+   "fix": "",
+   "data": {
+    "sha256": "984c7ff24fcc6293c9efa56cef05b3090fb9982b85bf44936f44ada4881b5ced",
+    "rehearsals": {
+     "x1": {
+      "rc": 0,
+      "outcome": "completed",
+      "completed": true,
+      "keepout_mm": 38,
+      "max_gap_ms": 14.0,
+      "summary": "/home/boosterk1/rebot_setup/runs_sim/traj_search_20261030T184704Z_SIM.json",
+      "refusals": []
+     },
+     "x2": {
+      "rc": 0,
+      "outcome": "completed",
+      "completed": true,
+      "keepout_mm": 38,
+      "max_gap_ms": 14.0,
+      "summary": "/home/boosterk1/rebot_setup/runs_sim/traj_search_20261030T184720Z_SIM.json",
+      "refusals": []
+     }
+    }
+   }
+  },
+  {
+   "name": "scan.json",
+   "status": "PASS",
+   "reason": "regenerated; rehearsed x1 and x2: completed, no guard fault, keep-out >= 38 mm",
+   "fix": "",
+   "data": {
+    "sha256": "876f5ad5ae2e361438769e42e6a157368dee275cafc79c1b6fb4cd78bdff5191",
+    "rehearsals": {
+     "x1": {
+      "rc": 0,
+      "outcome": "completed",
+      "completed": true,
+      "keepout_mm": 38,
+      "max_gap_ms": 14.0,
+      "summary": "/home/boosterk1/rebot_setup/runs_sim/traj_scan_20261030T184752Z_SIM.json",
+      "refusals": []
+     },
+     "x2": {
+      "rc": 0,
+      "outcome": "completed",
+      "completed": true,
+      "keepout_mm": 38,
+      "max_gap_ms": 14.0,
+      "summary": "/home/boosterk1/rebot_setup/runs_sim/traj_scan_20261030T184802Z_SIM.json",
+      "refusals": []
+     }
+    }
+   }
+  },
+  {
+   "name": "print PDF",
+   "status": "PASS",
+   "reason": "data/crack_targets/crack_prints.pdf (2.3 MB); print #1 (the single crack) = page 1, fit to page, matte",
+   "fix": "",
+   "data": {
+    "path": "/home/boosterk1/Projects/rebot_crack_vision/data/crack_targets/crack_prints.pdf",
+    "sha256": "14654d8cedafe6928428db49600647a5fe27d0370817034adb5771ed128ac630"
+   }
+  },
+  {
+   "name": "crack gate",
+   "status": "PASS",
+   "reason": "crack_filter.crack_trace: true (mean p >= 0.8, length >= 10.0 mm, width <= 10.0 mm, [0.07, 0.5] m)",
+   "fix": "",
+   "data": {}
+  }
+ ]
+}

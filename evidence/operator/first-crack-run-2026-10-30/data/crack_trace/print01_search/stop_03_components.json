@@ -1,0 +1,189 @@
+{
+ "schema": "crackvision.crack_components/1",
+ "case_id": "print01_stop_03",
+ "params": {
+  "seed_p": 0.9,
+  "grow_p": 0.5,
+  "min_mean_p": 0.8,
+  "min_length_px": 15,
+  "min_length_mm": 10.0,
+  "max_width_mm": 10.0,
+  "working_range_m": [
+   0.07,
+   0.5
+  ],
+  "require_surface_depth": true,
+  "annulus_inner_px": 4,
+  "annulus_outer_px": 14,
+  "min_annulus_px": 50,
+  "min_interior_px": 20,
+  "max_plane_rms_mm": 3.0,
+  "max_step_mm": 5.0,
+  "max_surface_tilt_deg": 60.0,
+  "ridge_min_contrast": 8.0,
+  "min_ridge_fraction": 0.5,
+  "max_flank_asymmetry": null,
+  "joint_max_tortuosity": 1.08,
+  "joint_max_width_cv": 0.3,
+  "joint_min_width_px": 2.0,
+  "joint_reject": false,
+  "border_px": 24,
+  "burst_vote_frames": 3,
+  "burst_vote_min": 2
+ },
+ "summary": {
+  "argmax_px": 5100,
+  "argmax_components": 6,
+  "candidate_px": 4870,
+  "candidate_components": 3,
+  "accepted_components": 2,
+  "accepted_px": 3724,
+  "depth": "used",
+  "gray": "used",
+  "vote": true,
+  "gates_skipped": [],
+  "best_id": 3
+ },
+ "best_id": 3,
+ "components": [
+  {
+   "id": 1,
+   "area_px": 1146,
+   "centroid_px": [
+    787.6,
+    141.3
+   ],
+   "bbox_rc": [
+    106,
+    722,
+    171,
+    846
+   ],
+   "skeleton_length_px": 147.7,
+   "main_path_px": 147.7,
+   "width_px": 7.76,
+   "mean_p": 0.767,
+   "max_p": 0.911,
+   "core_px": 39,
+   "elongation": 13.8,
+   "tortuosity": 1.079,
+   "width_cv": 0.274,
+   "touches_border": true,
+   "depth_m": 0.2319,
+   "mm_per_px": 0.5319,
+   "length_mm": 78.5,
+   "width_mm": 4.13,
+   "annulus_px": 2635,
+   "plane_rms_mm": 1.35,
+   "surface_tilt_deg": 15.2,
+   "interior_offset_mm": -0.8,
+   "depth_step": false,
+   "ridge_fraction": 0.992,
+   "ridge_contrast": 23.8,
+   "flank_asymmetry": 2.166,
+   "flags": [
+    "touches_border",
+    "joint_like"
+   ],
+   "reject_reasons": [
+    "low_confidence"
+   ],
+   "accepted": false,
+   "score": 60.21,
+   "score_units": "mean_p*mm"
+  },
+  {
+   "id": 2,
+   "area_px": 1464,
+   "centroid_px": [
+    756.4,
+    291.9
+   ],
+   "bbox_rc": [
+    261,
+    660,
+    311,
+    847
+   ],
+   "skeleton_length_px": 206.0,
+   "main_path_px": 206.0,
+   "width_px": 7.11,
+   "mean_p": 0.899,
+   "max_p": 0.979,
+   "core_px": 1029,
+   "elongation": 13.9,
+   "tortuosity": 1.087,
+   "width_cv": 0.188,
+   "touches_border": true,
+   "depth_m": 0.2608,
+   "mm_per_px": 0.5982,
+   "length_mm": 123.2,
+   "width_mm": 4.25,
+   "annulus_px": 3900,
+   "plane_rms_mm": 0.42,
+   "surface_tilt_deg": 19.6,
+   "interior_offset_mm": 0.02,
+   "depth_step": false,
+   "ridge_fraction": 1.0,
+   "ridge_contrast": 62.5,
+   "flank_asymmetry": 0.222,
+   "flags": [
+    "touches_border"
+   ],
+   "reject_reasons": [],
+   "accepted": true,
+   "score": 110.76,
+   "score_units": "mean_p*mm"
+  },
+  {
+   "id": 3,
+   "area_px": 2260,
+   "centroid_px": [
+    600.6,
+    372.3
+   ],
+   "bbox_rc": [
+    332,
+    509,
+    414,
+    692
+   ],
+   "skeleton_length_px": 207.5,
+   "main_path_px": 207.5,
+   "width_px": 10.89,
+   "mean_p": 0.891,
+   "max_p": 0.982,
+   "core_px": 1479,
+   "elongation": 14.8,
+   "tortuosity": 1.082,
+   "width_cv": 0.224,
+   "touches_border": false,
+   "depth_m": 0.2849,
+   "mm_per_px": 0.6534,
+   "length_mm": 135.6,
+   "width_mm": 7.12,
+   "annulus_px": 4080,
+   "plane_rms_mm": 1.8,
+   "surface_tilt_deg": 22.6,
+   "interior_offset_mm": -0.63,
+   "depth_step": false,
+   "ridge_fraction": 1.0,
+   "ridge_contrast": 71.0,
+   "flank_asymmetry": 0.052,
+   "flags": [],
+   "reject_reasons": [],
+   "accepted": true,
+   "score": 120.82,
+   "score_units": "mean_p*mm"
+  }
+ ],
+ "burst": {
+  "frames": [
+   2,
+   0,
+   1
+  ],
+  "min_votes": 2,
+  "model_s": 0.185
+ }
+}

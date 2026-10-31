@@ -1,0 +1,64 @@
+{
+ "schema": "crackvision.first_run_session/1",
+ "case": "print01",
+ "slow": "2",
+ "demo_extra": "--gains j2=100/4,j3=80/4",
+ "started_utc": "2026-10-30T18:56:36Z",
+ "started_unix": 1793386596.2389753,
+ "preflight": "/home/boosterk1/Projects/rebot_crack_vision/data/crack_trace/preflight_20261030T184653Z.json",
+ "steps": [
+  {
+   "step": "search",
+   "argv": [
+    "search",
+    "print01",
+    "2"
+   ],
+   "started_utc": "2026-10-30T18:56:43Z",
+   "started_unix": 1793386603.640568,
+   "rc": 0,
+   "ended_utc": "2026-10-30T19:00:02Z",
+   "runner": {
+    "path": "/home/boosterk1/rebot_setup/runs/traj_search_20261030T185643Z.json",
+    "outcome": "completed",
+    "csv": "/home/boosterk1/rebot_setup/runs/traj_search_20261030T185643Z.csv",
+    "refusal": null,
+    "guard_faults": []
+   }
+  },
+  {
+   "step": "scan-plan",
+   "argv": [
+    "scan-plan",
+    "--from-search",
+    "print01"
+   ],
+   "started_utc": "2026-10-30T19:00:14Z",
+   "started_unix": 1793386814.5343175,
+   "rc": 0,
+   "ended_utc": "2026-10-30T19:00:25Z"
+  },
+  {
+   "step": "scan",
+   "argv": [
+    "scan",
+    "print01",
+    "2"
+   ],
+   "started_utc": "2026-10-30T19:00:26Z",
+   "started_unix": 1793386826.6358624,
+   "rc": 1,
+   "ended_utc": "2026-10-30T19:00:52Z",
+   "runner": {
+    "path": "/home/boosterk1/rebot_setup/runs/traj_scan_20261030T190026Z.json",
+    "outcome": "aborted_parked",
+    "csv": "/home/boosterk1/rebot_setup/runs/traj_scan_20261030T190026Z.csv",
+    "refusal": null,
+    "guard_faults": []
+   }
+  }
+ ],
+ "outcome": "failed_at_scan",
+ "ended_utc": "2026-10-30T19:00:52Z",
+ "ended_unix": 1793386852.0598063
+}

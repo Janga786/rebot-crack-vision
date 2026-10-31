@@ -1,0 +1,7 @@
+{
+  "config_sha256": "fbf08261c8df7e7e2e681fcad4cb2c4e95f5e4ae205fc76ee514ef8c94f5288b",
+  "urdf_sha256": "697012de95acb99bda4a257d327c955a174a5b528dbefd2e9a9aafc1851e5c5b",
+  "approved_by": "Janga786",
+  "approved_at": "2026-10-29T21:01:59+00:00",
+  "note": "2026-10-29 reviewed and approved by the operator in chat: config sha fbf08261 unchanged since 2026-10-21, used by all 19 guarded powered runs 2026-10-22..25 with no fault; box/circle/smoke_raise/first_guarded_run/gravity_survey/j4_tune and gains j2=100/4 j3=80/4 j4<=50/3, friction and gravity ff all inside the caps. Unmeasured: URDF joint ranges (MOT-09), keep-out geometry (MOT-10)."
+}

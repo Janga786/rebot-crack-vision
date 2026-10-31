@@ -1,0 +1,254 @@
+{
+  "script": "demo_move.py",
+  "version": "2026-10-29.4",
+  "choreo": "trajectory",
+  "slow": 2.0,
+  "speed": 1.0,
+  "trajectory": {
+    "schema": "crackvision.joint_trajectory/1",
+    "created_utc": "2026-10-30T19:00:15Z",
+    "producer": "crackvision.crack_trace:scan-plan",
+    "purpose": "test",
+    "planning_frame": "base_link",
+    "joint_names": [
+      "joint1",
+      "joint2",
+      "joint3",
+      "joint4",
+      "joint5",
+      "joint6"
+    ],
+    "notes": "scan pose: the wrist camera 0.25 m from the surface point [0.317, -0.041, -0.011] (normal [0.0, 0.0, 1.0]), held 15.0 s for crack_trace capture; nominal camera mount (CAD prior)",
+    "limits_file": {
+      "path": "config/robot/b601_dm_limits.yaml",
+      "sha256": null
+    },
+    "end_effector_config_sha256": null,
+    "scene_config_sha256": null,
+    "source": {
+      "paths3d": null
+    },
+    "scan": {
+      "schema": "crackvision.crack_scan_pose/1",
+      "target_m": [
+        0.3167,
+        -0.0407,
+        -0.0108
+      ],
+      "normal": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "view_m": 0.25,
+      "dwell_s": 15.0,
+      "q_rad": [
+        -0.147352,
+        -1.355485,
+        -1.145809,
+        1.099354,
+        0.007977,
+        0.029798
+      ],
+      "clearance": {
+        "min_body_z_m": 0.2089,
+        "lowest_box": "camera_mount_link",
+        "min_gripper_z_m": 0.147
+      },
+      "camera_position_m": [
+        0.3167,
+        -0.0407,
+        0.2392
+      ],
+      "optical_axis_base": [
+        0.0001,
+        -0.0,
+        -1.0
+      ],
+      "gripper_link_z_m": 0.147,
+      "wrist_camera_value_status": "nominal"
+    },
+    "path": "/home/boosterk1/Projects/rebot_crack_vision/data/crack_trace/scan.json",
+    "sha256": "ee26dae6bbefe367ca69038767f84c66fb7b559f8eaaf98112ea3976724211fe",
+    "n_points": 2
+  },
+  "plan_cap": {
+    "4340P": 0.6,
+    "4310": 1.2
+  },
+  "vel_abort": {
+    "4340P": 1.0,
+    "4310": 1.6
+  },
+  "operator_go": "operator ran run-trajectory.sh",
+  "gains": {
+    "j1": [
+      100.0,
+      4.0
+    ],
+    "j2": [
+      100.0,
+      4.0
+    ],
+    "j3": [
+      80.0,
+      4.0
+    ],
+    "j4": [
+      40.0,
+      1.0
+    ],
+    "j5": [
+      40.0,
+      1.0
+    ],
+    "j6": [
+      40.0,
+      1.0
+    ],
+    "j7": [
+      40.0,
+      0.5
+    ]
+  },
+  "gains_override": {
+    "j2": [
+      100.0,
+      4.0
+    ],
+    "j3": [
+      80.0,
+      4.0
+    ]
+  },
+  "ff_bias": {},
+  "gravity_scale": {
+    "j1": 1.0,
+    "j2": 0.6,
+    "j3": 2.5,
+    "j4": 2.5,
+    "j5": 1.0,
+    "j6": 1.0,
+    "j7": 0.0
+  },
+  "gravity_model": null,
+  "friction": {
+    "j1": 1.0,
+    "j2": 1.0,
+    "j3": 2.0,
+    "j4": 0.5,
+    "j5": 0.3,
+    "j6": 0.1,
+    "j7": 0.0
+  },
+  "friction_override": {},
+  "simulated": false,
+  "start": {
+    "j1": 0.037194252014160156,
+    "j2": -0.02002716064453125,
+    "j3": -0.01354217529296875,
+    "j4": 0.01621246337890625,
+    "j5": 0.032235145568847656,
+    "j6": 0.00095367431640625,
+    "j7": -0.00133514404296875
+  },
+  "j1_offset": 0.00591278076171875,
+  "path_kinds": [
+    [
+      "approach",
+      9.4131
+    ],
+    [
+      "trajectory",
+      30.0
+    ],
+    [
+      "return",
+      9.4131
+    ]
+  ],
+  "guard_preflight": {
+    "problems": [],
+    "warnings": [],
+    "offsets": {
+      "j1": 0.0,
+      "j2": 0.0,
+      "j3": 0.0,
+      "j4": 0.0,
+      "j5": 0.0,
+      "j6": 0.0,
+      "j7": 0.0
+    },
+    "n_ticks": 10767,
+    "min_keepout_m": 0.026990296918132817,
+    "gravity_margin_nm": {
+      "j1": 10.0,
+      "j2": 9.015,
+      "j3": 2.969,
+      "j4": 0.804,
+      "j5": 2.498,
+      "j6": 2.5,
+      "j7": 2.5
+    }
+  },
+  "planned_peak_rad_s": {
+    "j1": 0.03558212496585077,
+    "j2": 0.26999999675971725,
+    "j3": 0.2282344889742453,
+    "j4": 0.21898108532206711,
+    "j5": 0.0015889441595829275,
+    "j6": 0.0059354842756991445,
+    "j7": 0.0
+  },
+  "outcome": "aborted_parked",
+  "trigger": {
+    "id": "signal",
+    "detail": "Ctrl-C/SIGTERM"
+  },
+  "stats": {
+    "n_cmd": 3594,
+    "max_err": {
+      "j1": 0.0,
+      "j2": 0.01773834228515625,
+      "j3": 0.01926422119140625,
+      "j4": 0.013115886548394885,
+      "j5": 0.00553131103515625,
+      "j6": 0.00057220458984375,
+      "j7": 0.00133514404296875
+    },
+    "max_gap_s": 0.01359912590123713,
+    "parked": true,
+    "wait_logged": true,
+    "ff_fade_at_abort": 1.0
+  },
+  "csv": "/home/boosterk1/rebot_setup/runs/traj_scan_20261030T190026Z.csv",
+  "all_disabled_confirmed": true,
+  "guard": {
+    "simulated": false,
+    "config_sha256": "fbf08261c8df7e7e2e681fcad4cb2c4e95f5e4ae205fc76ee514ef8c94f5288b",
+    "latched_at_end": "",
+    "events": [
+      {
+        "t_wall": 1793386826.8218915,
+        "kind": "bus",
+        "msg": "opened /dev/ttyACM0",
+        "pid": 4122015
+      },
+      {
+        "t_wall": 1793386833.091271,
+        "kind": "startup",
+        "msg": "startup check passed",
+        "pid": 4122015,
+        "readings": {
+          "j1": 0.037194252014160156,
+          "j2": -0.02002716064453125,
+          "j3": -0.01354217529296875,
+          "j4": 0.01621246337890625,
+          "j5": 0.032235145568847656,
+          "j6": 0.00095367431640625,
+          "j7": -0.00133514404296875
+        }
+      }
+    ]
+  }
+}
