@@ -2,7 +2,7 @@
 
 **Zero-shot crack segmentation for a reBot B601-DM concrete-inspection arm.**
 
-> **Current status (Phase 2, 2026-09-30).**
+> **Current status (Phase 2, updated 2026-10-22).**
 > - Phase 1 below is complete.
 > - Phase 2 ([ADR-011](docs/adr/011-phase2-full-pipeline-scope.md)) extends it to ordered crack paths,
 >   depth → 3D, eye-in-hand hand-eye calibration, MoveIt planning and gated commissioning. The work is
@@ -131,7 +131,7 @@ Every CLI accepts the common flags documented in `docs/INTERFACES.md` §0.3
 | `./env.sh python scripts/camera.py check\|snap\|live\|record` | The physical D405: first-connection evidence, capture + full crack pipeline, live model view in a browser, lossless recording ([docs/camera/D405_SETUP.md](docs/camera/D405_SETUP.md)). |
 | `./env.sh python scripts/capture_d405.py` | Captures depth-aligned RGB + raw depth from a D405 (or `--synthetic` with no hardware). |
 | `./env.sh python tools/dataset_manifest.py` | `init`/`scan`/`validate`/`summary` for the D405 evaluation manifest (`docs/D405_TEST_PLAN.md`). |
-| `./env.sh pytest tests/ -v` | The unit/integration/contract test suite (225 passed, 3 skipped as of this writing). |
+| `./env.sh pytest tests/ -v` | The unit/integration/contract test suite (225 passed, 3 skipped at the 2026-09-30 snapshot; the suite has since grown to 588 test functions). |
 
 ## Project layout
 
