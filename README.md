@@ -12,8 +12,9 @@
 >   view and trace phases.
 > - **Physical arm (2026-10-14 / 10-17): first powered runs.** All 7 motors over CAN at 200 Hz in MIT mode,
 >   gravity and friction feed-forward identified on hardware (elbow gravity load measured at 6.6 N·m vs
->   2.7 N·m in the URDF), and loaded-joint hold error cut from 0.04–0.05 rad to ≤ 0.005 rad over 41 logged
->   runs. A 52 s seven-joint demo tracked every joint within 0.025 rad. Write-up and raw logs:
+>   2.7 N·m in the URDF), and loaded-joint hold error cut from 0.04–0.05 rad to ≤ 0.005 rad in
+>   post-tuning holds, across a 41-run logged campaign (28 completed; aborted, refused, and read-only
+>   checks logged too). A 52 s seven-joint demo tracked every joint within 0.025 rad. Write-up and raw logs:
 >   [`docs/motion/CONTROLLER_TUNING.md`](docs/motion/CONTROLLER_TUNING.md). These were operator-attended
 >   runs, not commissioning.
 > - Still nominal until measured: camera extrinsic, tool tip, workcell, and joint limits (vendor URDF values).
@@ -25,7 +26,8 @@
 >   [session summary](docs/SESSION_2026-10-21_22.md)).
 > - **Arm safety (2026-10-21):** every motor command now passes [`arm_guard`](docs/motion/ARM_GUARD.md), a
 >   last-line filter in front of `motorbridge`, with a startup position check. A trajectory runner on the operator's
->   controller is rehearsed and ready for the first powered run: [`FIRST_GUARDED_RUN.md`](docs/motion/FIRST_GUARDED_RUN.md).
+>   controller was rehearsed ahead of the first guarded run, which completed on 2026-10-22 (bullet above):
+>   [`FIRST_GUARDED_RUN.md`](docs/motion/FIRST_GUARDED_RUN.md).
 >   Remaining steps (CAN watchdog, measured joint limits) are in [`TODO.md`](TODO.md).
 > - **Camera (2026-10-22): the real D405 is connected and running the model.** `scripts/camera.py check` (first
 >   connection + evidence), `record --video` (30 fps, lossless + MP4), `snap` (capture -> full crack pipeline ->
@@ -91,9 +93,10 @@ mask/skeleton-out, on files on disk. It deliberately does **not** include:
   (`docs/adr/009-robot-ros-integration-deferred.md`).
 - **Any model training or fine-tuning** — the OpenCrack weights are used exactly as released
   (`docs/adr/010-no-training-this-phase.md`).
-- **A quantitative zero-shot accuracy claim on real D405 imagery** — no camera has been attached to
-  this development machine; see [`docs/D405_TEST_PLAN.md`](docs/D405_TEST_PLAN.md) for the planned
-  evaluation and `tools/dataset_manifest.py` for the manifest tooling that will back it.
+- **A quantitative zero-shot accuracy claim on real D405 imagery** — the D405 is now connected
+  (status above), but no measured accuracy on real imagery is claimed yet; see
+  [`docs/D405_TEST_PLAN.md`](docs/D405_TEST_PLAN.md) for the planned evaluation and
+  `tools/dataset_manifest.py` for the manifest tooling that will back it.
 
 A later phase of this same repository (`docs/adr/011-phase2-full-pipeline-scope.md`,
 `docs/adr/012-frames-and-conventions.md`) has since started lifting these deferrals in dependency
@@ -166,6 +169,10 @@ run_test.sh             the one-command orchestrator (see Commands, above)
 ## Attribution
 
 Fort Lewis College senior-design project (Robotic Arm Bridge Repair Team), advised by Dr. Yiyan Li.
+Two-person team; the control, kinematics/IK, planning, and tuning work documented in this repository
+is mine. Substantial parts of the implementation were carried out with AI coding agents under my
+direction (the task cards in `task_cards/` are their work orders); hardware operation, tuning
+decisions, and verification runs are the operator's own, with raw logs committed as evidence.
 
 - **OpenCrack nnU-Net** — `fadeevla/opencrack-nnunet`, CC-BY-4.0.
 - **nnU-Net v2** — Isensee, F. et al., *nnU-Net: a self-configuring method for deep learning-based
