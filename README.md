@@ -16,7 +16,9 @@
 >   post-tuning holds, across a 41-run logged campaign (28 completed; aborted, refused, and read-only
 >   checks logged too). A 52 s seven-joint demo tracked every joint within 0.025 rad. Write-up and raw logs:
 >   [`docs/motion/CONTROLLER_TUNING.md`](docs/motion/CONTROLLER_TUNING.md). These were operator-attended
->   runs, not commissioning.
+>   runs, not commissioning. Video of the physical arm under commanded motion:
+>   [`docs/media/trajectory_live.mp4`](docs/media/trajectory_live.mp4) and
+>   [`docs/media/kinematics_live.mp4`](docs/media/kinematics_live.mp4).
 > - Still nominal until measured: camera extrinsic, tool tip, workcell, and joint limits (vendor URDF values).
 >   Pending: D405 hand-eye calibration and gated commissioning (MOT-05 / MOT-09).
 > - **First guarded trajectory on the physical arm (2026-10-22):** shown in simulation first, then run on the
