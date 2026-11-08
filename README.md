@@ -2,6 +2,11 @@
 
 **Zero-shot crack segmentation for a reBot B601-DM concrete-inspection arm.**
 
+**Live demos** (the physical arm, recorded on hardware):
+- [Commanded trajectory](https://janga786.github.io/media/rebot-trajectory-live.mp4) — the real arm under commanded motion.
+- [Kinematics on hardware](https://janga786.github.io/media/rebot-kinematics-live.mp4) — DLS IK and the minimum-jerk planner driving the 200 Hz CAN loop on the real arm.
+- Project page: [janga786.github.io/projects/rebot-crack-inspection](https://janga786.github.io/projects/rebot-crack-inspection/)
+
 > **Current status (Phase 2, updated 2026-10-22).**
 > - Phase 1 below is complete.
 > - Phase 2 ([ADR-011](docs/adr/011-phase2-full-pipeline-scope.md)) extends it to ordered crack paths,
@@ -171,8 +176,8 @@ run_test.sh             the one-command orchestrator (see Commands, above)
 ## Attribution
 
 Fort Lewis College senior-design project (Robotic Arm Bridge Repair Team), advised by Dr. Yiyan Li.
-Two-person team; the control, kinematics/IK, planning, and tuning work documented in this repository
-is mine. Substantial parts of the implementation were carried out with AI coding agents under my
+Two-person team, but my teammate is building a separate robot, so all work on this arm is mine:
+bring-up, control, kinematics/IK, planning, tuning, and vision integration. Substantial parts of the implementation were carried out with AI coding agents under my
 direction (the task cards in `task_cards/` are their work orders); hardware operation, tuning
 decisions, and verification runs are the operator's own, with raw logs committed as evidence.
 
