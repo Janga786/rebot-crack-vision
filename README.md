@@ -175,11 +175,9 @@ run_test.sh             the one-command orchestrator (see Commands, above)
 
 ## Attribution
 
-Fort Lewis College senior-design project (Robotic Arm Bridge Repair Team), advised by Dr. Yiyan Li.
-Two-person team, but my teammate is building a separate robot, so all work on this arm is mine:
-bring-up, control, kinematics/IK, planning, tuning, and vision integration. Substantial parts of the implementation were carried out with AI coding agents under my
-direction (the task cards in `task_cards/` are their work orders); hardware operation, tuning
-decisions, and verification runs are the operator's own, with raw logs committed as evidence.
+Fort Lewis College senior-design project (Robotic Arm Bridge Repair Team), advised by Dr. Yiyan Li. Two-person team; my teammate is building a second arm from scratch, so all work on this arm is mine.
+
+How the work was split: I designed the system, including the control architecture, how the ROS 2 nodes connect, and the safety gating, and I wrote pseudocode, line by line, for how much of the software should work. AI coding agents translated that design into Python and C++: a planning agent broke the work into the task cards in `plan/`, implementation agents wrote the code, and an independent review agent checked each change before it was accepted (`docs/ORCHESTRATION.md`). All hardware work is mine: motor bring-up, the torque test that found the URDF's gravity error, the gain and feed-forward decisions, and every physical run, with raw logs committed as evidence.
 
 - **OpenCrack nnU-Net** — `fadeevla/opencrack-nnunet`, CC-BY-4.0.
 - **nnU-Net v2** — Isensee, F. et al., *nnU-Net: a self-configuring method for deep learning-based
