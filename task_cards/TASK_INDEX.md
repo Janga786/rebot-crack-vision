@@ -142,10 +142,9 @@ One card creates each file. Nothing else may create or rewrite it.
 | `task_cards/TASK_INDEX.md` | planning | every card (status cells); re-synced from canonical state by the harness |
 | `docs/ENVIRONMENT_SNAPSHOT.md`, `RUNBOOK.md`, `LICENSE-NOTICES.md` | TC-016 | — |
 | `docs/ARCHITECTURE.md`, `INTERFACES.md`, `RISKS.md`, `VALIDATION_PLAN.md`, `D405_TEST_PLAN.md`, `MACHINE_STATE.md`, `IMPLEMENTATION_PLAN.md`, `adr/**` | planning session | **nobody** (TC-016 may *append* an "Implementation notes" section to `ARCHITECTURE.md`) |
-| `docs/ORCHESTRATION.md` | harness | **nobody** |
 | `.task_orchestrator/**`, `~/.local/bin/cv-*` | harness | **nobody — this is the review gate** |
 | `docs/REVIEW_LOG.md`, `.task_orchestrator/reviews/**` | `cv-review` (Opus) | **no implementation agent** |
-| `task_cards/TC-*.md`, `AGENT_INSTRUCTIONS.md` | planning session | **nobody** |
+| `task_cards/TC-*.md` | planning session | **nobody** |
 
 ---
 

@@ -73,7 +73,7 @@ Also check `env.sh` and `run_test.sh`. Exempt: nothing. (Docs may contain them; 
 - no source file contains `weights_only=False` (TC-005 safety rule)
 - no source file contains `shell=True`
 - no source file calls `os.system`, `subprocess.call("kill"...)`, `pkill`, or `nvidia-smi --gpu-reset`
-  (`AGENT_INSTRUCTIONS.md` rule 13)
+  (the task cards' no-kill rule)
 
 **F. CLI surface:** for each of the 5 `crackvision.*` CLIs and 5 `scripts/*.py`, assert
 `--help` exits 0, and that each accepts `--dry-run` and `--verbose`.

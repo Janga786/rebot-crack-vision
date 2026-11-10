@@ -25,7 +25,7 @@ spur pruning, polyline fitting, spline smoothing, or `skan` integration. Emit a 
 + Small, testable, unambiguous card (TC-010) with no open design questions.
 + The stats files become the evidence base for designing the traversal stage properly later.
 − A downstream consumer cannot yet get an ordered path — correct and intended for this phase.
-− A later agent may be tempted to "helpfully" add traversal. `AGENT_INSTRUCTIONS.md` rule 6 and the
+− A later card may be tempted to "helpfully" add traversal. The task cards and the
   Out-of-scope section of TC-010 forbid it explicitly.
 
 ## Revisit when
