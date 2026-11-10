@@ -9,8 +9,8 @@ This file is orientation; the task cards are the instructions.
 
 ## 1. Strategy
 
-The planning effort was spent **once**, deliberately, on a more capable model, so that sixteen
-cheaper implementation sessions can *execute* rather than *design*. Concretely, that means every card
+The planning effort was spent **once**, up front, so that the sixteen implementation steps can
+*execute* rather than *design*. Concretely, that means every card
 already specifies:
 
 - exact file paths, CLI flags and exit codes (`INTERFACES.md`)
@@ -20,7 +20,7 @@ already specifies:
 - what **not** to build, and the ADR that explains why (`adr/008`, `adr/009`, `adr/010`)
 - verification commands whose output can be pasted into a completion report
 
-A Sonnet agent that finds itself doing architecture research has almost certainly missed a document.
+An implementer who finds themselves doing architecture research has almost certainly missed a document.
 
 ## 2. Phasing
 
@@ -87,7 +87,7 @@ TC-013 is the only genuinely complex card: it combines lazy imports, hardware ab
 fidelity (16-bit depth round-trip) and a metadata schema that a later 3D stage depends on. Give it a
 full session. TC-002 is medium but **highest-consequence** — a mistake there poisons everything after.
 
-## 7. What a Sonnet agent should do when the plan is wrong
+## 7. What to do when the plan is wrong
 
 Adapt to minor upstream drift (a renamed kwarg, a changed function signature) and record it under
 `ISSUES:`. **Stop and report BLOCKED** when a *verified fact* in `ARCHITECTURE.md` §4 turns out to be
