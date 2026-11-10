@@ -73,7 +73,7 @@ TESTS:
   - `git add <25 named files>` (no `-A`, no `-.`) followed by
     `git commit -m "chore: project scaffolding, config and logging primitives"`
     -> committed (see `git log --oneline` / `git log -1` in the session's shell transcript for the
-    resulting hash; exactly one commit, branch `main`, author `Gavinw575 <gavinw575@gmail.com>`,
+    resulting hash; exactly one commit, branch `main`, author `<lab machine git identity>`,
     no `Co-Authored-By` trailer).
   - `git ls-files -s` / `git cat-file -s <blob>` on every tracked blob -> largest tracked file is
     `docs/INTERFACES.md`-scale text, all committed files are well under 1 MB (all `.gitkeep` files
@@ -121,7 +121,7 @@ CHANGES:
     excludes torch/torchvision/nvidia-*/triton/pyrealsense2 and also `cuda-bindings`,
     `cuda-pathfinder`, `cuda-toolkit` (see ISSUES) and the project's own `-e` self-install
   - git commit `3d8247f` on `main`: "chore: crackvision python 3.11 environment, pinned deps and
-    env.sh launcher" — exactly the 5 files above, author `Gavinw575 <gavinw575@gmail.com>`, no
+    env.sh launcher" — exactly the 5 files above, author `<lab machine git identity>`, no
     Claude co-author trailer
 TESTS:
   - `conda env list` ->
@@ -173,8 +173,8 @@ TESTS:
     no match (PASS). Every non-comment line matches `==` (83/83 pinned).
   - `git status` before commit showed only the pre-existing untracked planning docs (`docs/*.md`,
     `docs/adr/`, `task_cards/` — not owned by this card) plus this card's 5 new files; `git add`
-    named exactly those 5; `git commit` succeeded as `3d8247f`, author `Gavinw575
-    <gavinw575@gmail.com>`, no co-author trailer.
+    named exactly those 5; `git commit` succeeded as `3d8247f`, author `<lab machine git
+    identity>`, no co-author trailer.
 ISSUES:
   - `requirements-core.txt` excludes three packages beyond the card's literal grep pattern:
     `cuda-bindings`, `cuda-pathfinder`, `cuda-toolkit`. These are new (upstream drift since the
@@ -1942,7 +1942,7 @@ NEXT: TODO.md section C: cable (USB-A to USB 3.0 Micro-B), plug in, `scripts/cam
 TASK: CAMERA-BRINGUP (operator: "the camera is now plugged in, make it fully ready to go and test it by recording
       a video; then set up the computer vision pipeline from the camera and test that we can run it live")
 STATUS: COMPLETE (positive crack detection on real imagery still pending: no crack in view)
-DEVICE: RealSense D405 serial 260522273107, firmware 5.15.1.55, USB 3.2 (5000M, root hub, no hub), udev rule
+DEVICE: RealSense D405 serial <D405-serial-redacted>, firmware 5.15.1.55, USB 3.2 (5000M, root hub, no hub), udev rule
         applied (root:plugdev 0660), pyrealsense2 2.58.4, kernel 6.8 stock uvcvideo.
 RESULTS:
   - Capture: 30.3 fps (848x480) / 30.2 fps (1280x720) aligned, 0 hardware frame gaps, 91-94% valid depth.

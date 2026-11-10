@@ -4,7 +4,7 @@
   "operator_go": "operator plugged the D405 in and asked: make it fully ready, test it by recording a video, then run the CV pipeline live on the camera",
   "device": {
     "name": "RealSense D405",
-    "serial": "260522273107",
+    "serial": "<D405-serial-redacted>",
     "firmware": "5.15.1.55",
     "recommended_firmware": "unknown",
     "product_line": "D400",

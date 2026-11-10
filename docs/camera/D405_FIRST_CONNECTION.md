@@ -9,7 +9,7 @@ it. The machine-readable versions are `evidence/camera/d405_discovery.json` (fro
 
 | | |
 |---|---|
-| Device | RealSense D405, serial **260522273107**, product line D400, USB PID 0B5B |
+| Device | RealSense D405, serial **<D405-serial-redacted>**, product line D400, USB PID 0B5B |
 | Firmware | **5.15.1.55**. That predates 5.17.0.9, which fixed D405 auto-exposure; the newest D405 firmware is 5.17.0.10. pyrealsense2 2.58.4 bundles no firmware, so it reports no "recommended" version |
 | USB | **3.2** (`Usb Type Descriptor`). `lsusb -t`: Bus 02 Port 4, `uvcvideo`, **5000M**, directly on the xHCI root hub with no hub in between |
 | Access | The udev rule `99-crackvision-d405.rules` applied: the USB node is `root:plugdev 0660`. The operator is in `plugdev`, so no sudo was needed |

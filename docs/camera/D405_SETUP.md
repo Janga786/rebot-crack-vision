@@ -1,6 +1,6 @@
 # D405 camera: setup and running the crack model on it
 
-**Status (2026-10-22): connected and working.** The D405 (serial 260522273107, firmware 5.15.1.55) is on a USB 3
+**Status (2026-10-22): connected and working.** The D405 (serial <D405-serial-redacted>, firmware 5.15.1.55) is on a USB 3
 port of this workstation. [D405_FIRST_CONNECTION.md](D405_FIRST_CONNECTION.md) has the full report.
 - **Capture:** 30 fps with no dropped frames at 848×480 and 1280×720.
 - **Video test:** 10 s at 1280×720, recorded losslessly and validated, plus an MP4.

@@ -16,7 +16,7 @@
   },
   "device": {
     "name": "RealSense D405",
-    "serial": "260522273107",
+    "serial": "<D405-serial-redacted>",
     "firmware": "5.15.1.55",
     "recommended_firmware": "unknown",
     "product_line": "D400",
@@ -28,7 +28,7 @@
   "all_devices": [
     {
       "name": "RealSense D405",
-      "serial": "260522273107",
+      "serial": "<D405-serial-redacted>",
       "firmware": "5.15.1.55",
       "recommended_firmware": "unknown",
       "product_line": "D400",

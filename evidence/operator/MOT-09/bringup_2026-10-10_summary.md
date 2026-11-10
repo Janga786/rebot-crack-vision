@@ -13,7 +13,7 @@ The raw evidence comes from the operator's attended bring-up sessions on 2026-10
 ## Scope: what this evidence establishes
 
 1. **Bus and adapter.** A Damiao USB2CAN serial bridge, USB `2e88:4603` (manufacturer `HDSC`, product
-   `CDC Device`, serial `00000000050C`). It enumerated as `/dev/ttyACM0` at 14:06:10 and again at 15:51:48
+   `CDC Device`, serial `<USB2CAN-serial-redacted>`). It enumerated as `/dev/ttyACM0` at 14:06:10 and again at 15:51:48
    (`journalctl -k` excerpts, `SETUP_LOG.md` §1.3 and S2 Phase 1). Transport `dm-serial` at 921600 baud,
    motorbridge 0.5.6 in conda env `rebot` (Python 3.12), commands run with `env -u PYTHONPATH`.
    CAN bitrate 1 Mbps and the 24 V supply: **operator statement**.

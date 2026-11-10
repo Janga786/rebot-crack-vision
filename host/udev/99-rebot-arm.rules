@@ -1,6 +1,6 @@
 # Provenance: VID:PID cited from evidence/operator/HOST-04/arm_adapter_usb_ids_2026-10-10.md,
 # which excerpts journalctl -k entries at 2026-10-10 14:06:10 and 15:51:48
-# (idVendor=2e88, idProduct=4603, HDSC "CDC Device", serial 00000000050C) and the
+# (idVendor=2e88, idProduct=4603, HDSC "CDC Device", serial <USB2CAN-serial-redacted>) and the
 # operator's lsusb statement ("HDSC VID:PID 2e88:4603"). This is the Damiao
 # USB2CAN serial bridge (dm-serial, 921600 baud) for the B601-DM arm's CAN bus.
 # No upstream rule exists for this device; the VID:PID is never guessed.

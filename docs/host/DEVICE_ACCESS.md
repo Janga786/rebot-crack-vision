@@ -114,7 +114,7 @@ the B601-DM CAN bus. Its identity is cited, never guessed, from
 excerpts `journalctl -k` at 2026-10-10 14:06:10 and 15:51:48:
 
 ```
-idVendor=2e88, idProduct=4603, HDSC "CDC Device", SerialNumber 00000000050C
+idVendor=2e88, idProduct=4603, HDSC "CDC Device", SerialNumber <USB2CAN-serial-redacted>
 cdc_acm 1-7:1.0: ttyACM0: USB ACM device
 ```
 

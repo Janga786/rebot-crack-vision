@@ -36,7 +36,7 @@
       }
     ],
     "criteria": [
-      "VID:PID 2e88:4603 is cited from evidence/operator/HOST-04/arm_adapter_usb_ids_2026-10-10.md, which holds the journalctl -k excerpts of 2026-10-10 14:06:10 and 15:51:48 (HDSC 'CDC Device', SN 00000000050C) and the operator's lsusb statement. It is never guessed.",
+      "VID:PID 2e88:4603 is cited from evidence/operator/HOST-04/arm_adapter_usb_ids_2026-10-10.md, which holds the journalctl -k excerpts of 2026-10-10 14:06:10 and 15:51:48 (HDSC 'CDC Device', SN <USB2CAN-serial-redacted>) and the operator's lsusb statement. It is never guessed.",
       "host/udev/99-rebot-arm.rules has a provenance header and exactly one active line: SUBSYSTEM==\"tty\", ATTRS{idVendor}==\"2e88\", ATTRS{idProduct}==\"4603\", MODE:=\"0660\", GROUP:=\"plugdev\", SYMLINK+=\"ttyREBOT_ARM\", ENV{ID_MM_DEVICE_IGNORE}=\"1\". It has no RUN hook, no 0666/0777, no OWNER and no dialout. The header explains why the symlink name must begin with tty and why ModemManager is told to ignore the port (body below).",
       "It is installed through the privileged path with exactly two requests, one at a time, as HOST-03 did. (a) /usr/bin/install -m 0644 -o root -g root <absolute repo path>/host/udev/99-rebot-arm.rules /etc/udev/rules.d/99-rebot-arm.rules, with verify_argv /usr/bin/cmp <same two paths>. (b) /usr/bin/udevadm control --reload-rules, with verify_argv /usr/bin/test -f /etc/udev/rules.d/99-rebot-arm.rules. There is no udevadm trigger: the adapter is unplugged and the rule applies at the next plug-in. No shell is requested, nothing else under /etc is touched, and there is no usermod, gpasswd or chmod.",
       "docs/host/DEVICE_ACCESS.md gains an 'Arm USB/CAN adapter (HOST-04)' section; the existing D405 content stays unchanged. The section covers provenance, why it is narrowed, the install commands, verification (content cmp; owner/mode from a host shell, since the sandbox shows root as nobody; the operator's replug check `ls -l /dev/ttyACM0 /dev/ttyREBOT_ARM` expecting crw-rw---- root plugdev), rollback (remove the file, then reload) and the dialout note below.",
@@ -74,7 +74,7 @@ The operator connected the adapter on 2026-10-10 and the kernel identified it. S
 
 | Field | Value |
 |---|---|
-| Device | `idVendor=2e88`, `idProduct=4603`, `HDSC` / `CDC Device`, serial `00000000050C` |
+| Device | `idVendor=2e88`, `idProduct=4603`, `HDSC` / `CDC Device`, serial `<USB2CAN-serial-redacted>` |
 | Driver and node | `cdc_acm`, `/dev/ttyACM0` |
 | Default permissions | `root:dialout 0660` (the operator has been using `sudo chmod 666` as a stop-gap) |
 
