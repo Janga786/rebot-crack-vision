@@ -15,7 +15,7 @@ Run state was recovered by `cv-recover`, not witnessed, so every claim was re-de
 filesystem and git and the card's verification commands were re-executed.
 
 **Verified:** commit contains exactly the card's 27 files and nothing else (no `git add -A`, no
-co-author trailer, one commit on `main`, author `Gavinw575`, largest blob 5 943 B). `config/project.yaml`
+co-author trailer, one commit on `main`, author `<lab machine git identity>`, largest blob 5 943 B). `config/project.yaml`
 is byte-identical to `INTERFACES.md` §4 (`diff` clean). `.gitignore` proof re-run verbatim: 4 ignored,
 0 visible. `config.py` / `logging_setup.py` re-exercised with 39 assertions — all pass, including
 deep-merge over `DEFAULT_CONFIG`, `ConfigError` on malformed YAML, the six §0.3 flags, the 0/1/2/3
@@ -48,7 +48,7 @@ Every acceptance command was re-executed independently; the report's pasted outp
 filesystem value for value.
 
 **Verified:** commit contains exactly the card's five files (`env.sh`, `requirements/*`), author and
-committer `Gavinw575`, no co-author trailer, no `git add -A`; `docs/COMPLETION_LOG.md` correctly left
+committer `<lab machine git identity>`, no co-author trailer, no `git add -A`; `docs/COMPLETION_LOG.md` correctly left
 uncommitted per the card's commit guidance, and the ten pre-existing untracked planning paths were
 not swept in. The critical ROS scrub was proven under a **forced** `PYTHONPATH=/opt/ros/humble/...3.10...`
 and `LD_LIBRARY_PATH` containing `/opt/ros` + `/usr/local/cuda-11.8` — output `python 3.11.16`,
@@ -110,7 +110,7 @@ filesystem value for value.
 **Verified:** commit contains exactly three files — `scripts/check_env.py` (the card's only creation)
 plus the two allowed doc/index files. Twenty-six untracked planning paths were present at commit time
 and none were swept in, so `git add -A` was provably not used; no co-author trailer; author and
-committer `Gavinw575`. All forbidden files (`config.py`, `logging_setup.py`, `project.yaml`, `env.sh`,
+committer `<lab machine git identity>`. All forbidden files (`config.py`, `logging_setup.py`, `project.yaml`, `env.sh`,
 `pyproject.toml`, every `docs/**` and `task_cards/TC-0NN-*.md`) carry mtimes predating the 21:33–21:58
 run window. All **20 checks** present in the card's prescribed order; via `env.sh` →
 `17 PASS · 0 WARN · 3 FAIL`, exit 3. The ROS guard was proven, not assumed: under a forced
@@ -263,7 +263,7 @@ Dataset501_OpenCrack`) and resolves; all three edge cases re-exercised by the re
 link is refused without `--repair-symlink` and left untouched, repaired with it, and a **real
 directory survives with its `CANARY` file intact**. Scope is exact (3 files, all on the card's list),
 26 untracked planning paths present at commit time and none swept in, no co-author trailer, author
-`Gavinw575`. `src/`, `config/`, `env.sh`, `scripts/check_env.py`, `scripts/fetch_model.py` are
+`<lab machine git identity>`. `src/`, `config/`, `env.sh`, `scripts/check_env.py`, `scripts/fetch_model.py` are
 byte-identical to baseline with mtimes predating the run window; `find models -newer
 config/model_manifest.json` empty. ADRs 002/004/005/006/008/009/010 clear — no skeleton traversal, no
 depth→3D, no ROS, no training. No `sudo`, `subprocess`, `shell=True` or `rm -rf`; the only `unlink`
@@ -327,7 +327,7 @@ completion report's ISSUES as their acceptance conditions required, naming **TC-
 **Scope exact.** Only `docs/COMPLETION_LOG.md`, `task_cards/TASK_INDEX.md` (both on the card's
 allowed list) and `config/model_manifest.json` changed in the run window; the commit carries the
 first two only. 26 untracked planning paths present and none swept in — no `git add -A`, no
-co-author trailer, author `Gavinw575`. The manifest and `models/**` writes were pre-authorised in
+co-author trailer, author `<lab machine git identity>`. The manifest and `models/**` writes were pre-authorised in
 writing by the rev-1 review as a revision-only exception, and the manifest was correctly left
 uncommitted. ADRs 002/004/005/006/008/009/010 clear — relative symlink verified, `-d 501` glob
 discoverable, no skeleton traversal, no depth→3D, no ROS, no training. No `sudo`, `shell=True`,
@@ -401,7 +401,7 @@ assertion count and an undisclosed `--skip-existing` no-op.
 
 **Scope exact, gate intact.** Commit = exactly `scripts/smoke_test.py`, `docs/COMPLETION_LOG.md`,
 `task_cards/TASK_INDEX.md` — all on the card's own lists. No `git add -A`, no co-author trailer,
-author `Gavinw575`. `config/model_manifest.json` appears in the run diff but its only change
+author `<lab machine git identity>`. `config/model_manifest.json` appears in the run diff but its only change
 (`downloaded_utc → 2026-09-19T01:26:14Z`) was written **16 minutes before the run began** and was
 correctly left uncommitted. `models/**` untouched and hash-clean; the six sibling `data/` pipeline
 dirs still hold only their TC-001 `.gitkeep`. No `sudo`, `rm -rf` on a variable, `os.system`,
@@ -484,7 +484,7 @@ crack pixels and still passed — the card's "all-zero is acceptable" branch dem
 
 **Scope and safety clean.** `git show --stat HEAD` touches exactly `scripts/smoke_test.py` and
 `docs/COMPLETION_LOG.md` — both on the card's lists. No `git add -A`, no co-author trailer, author
-`Gavinw575`. `config/model_manifest.json` appears in the run diff only as pre-existing dirt
+`<lab machine git identity>`. `config/model_manifest.json` appears in the run diff only as pre-existing dirt
 (`downloaded_utc` from TC-005's repair, written before this run) and was correctly left uncommitted.
 `models/**`, `src/crackvision/**`, `scripts/check_env.py`, `scripts/verify_model.py` and the six
 sibling `data/` pipeline dirs are all untouched — the latter still hold only their TC-001 `.gitkeep`.
@@ -554,7 +554,7 @@ a green suite.
 **Scope and safety clean.** `git show --stat HEAD` touches exactly the card's five *Files to create*
 plus its two *allowed to modify* — nothing else. `data/input_originals/`, `config.py`,
 `logging_setup.py`, `scripts/**` and `models/**` unchanged since the baseline. No `git add -A`, no
-co-author trailer, author `Gavinw575`. `config/model_manifest.json` appears in the run diff only as
+co-author trailer, author `<lab machine git identity>`. `config/model_manifest.json` appears in the run diff only as
 pre-existing dirt (mtime 80 minutes before the run began) and was correctly left uncommitted. No
 `sudo`, `shell=True`, `subprocess`, `os.system`, `pkill`, `rm -rf` or `weights_only=False`; no
 OpenCV. `~/.bashrc`, `/opt/ros`, `/usr/local/cuda*`, the driver and all six sibling conda envs carry

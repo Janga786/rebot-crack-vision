@@ -203,7 +203,7 @@ git log --oneline
 - [ ] `src/crackvision/config.py` and `logging_setup.py` exist with every function/class listed above.
 - [ ] `.gitignore` proof: a dummy file in each of `models/`, `data/input_originals/`, `logs/`,
       `nnunet/results/` is ignored — `git status --porcelain` shows **zero** of them.
-- [ ] `git log` shows exactly one commit, on branch `main`, authored by `Gavinw575`.
+- [ ] `git log` shows exactly one commit, on branch `main`, authored by `<lab machine git identity>`.
 - [ ] The commit contains **no** file over 1 MB (`git cat-file` / `git ls-files -s` check).
 - [ ] No Claude co-author trailer in the commit message.
 - [ ] `docs/` and `task_cards/` planning files are byte-identical to before this card ran

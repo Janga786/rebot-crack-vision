@@ -146,8 +146,8 @@
   {
    "path": "preflight/preflight_20261030T184653Z.json",
    "source": "/home/boosterk1/Projects/rebot_crack_vision/data/crack_trace/preflight_20261030T184653Z.json",
-   "sha256": "a6d54e24ed704c054254eaf8ee02ce309a398c90bca71f9d21633c4c90c679f6",
-   "bytes": 6265
+   "sha256": "3cf5ab68a3f0928cb1a15bddb04e473eeacb739dd79a48cc59ae2fb905a3d939",
+   "bytes": 6285
   },
   {
    "path": "runner_runs/traj_search_20261030T185643Z.json",

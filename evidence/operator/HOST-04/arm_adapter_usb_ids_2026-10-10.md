@@ -12,14 +12,14 @@ overnight instructions 2026-10-10).
 
 ```
 Oct 10 14:06:10 usb 1-7: New USB device found, idVendor=2e88, idProduct=4603
-Oct 10 14:06:10 usb 1-7: Product: CDC Device / Manufacturer: HDSC / SerialNumber: 00000000050C
+Oct 10 14:06:10 usb 1-7: Product: CDC Device / Manufacturer: HDSC / SerialNumber: <USB2CAN-serial-redacted>
 Oct 10 14:06:10 cdc_acm 1-7:1.0: ttyACM0: USB ACM device
 ```
 
 ## Re-enumeration after the DMTool session, session 2 (SETUP_LOG.md lines 155–156)
 
 ```
-15:51:48 usb 1-7: New USB device found, idVendor=2e88, idProduct=4603 (HDSC CDC Device, SN 00000000050C)
+15:51:48 usb 1-7: New USB device found, idVendor=2e88, idProduct=4603 (HDSC CDC Device, SN <USB2CAN-serial-redacted>)
 15:51:48 cdc_acm 1-7:1.0: ttyACM0: USB ACM device
 ```
 
@@ -28,7 +28,7 @@ Oct 10 14:06:10 cdc_acm 1-7:1.0: ttyACM0: USB ACM device
 ```
 crw-rw---- 1 root dialout 166, 0 Oct 10 14:06 /dev/ttyACM0      (no ttyUSB*)
 $ ls -l /dev/serial/by-id/
-usb-HDSC_CDC_Device_00000000050C-if00 -> ../../ttyACM0
+usb-HDSC_CDC_Device_<USB2CAN-serial-redacted>-if00 -> ../../ttyACM0
 ```
 
 The same device, with the same serial number, came back at 15:51 as `/dev/ttyACM0` with `root:dialout 0660`.
@@ -42,7 +42,7 @@ stop-gap.
 | idVendor | `2e88` |
 | idProduct | `4603` |
 | manufacturer / product | `HDSC` / `CDC Device` |
-| serial | `00000000050C` |
+| serial | `<USB2CAN-serial-redacted>` |
 | kernel driver / node | `cdc_acm` / `/dev/ttyACM0` (tty subsystem) |
 | default node permissions | `root:dialout 0660` |
 | what it is | Damiao USB2CAN serial bridge (dm-serial, 921600 baud) to the B601-DM CAN bus |

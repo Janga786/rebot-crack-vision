@@ -216,7 +216,7 @@ Done:
   `CaptureFrame` source (`crackvision.d405_live`); the in-memory network (`crackvision.live_predictor`, identical to
   the batch path with TTA); [`docs/camera/D405_SETUP.md`](docs/camera/D405_SETUP.md).
 - **The real camera (2026-10-22, after the operator plugged it in):**
-  - D405 serial 260522273107 on USB 3.2.
+  - D405 serial <D405-serial-redacted> on USB 3.2.
   - Capture at 30 fps with no dropped frames.
   - `check`: validator PASS, verdict WARN for the firmware only.
   - Video test: 10 s at 1280×720, lossless and validated, plus an MP4.

@@ -20,11 +20,11 @@ bus:
     usb_pid: "4603"
     usb_manufacturer: "HDSC"
     usb_product: "CDC Device"
-    usb_serial: "00000000050C"
+    usb_serial: "<USB2CAN-serial-redacted>"
     src: "SETUP_LOG.md §1.3 and S2 Phase 1 (journalctl -k: 'New USB device found, idVendor=2e88, idProduct=4603' at 14:06:10 and 15:51:48)"
   port: "/dev/ttyACM0"
   port_default_perms: "crw-rw---- root dialout (reset by every replug)"
-  port_src: "SETUP_LOG.md §1.3, S2 Phase 1 (ls -l /dev/ttyACM*; /dev/serial/by-id/usb-HDSC_CDC_Device_00000000050C-if00)"
+  port_src: "SETUP_LOG.md §1.3, S2 Phase 1 (ls -l /dev/ttyACM*; /dev/serial/by-id/usb-HDSC_CDC_Device_<USB2CAN-serial-redacted>-if00)"
   transport: "dm-serial"
   serial_baud: 921600
   serial_src: "scan_s2_phase2.txt header line (transport=dm-serial serial_baud=921600)"

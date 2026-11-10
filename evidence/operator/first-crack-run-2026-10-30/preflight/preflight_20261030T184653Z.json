@@ -107,12 +107,12 @@
   {
    "name": "D405",
    "status": "PASS",
-   "reason": "serial 260522273107, USB 3.2, firmware 5.15.1.55 (5.17 not needed for this run)",
+   "reason": "serial <D405-serial-redacted>, USB 3.2, firmware 5.15.1.55 (5.17 not needed for this run)",
    "fix": "",
    "data": {
     "device": {
      "name": "RealSense D405",
-     "serial": "260522273107",
+     "serial": "<D405-serial-redacted>",
      "firmware": "5.15.1.55",
      "recommended_firmware": "unknown",
      "product_line": "D400",
