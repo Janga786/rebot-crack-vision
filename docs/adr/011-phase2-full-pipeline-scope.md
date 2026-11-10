@@ -39,7 +39,7 @@ Constraints that do **not** change:
   fine-tune or retrain is decided later, by the real-imagery evaluation (PERC-08 / Level 3 in
   `docs/VALIDATION_PLAN.md`), not by this scope change.
 - **Real robot motion happens only through the operator commissioning gate**: an explicit
-  commissioning flag plus a typed operator confirmation, per `AGENT_INSTRUCTIONS.md` and the standing
+  commissioning flag plus a typed operator confirmation, per the task cards and the standing
   house rule. Every code path reachable without that gate defaults to simulation/dry-run; no card in
   this phase may command the physical arm outside it.
 

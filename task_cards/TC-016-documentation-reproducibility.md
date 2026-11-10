@@ -45,8 +45,7 @@ LICENSE-NOTICES.md
 ## Files that must NOT be modified
 `src/crackvision/**`, `scripts/**`, `tools/**`, `tests/**`, `env.sh`, `run_test.sh`,
 `config/project.yaml`, `docs/adr/**`, `docs/INTERFACES.md`, `docs/RISKS.md`,
-`docs/D405_TEST_PLAN.md`, `docs/VALIDATION_PLAN.md`, `task_cards/TC-*.md`,
-`task_cards/AGENT_INSTRUCTIONS.md`.
+`docs/D405_TEST_PLAN.md`, `docs/VALIDATION_PLAN.md`, `task_cards/TC-*.md`.
 
 ## Implementation requirements
 

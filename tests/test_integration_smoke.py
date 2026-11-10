@@ -268,7 +268,7 @@ def test_no_source_file_uses_shell_true() -> None:
 
 
 def test_no_source_file_kills_processes_or_resets_the_gpu() -> None:
-    """AGENT_INSTRUCTIONS.md rule 13: never kill a process or reset the shared GPU from code."""
+    """Task-card rule: never kill a process or reset the shared GPU from code."""
     forbidden = re.compile(r"os\.system\(|subprocess\.call\(\s*[\"']kill|pkill|nvidia-smi\s+--gpu-reset")
     offenders = []
     for directory in ("src", "scripts", "tools"):
