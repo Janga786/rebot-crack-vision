@@ -89,7 +89,9 @@ The raw evidence comes from the operator's attended bring-up sessions on 2026-10
   `config/robot/b601_dm_limits.yaml` and `config/motion/execution.yaml` are unchanged.
 - **Motor 7 firmware.** The 06 versus 09 difference was not evaluated.
 
-## Raw files (copied unmodified from `~/rebot_setup/`)
+## Raw files (copied from `~/rebot_setup/`, unmodified except that redaction)
+
+SETUP_LOG.md was redacted in 2026-11 (USB serial number, sudo note). Original sha256 `c697d9e2c751d07f7d4d97ffe337cd70838688277b101ec879a73170c6ae2bae`, filed copy `9b7d049c27bc9d8501287347b5a1dc61caeeca8e7f5cf86ec0b579b70a04bcb7`.
 
 | File | sha256 | What it is |
 |---|---|---|

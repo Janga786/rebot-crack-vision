@@ -2,7 +2,8 @@
 
 This file excerpts operator-sourced evidence from the 2026-10-10 bring-up. The source is
 `~/rebot_setup/SETUP_LOG.md`, sha256 `c697d9e2c751d07f7d4d97ffe337cd70838688277b101ec879a73170c6ae2bae`.
-The full file is filed unmodified as `evidence/operator/MOT-09/SETUP_LOG.md`. The overnight Claude Code session
+SETUP_LOG.md was redacted in 2026-11 (USB serial number, sudo note). Original sha256 `c697d9e2c751d07f7d4d97ffe337cd70838688277b101ec879a73170c6ae2bae`, filed copy `9b7d049c27bc9d8501287347b5a1dc61caeeca8e7f5cf86ec0b579b70a04bcb7`.
+The full file is filed, unmodified except that redaction, as `evidence/operator/MOT-09/SETUP_LOG.md`. The overnight Claude Code session
 filed this excerpt on the operator's instruction and added no measurement of its own.
 
 The operator also states that the adapter is the "HDSC VID:PID 2e88:4603 from lsusb" (**operator statement**,
