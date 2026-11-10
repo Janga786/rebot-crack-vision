@@ -74,3 +74,6 @@ This project's own code and documentation are released under the MIT License (se
 vendor reBot B601-DM URDF copied into `presentation/sim/reBot_B601_DM_with_gripper.urdf` (from the
 `rebotarm_bringup` package of the arm's ROS 2 controller) or the vendor URDF under
 `evidence/operator/controller-tuning-2026-10/code/model/`; those keep their own licences.
+`packages/arm_guard/vendor_patches/rebot_ws-hardware_manager-require-arm_guard.patch` is a patch to the
+arm vendor's ROS 2 controller code (`rebot_ws`); applying it modifies that vendor code, which stays under its own
+licence.
