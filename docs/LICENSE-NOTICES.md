@@ -69,6 +69,8 @@ dependencies (`requirements/`) and are named here only for attribution completen
 
 ## This project's own licence
 
-**Not yet chosen — capstone coursework.** No `LICENSE` file has been added to this repository as of
-this writing; do not assume a default open-source licence applies. The notices above govern only
-the third-party components they name.
+This project's own code and documentation are released under the MIT License (see
+[`LICENSE`](../LICENSE)). The MIT License does not cover the third-party components above, nor the
+vendor reBot B601-DM URDF copied into `presentation/sim/reBot_B601_DM_with_gripper.urdf` (from the
+`rebotarm_bringup` package of the arm's ROS 2 controller) or the vendor URDF under
+`evidence/operator/controller-tuning-2026-10/code/model/`; those keep their own licences.
