@@ -22,7 +22,7 @@ setup(
         "B601-DM end-of-arm overlay (tool tip, wrist D405 + mount collision proxies) "
         "driven by config/robot/end_effector.yaml (ADR-014)."
     ),
-    license="Apache-2.0",
+    license="MIT",
     tests_require=["pytest"],
     entry_points={"console_scripts": []},
 )

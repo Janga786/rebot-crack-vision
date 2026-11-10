@@ -18,7 +18,7 @@ setup(
         "crackvision ROS 2 camera overlay: one-shot optical-TF and joint-state "
         "capture tools (CAM-05.2)."
     ),
-    license="Apache-2.0",
+    license="MIT",
     tests_require=["pytest"],
     entry_points={
         "console_scripts": [
