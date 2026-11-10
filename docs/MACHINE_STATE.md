@@ -1,6 +1,6 @@
 # MACHINE_STATE.md — Target machine inventory
 
-**Captured:** 2026-09-16 (read-only inspection, Opus planning session)
+**Captured:** 2026-09-16 (read-only inspection, planning session)
 **Host:** `booster`
 **Inspection method:** shell probes only. Nothing was installed, downloaded, or modified.
 
@@ -211,7 +211,7 @@ To reclaim it the user must run, interactively:
 sudo rm -rf ~/nvidia/nvidia_sdk
 ```
 
-This is **not** a task card and no agent should attempt it — see `AGENT_INSTRUCTIONS.md` rule 14.
+This is **not** a task card; it is left to the machine's owner.
 
 **Planning consequence:** 124 G free is comfortable. This project needs ≈10 G
 (conda env with torch ≈6–9 G, model ≈275 MB, imagery small). Still download the model with
@@ -227,8 +227,7 @@ weights are not stored twice — see TC-004.
 | `~/Projects` is a git repo | no |
 | `git` | 2.34.1 |
 | `git-lfs` | **NOT installed** |
-| `git config user.name` | `Gavinw575` |
-| `git config user.email` | `gavinw575@gmail.com` |
+| `git config user.name` / `user.email` | `<lab machine git identity>` |
 | `init.defaultBranch` | unset (git will default to `master` and print a hint) |
 
 Related existing workspace: `~/rebot_ws` — a git repo for the **same physical arm**

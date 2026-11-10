@@ -1,11 +1,9 @@
 # IMPLEMENTATION_PLAN.md — how this gets built
 
-**Planned:** 2026-09-16 (Opus architecture session) · **Implemented by:** Claude Sonnet agents,
-one task card per session.
+**Planned:** 2026-09-16 · **Implemented:** one task card at a time.
 
 This document is the narrative bridge between `ARCHITECTURE.md` (what) and `task_cards/` (how).
-If you are an implementation agent, read `task_cards/AGENT_INSTRUCTIONS.md` first — this file is
-orientation, not instruction.
+This file is orientation; the task cards are the instructions.
 
 ---
 

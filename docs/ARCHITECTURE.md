@@ -3,10 +3,10 @@
 **Project:** Crack segmentation perception front-end for a reBot-DevArm B601-DM bridge/concrete
 inspection capstone.
 **Status:** ARCHITECTURE FROZEN — no implementation performed. Planned 2026-09-16.
-**Audience:** the Claude Sonnet implementation agents executing `task_cards/`.
+**Audience:** anyone implementing a `task_cards/` card.
 
 Read this file completely before executing any task card. If you believe the architecture is wrong,
-say so in your completion report — **do not silently redesign**. See `task_cards/AGENT_INSTRUCTIONS.md`.
+say so in your completion report — **do not silently redesign**.
 
 ---
 
@@ -240,7 +240,6 @@ Read verbatim from `nnunetv2/imageio/natural_image_reader_writer.py`:
 │   └── adr/                             architecture decision records 001–010
 │
 ├── task_cards/                   [git]
-│   ├── AGENT_INSTRUCTIONS.md            ⭐ read first, every time
 │   ├── TASK_INDEX.md                    dependency table + status board
 │   └── TC-0NN-*.md
 │
@@ -516,10 +515,9 @@ marked `@pytest.mark.gpu` / `@pytest.mark.camera` and skipped by default.
   itself is not a repo and must not become one.
 - Default branch `main` (`git init -b main` or `git symbolic-ref`). `init.defaultBranch` is unset
   globally — do **not** change the global config; set it per-repo.
-- Commit identity is the machine's existing `Gavinw575 <gavinw575@gmail.com>`. **Do not add Claude
-  co-author trailers** (standing user preference).
+- Commit identity: the lab machine's existing git identity (`<lab machine git identity>`).
 - One commit per task card, message given on each card. If `git status` is dirty with files the card
-  does not own, the agent **reports** it and does not commit.
+  does not own, it is **reported** and not committed.
 - No force-push, no history rewrite, no remote configured this phase.
 
 ## 15. Known risks
