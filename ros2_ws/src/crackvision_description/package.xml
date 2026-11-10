@@ -5,7 +5,7 @@
   <version>0.1.0</version>
   <description>B601-DM end-of-arm overlay (tool tip, wrist D405 + mount collision proxies) on the vendor model, driven by config/robot/end_effector.yaml (ADR-014).</description>
   <maintainer email="jangarabliss@gmail.com">crackvision maintainers</maintainer>
-  <license>Apache-2.0</license>
+  <license>MIT</license>
 
   <buildtool_depend>ament_python</buildtool_depend>
 

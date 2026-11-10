@@ -22,7 +22,7 @@ setup(
         "crackvision ROS 2 overlay: headless MoveIt mock planning against the "
         "B601-DM model (MOT-02)."
     ),
-    license="Apache-2.0",
+    license="MIT",
     tests_require=["pytest"],
     entry_points={
         "console_scripts": [

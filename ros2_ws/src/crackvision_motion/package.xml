@@ -5,7 +5,7 @@
   <version>0.1.0</version>
   <description>crackvision ROS 2 overlay: headless MoveIt mock planning against the B601-DM model (MOT-02).</description>
   <maintainer email="jangarabliss@gmail.com">crackvision maintainers</maintainer>
-  <license>Apache-2.0</license>
+  <license>MIT</license>
 
   <buildtool_depend>ament_python</buildtool_depend>
 
