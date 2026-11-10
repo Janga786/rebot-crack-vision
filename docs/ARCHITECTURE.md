@@ -515,7 +515,7 @@ marked `@pytest.mark.gpu` / `@pytest.mark.camera` and skipped by default.
   itself is not a repo and must not become one.
 - Default branch `main` (`git init -b main` or `git symbolic-ref`). `init.defaultBranch` is unset
   globally — do **not** change the global config; set it per-repo.
-- Commit identity: the lab machine's existing git identity (`<lab machine git identity>`).
+- Commit identity: the lab machine's existing git identity.
 - One commit per task card, message given on each card. If `git status` is dirty with files the card
   does not own, it is **reported** and not committed.
 - No force-push, no history rewrite, no remote configured this phase.
