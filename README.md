@@ -1,59 +1,76 @@
-# rebot_crack_vision
+# reBot B601-DM bridge crack-inspection arm
 
-**Zero-shot crack segmentation for a reBot B601-DM concrete-inspection arm.**
+My Fort Lewis College senior-design project (Sep 2026 to present, advisor Dr. Yiyan Li): a reBot B601-DM
+arm (six joints plus a gripper) with a wrist-mounted Intel RealSense D405 camera, being adapted to find and
+trace cracks in concrete. We are a two-person team. My teammate is building a second arm from scratch; I am
+the only person working on this reBot arm.
 
-**Live demos** (the physical arm, recorded on hardware):
-- [Commanded trajectory](https://janga786.github.io/media/rebot-trajectory-live.mp4) — the real arm under commanded motion.
-- [Kinematics on hardware](https://janga786.github.io/media/rebot-kinematics-live.mp4) — DLS IK and the minimum-jerk planner driving the 200 Hz CAN loop on the real arm.
-- Project page: [janga786.github.io/projects/rebot-crack-inspection](https://janga786.github.io/projects/rebot-crack-inspection/)
+## What I built on the arm
 
-> **Current status (Phase 2, updated 2026-10-22).**
-> - Phase 1 below is complete.
-> - Phase 2 ([ADR-011](docs/adr/011-phase2-full-pipeline-scope.md)) extends it to ordered crack paths,
->   depth → 3D, eye-in-hand hand-eye calibration, MoveIt planning and gated commissioning. The work is
->   tracked as cards under [`plan/`](plan) and weekly write-ups in [`docs/progress/`](docs/progress).
-> - The end-of-arm model is in [ADR-014](docs/adr/014-end-effector-frames-and-task-phases.md): a wrist D405
->   on Seeed's stock mount, a `tool_tip` distinct from the grasp-centre `gripper_tcp`, and separate
->   view and trace phases.
-> - **Physical arm (2026-10-14 / 10-17): first powered runs.** All 7 motors over CAN at 200 Hz in MIT mode,
->   gravity and friction feed-forward identified on hardware (elbow gravity load measured at 6.6 N·m vs
->   2.7 N·m in the URDF), and loaded-joint hold error cut from 0.04–0.05 rad to ≤ 0.005 rad in
->   post-tuning holds, across a 41-run logged campaign (28 completed; aborted, refused, and read-only
->   checks logged too). A 52 s seven-joint demo tracked every joint within 0.025 rad. Write-up and raw logs:
->   [`docs/motion/CONTROLLER_TUNING.md`](docs/motion/CONTROLLER_TUNING.md). These were operator-attended
->   runs, not commissioning. Video of the physical arm under commanded motion:
->   [`docs/media/trajectory_live.mp4`](docs/media/trajectory_live.mp4) and
->   [`docs/media/kinematics_live.mp4`](docs/media/kinematics_live.mp4).
-> - Still nominal until measured: camera extrinsic, tool tip, workcell, and joint limits (vendor URDF values).
->   Pending: D405 hand-eye calibration and gated commissioning (MOT-05 / MOT-09).
-> - **First guarded trajectory on the physical arm (2026-10-22):** shown in simulation first, then run on the
->   operator's go. It completed with tracking within 0.023 rad and no guard fault. A visible 3.3 Hz shoulder/elbow
->   wobble was traced to low damping, and kd 4 cut it about in half
->   ([evidence](evidence/operator/first-guarded-run-2026-10-22/README.md),
->   [session summary](docs/SESSION_2026-10-21_22.md)).
-> - **Arm safety (2026-10-21):** every motor command now passes [`arm_guard`](docs/motion/ARM_GUARD.md), a
->   last-line filter in front of `motorbridge`, with a startup position check. A trajectory runner on the operator's
->   controller was rehearsed ahead of the first guarded run, which completed on 2026-10-22 (bullet above):
->   [`FIRST_GUARDED_RUN.md`](docs/motion/FIRST_GUARDED_RUN.md).
->   Remaining steps (CAN watchdog, measured joint limits) are in [`TODO.md`](TODO.md).
-> - **Camera (2026-10-22): the real D405 is connected and running the model.** `scripts/camera.py check` (first
->   connection + evidence), `record --video` (30 fps, lossless + MP4), `snap` (capture -> full crack pipeline ->
->   overlays, mm scale from depth) and `live` (30 fps video in a browser, crack mask from the model 17 times a second). Setup:
->   [`docs/camera/D405_SETUP.md`](docs/camera/D405_SETUP.md); first-connection report:
->   [`docs/camera/D405_FIRST_CONNECTION.md`](docs/camera/D405_FIRST_CONNECTION.md).
+All results below are from operator-attended runs on the physical arm. Full write-up, raw logs and figures:
+[`docs/motion/CONTROLLER_TUNING.md`](docs/motion/CONTROLLER_TUNING.md).
 
-This repository builds the Phase-1 perception pipeline that turns an RGB image of a concrete/masonry
-surface into a binary crack mask and a one-pixel crack skeleton, using publicly released weights
-with no training of our own, and answers one honest question: *can a zero-shot, publicly released
-crack-segmentation model do useful work on this hardware and imagery, or does the project need to
-fund its own labelling and training effort?* It deliberately stops short of depth projection,
-hand-eye calibration, ROS/robot integration and any model fine-tuning — each deferral is recorded as
-an ADR in [`docs/adr/`](docs/adr).
+- **Motor bring-up and control loop.** All seven Damiao motors run over the CAN bus in MIT mode. A 200 Hz host
+  loop streams each motor its setpoint, stiffness and damping gains, and feed-forward torque
+  ([`demo_move.py`](evidence/operator/controller-tuning-2026-10/code/demo_move.py),
+  [`first_move_j1.py`](evidence/operator/controller-tuning-2026-10/code/first_move_j1.py)).
+- **Kinematics and planning.** The arm's full 6-row geometric Jacobian, mapping joint velocities to the tool's
+  linear and angular velocity (`geometric_jacobian` in
+  [`presentation/demo/arm_kinematics.py`](presentation/demo/arm_kinematics.py), which also has a
+  damped-least-squares IK); the damped-least-squares IK and Cartesian-path follower used for trajectories on the
+  arm ([`src/crackvision/arm_ik.py`](src/crackvision/arm_ik.py)); and minimum-jerk joint trajectories
+  (`min_jerk` in [`demo_move.py`](evidence/operator/controller-tuning-2026-10/code/demo_move.py), derivation in
+  [write-up §3](docs/motion/CONTROLLER_TUNING.md#3-reference-trajectories)).
+- **Simulation before hardware.** Motion scripts and their abort checks are tested first against a simulated
+  motor bus ([`fakebus.py`](evidence/operator/controller-tuning-2026-10/code/fakebus.py), write-up §10), and
+  trajectories are rehearsed in simulation (`run-trajectory.sh --rehearse`) before they run on the arm
+  ([`docs/motion/FIRST_GUARDED_RUN.md`](docs/motion/FIRST_GUARDED_RUN.md)). Every motor command also passes
+  [`arm_guard`](docs/motion/ARM_GUARD.md), a last-line safety filter.
+- **Measured the real gravity load.** The elbow kept falling short of its target. A slow torque test on the
+  elbow (J3) found 6.6 N·m of gravity load, against 2.7 N·m computed from the vendor URDF
+  ([write-up §6](docs/motion/CONTROLLER_TUNING.md#6-identification-of-the-real-loads)).
+- **Gravity and friction feed-forward plus retuned gains** cut the holding error on loaded joints from
+  0.04–0.05 rad to 0.005 rad or less, measured in post-tuning single-joint holds after a 0.10 rad move
+  (41 logged runs: 28 completed; aborted, refused and read-only runs are logged too). With several joints moving
+  at once the error is larger: in the first multi-joint move J3's hold error grew to 0.0096 rad, because its
+  gravity load changes as J2 moves, and a 52 s seven-joint demo tracked every joint within 0.025 rad
+  ([write-up §9](docs/motion/CONTROLLER_TUNING.md#9-multi-joint-moves-and-the-demos)).
+
+Videos of the physical arm:
+[commanded trajectory](docs/media/trajectory_live.mp4) and
+[kinematics on hardware](docs/media/kinematics_live.mp4)
+(also on the [project page](https://janga786.github.io/projects/rebot-crack-inspection/)).
+
+<p align="center">
+  <img src="evidence/operator/controller-tuning-2026-10/figures/f02_j3_compensation_progression.png" width="70%"
+       alt="Elbow (J3) lift on the real arm: tracking error with no feed-forward, URDF gravity, scaled gravity, and friction feed-forward">
+</p>
+
+**Scope.** These were operator-attended runs, not commissioning. Joint limits are still the vendor URDF values,
+the only e-stop during the tuning runs was the 24 V supply switch, and the camera-to-gripper transform is a
+nominal CAD value until hand-eye calibration is done.
+
+## Crack-segmentation pipeline
+
+The perception pipeline turns an RGB image of a concrete or masonry surface into a binary crack mask and a
+one-pixel crack skeleton. It uses the publicly released OpenCrack nnU-Net weights as released, with no training
+of my own. Phase 1 asked one question: can a zero-shot, publicly released crack-segmentation model do useful
+work on this hardware and imagery, or does the project need its own labelling and training? Phase 1 left out
+depth projection, hand-eye calibration, robot integration and fine-tuning, each recorded as an ADR in
+[`docs/adr/`](docs/adr). Phase 2 has since started adding depth, frames and motion planning
+([ADR-011](docs/adr/011-phase2-full-pipeline-scope.md)); any fine-tuning waits on an evaluation on real imagery.
 
 <p align="center">
   <img src="presentation/figures/fig01_pipeline_result.png" width="100%"
        alt="Input image, binary mask, overlay and centerline from a real GPU inference run">
 </p>
+
+**Status.** The model runs on the real D405 (live view about 17 mask updates a second). On 2026-10-30 the arm
+completed its first crack search on a printed crack: every stop that saw the crack accepted it, but the scan
+step aborted when the camera dropped off USB, so no crack was traced
+([evidence](evidence/operator/first-crack-run-2026-10-30/README.md)). No accuracy number on real D405 imagery is
+claimed yet ([`docs/D405_TEST_PLAN.md`](docs/D405_TEST_PLAN.md)), and the model over-fires on masonry joints
+and similar crack-like texture.
 
 ## Quickstart
 
@@ -138,7 +155,7 @@ Every CLI accepts the common flags documented in `docs/INTERFACES.md` §0.3
 | `./env.sh python scripts/camera.py check\|snap\|live\|record` | The physical D405: first-connection evidence, capture + full crack pipeline, live model view in a browser, lossless recording ([docs/camera/D405_SETUP.md](docs/camera/D405_SETUP.md)). |
 | `./env.sh python scripts/capture_d405.py` | Captures depth-aligned RGB + raw depth from a D405 (or `--synthetic` with no hardware). |
 | `./env.sh python tools/dataset_manifest.py` | `init`/`scan`/`validate`/`summary` for the D405 evaluation manifest (`docs/D405_TEST_PLAN.md`). |
-| `./env.sh pytest tests/ -v` | The unit/integration/contract test suite (225 passed, 3 skipped at the 2026-09-30 snapshot; the suite has since grown to 588 test functions). |
+| `./env.sh pytest tests/ -v` | The unit/integration/contract test suite; no GPU or camera needed (725 passed, 26 skipped on a CPU-only machine, 2026-11-09, about two minutes). |
 
 ## Project layout
 
@@ -153,7 +170,7 @@ docs/                   ARCHITECTURE · INTERFACES · RISKS · VALIDATION_PLAN �
                         TECHNICAL_APPROACH · MACHINE_STATE · RUNBOOK · ENVIRONMENT_SNAPSHOT ·
                         LICENSE-NOTICES · COMPLETION_LOG · REVIEW_LOG · adr/
 task_cards/             the 16 Phase-1 specs this pipeline was built from, plus the (frozen) status
-                        board — see `docs/ORCHESTRATION.md` for how planning moved on from here
+                        board; later work is specified as cards under `plan/`
 presentation/           slide deck, figures, and the vision → path → arm demo
 config/project.yaml     every tunable; no magic numbers in source
 config/model_manifest.json   the pinned model download: repo id, revision, per-file sha256
@@ -161,6 +178,45 @@ packages/arm_guard/      last-line motor-command safety filter (docs/motion/ARM_
 env.sh                  the launcher — scrubs ROS off the interpreter path, then runs your command
 run_test.sh             the one-command orchestrator (see Commands, above)
 ```
+
+## Status log
+
+The dated project log, newest phase first. Weekly write-ups are in [`docs/progress/`](docs/progress).
+
+> **Current status (Phase 2, updated 2026-10-22).**
+> - Phase 1 below is complete.
+> - Phase 2 ([ADR-011](docs/adr/011-phase2-full-pipeline-scope.md)) extends it to ordered crack paths,
+>   depth → 3D, eye-in-hand hand-eye calibration, MoveIt planning and gated commissioning. The work is
+>   tracked as cards under [`plan/`](plan) and weekly write-ups in [`docs/progress/`](docs/progress).
+> - The end-of-arm model is in [ADR-014](docs/adr/014-end-effector-frames-and-task-phases.md): a wrist D405
+>   on Seeed's stock mount, a `tool_tip` distinct from the grasp-centre `gripper_tcp`, and separate
+>   view and trace phases.
+> - **Physical arm (2026-10-14 / 10-17): first powered runs.** All 7 motors over CAN at 200 Hz in MIT mode,
+>   gravity and friction feed-forward identified on hardware (elbow gravity load measured at 6.6 N·m vs
+>   2.7 N·m in the URDF), and loaded-joint hold error cut from 0.04–0.05 rad to ≤ 0.005 rad in
+>   post-tuning holds, across a 41-run logged campaign (28 completed; aborted, refused, and read-only
+>   checks logged too). A 52 s seven-joint demo tracked every joint within 0.025 rad. Write-up and raw logs:
+>   [`docs/motion/CONTROLLER_TUNING.md`](docs/motion/CONTROLLER_TUNING.md). These were operator-attended
+>   runs, not commissioning. Video of the physical arm under commanded motion:
+>   [`docs/media/trajectory_live.mp4`](docs/media/trajectory_live.mp4) and
+>   [`docs/media/kinematics_live.mp4`](docs/media/kinematics_live.mp4).
+> - Still nominal until measured: camera extrinsic, tool tip, workcell, and joint limits (vendor URDF values).
+>   Pending: D405 hand-eye calibration and gated commissioning (MOT-05 / MOT-09).
+> - **First guarded trajectory on the physical arm (2026-10-22):** shown in simulation first, then run on the
+>   operator's go. It completed with tracking within 0.023 rad and no guard fault. A visible 3.3 Hz shoulder/elbow
+>   wobble was traced to low damping, and kd 4 cut it about in half
+>   ([evidence](evidence/operator/first-guarded-run-2026-10-22/README.md),
+>   [session summary](docs/SESSION_2026-10-21_22.md)).
+> - **Arm safety (2026-10-21):** every motor command now passes [`arm_guard`](docs/motion/ARM_GUARD.md), a
+>   last-line filter in front of `motorbridge`, with a startup position check. A trajectory runner on the operator's
+>   controller was rehearsed ahead of the first guarded run, which completed on 2026-10-22 (bullet above):
+>   [`FIRST_GUARDED_RUN.md`](docs/motion/FIRST_GUARDED_RUN.md).
+>   Remaining steps (CAN watchdog, measured joint limits) are in [`TODO.md`](TODO.md).
+> - **Camera (2026-10-22): the real D405 is connected and running the model.** `scripts/camera.py check` (first
+>   connection + evidence), `record --video` (30 fps, lossless + MP4), `snap` (capture -> full crack pipeline ->
+>   overlays, mm scale from depth) and `live` (30 fps video in a browser, crack mask from the model 17 times a second). Setup:
+>   [`docs/camera/D405_SETUP.md`](docs/camera/D405_SETUP.md); first-connection report:
+>   [`docs/camera/D405_FIRST_CONNECTION.md`](docs/camera/D405_FIRST_CONNECTION.md).
 
 ## Results interpretation
 
@@ -175,16 +231,28 @@ run_test.sh             the one-command orchestrator (see Commands, above)
 
 ## Attribution
 
-Fort Lewis College senior-design project (Robotic Arm Bridge Repair Team), advised by Dr. Yiyan Li. Two-person team; my teammate is building a second arm from scratch, so all work on this arm is mine.
+Fort Lewis College senior-design project (Robotic Arm Bridge Repair Team), advised by Dr. Yiyan Li. We are a
+two-person team: my teammate is building a second arm from scratch, and I am the only person working on this
+reBot arm.
 
-How the work was split: I designed the system, including the control architecture, how the ROS 2 nodes connect, and the safety gating, and I wrote pseudocode, line by line, for how much of the software should work. AI coding agents translated that design into Python and C++: a planning agent broke the work into the task cards in `plan/`, implementation agents wrote the code, and an independent review agent checked each change before it was accepted (`docs/ORCHESTRATION.md`). All hardware work is mine: motor bring-up, the torque test that found the URDF's gravity error, the gain and feed-forward decisions, and every physical run, with raw logs committed as evidence.
+Third-party work this project builds on:
+
 
 - **OpenCrack nnU-Net** — `fadeevla/opencrack-nnunet`, CC-BY-4.0.
 - **nnU-Net v2** — Isensee, F. et al., *nnU-Net: a self-configuring method for deep learning-based
   biomedical image segmentation*, Nature Methods 18, 203–211 (2021). Apache-2.0.
 
-Full third-party notices and citations: [`docs/LICENSE-NOTICES.md`](docs/LICENSE-NOTICES.md). This
-project's own licence has not yet been chosen (capstone coursework) — see that file for details.
+- **reBot B601-DM vendor URDF** — the copy in [`presentation/sim/`](presentation/sim/reBot_B601_DM_with_gripper.urdf)
+  comes from the `rebotarm_bringup` package of the arm's ROS 2 controller; the motors are driven through the
+  third-party `motorbridge` library (not included here).
+
+Full third-party notices and citations: [`docs/LICENSE-NOTICES.md`](docs/LICENSE-NOTICES.md).
+
+## License
+
+This project's own code and documentation are released under the MIT License ([`LICENSE`](LICENSE)).
+Third-party models, libraries and the vendor URDF keep their own licences, listed in
+[`docs/LICENSE-NOTICES.md`](docs/LICENSE-NOTICES.md).
 
 Crack imagery in `presentation/assets/` is synthetic, generated by this project's own smoke test.
 
@@ -201,7 +269,6 @@ Crack imagery in `presentation/assets/` is synthetic, generated by this project'
 - [`docs/RISKS.md`](docs/RISKS.md) — risk register (R-01…, including the `{0,1}` prediction trap).
 - [`docs/VALIDATION_PLAN.md`](docs/VALIDATION_PLAN.md) — the three testing levels this project uses.
 - [`docs/D405_TEST_PLAN.md`](docs/D405_TEST_PLAN.md) — the planned zero-shot evaluation design.
-- [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md) — how this got built, card by card.
 - [`docs/MACHINE_STATE.md`](docs/MACHINE_STATE.md) — target machine inventory (OS/CPU/GPU) as
   directly probed.
 - [`docs/adr/`](docs/adr) — every deferral/design decision, numbered (`000`…`012`).
@@ -213,17 +280,17 @@ Crack imagery in `presentation/assets/` is synthetic, generated by this project'
   from-lock-file reproducibility audit (`scripts/audit_fresh_clone.sh`), with RUNBOOK findings.
 - [`docs/LICENSE-NOTICES.md`](docs/LICENSE-NOTICES.md) — third-party model/library attribution.
 
-**History and process**
+**History**
 - [`docs/COMPLETION_LOG.md`](docs/COMPLETION_LOG.md) — append-only build history (evidence per card).
-- [`docs/REVIEW_LOG.md`](docs/REVIEW_LOG.md) — append-only independent-review audit history.
-- [`docs/ORCHESTRATION.md`](docs/ORCHESTRATION.md) — how this project's planning/agent process works,
-  including how it moved on from the original `task_cards/` board.
+- [`docs/REVIEW_LOG.md`](docs/REVIEW_LOG.md) — append-only review history (acceptance checks re-run per card).
 - [`task_cards/TASK_INDEX.md`](task_cards/TASK_INDEX.md) — the original Phase-1 dependency map and
-  status board (frozen as history; see `docs/ORCHESTRATION.md` for the current one).
-- [`task_cards/AGENT_INSTRUCTIONS.md`](task_cards/AGENT_INSTRUCTIONS.md) and `task_cards/TC-001.md`
-  through `TC-016.md` — the individual Phase-1 task specs this pipeline was built from.
+  status board (frozen as history; later cards are under [`plan/cards/`](plan/cards)).
+- `task_cards/TC-001-*.md` through `TC-016-*.md` — the individual Phase-1 task specs this pipeline was
+  built from.
 
-**Later-phase tracks** (beyond this document's scope; linked for completeness)
+**Arm, camera and later-phase docs**
+- [`docs/motion/CONTROLLER_TUNING.md`](docs/motion/CONTROLLER_TUNING.md) — controller tuning of the physical
+  arm: control law, gravity identification, gain sweeps, demos, raw logs.
 - [`docs/host/HOST_MANIFEST.md`](docs/host/HOST_MANIFEST.md) — host version pinning and drift checks.
 - [`docs/motion/ROBOT_MODEL.md`](docs/motion/ROBOT_MODEL.md) — reBot B601-DM model reconciliation.
 - [`docs/motion/ROS_WORKSPACE.md`](docs/motion/ROS_WORKSPACE.md) — ROS 2 overlay workspace + headless
@@ -234,7 +301,6 @@ Crack imagery in `presentation/assets/` is synthetic, generated by this project'
   powered arm with arm_guard in front of it
 - [`docs/motion/ARM_GUARD.md`](docs/motion/ARM_GUARD.md) — the last-line motor-command filter; open items in
   [`TODO.md`](TODO.md).
-- [`docs/llm/SELECTION.md`](docs/llm/SELECTION.md) — local coding model shortlist.
 - [`docs/progress/README.md`](docs/progress/README.md) — the project's running progress log.
 
 **Presentation**
